@@ -1,0 +1,9 @@
+FastAPI
+NiceGUI
+uvicorn
+pydantic
+jsonschema
+pytest
+pydantic-settings
+Pillow
+babel
