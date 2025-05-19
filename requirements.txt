@@ -7,3 +7,5 @@ pytest
 pydantic-settings
 Pillow
 babel
+icalendar
+recurring-ical-events
