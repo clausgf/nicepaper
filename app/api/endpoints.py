@@ -34,7 +34,7 @@ async def get_screen_image(request: Request, id: str, response: Response, if_non
 
     # determine color model
     color_model_dict = {c.id: c for c in app_config.epaper_color_models}
-    color_model = None
+    #color_model = None
     if color_model is not None:
         if color_model in color_model_dict.keys():
             color_model = color_model_dict[color_model]

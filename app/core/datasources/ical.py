@@ -76,6 +76,7 @@ async def get_from_ical(id: str, url: str, extract_organizer_from_summary: bool 
                 "summary": summary.strip()
             })
 
+    data['events'].sort(key=lambda e: datetime.datetime.fromisoformat(e.get("dtstart"))) 
     with open(cache_filename, "w") as cache_file:
         json.dump(data, cache_file)
 
