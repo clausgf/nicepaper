@@ -24,10 +24,10 @@ async def health_check():
     summary="Get the current image for a screen",
     response_description="PNG image"
 )
-async def get_screen_image(request: Request, id: str, response: Response, if_none_match: Optional[str] = Header(None), colors: Optional[str] = None):
+async def get_screen_image(request: Request, id: str, response: Response, if_none_match: Optional[str] = Header(None), color_model: Optional[str] = None):
     # determine rendering
     id = clean_path_parameter(id)
-    logger.info(f"GET /api/displays/{id}/image with If-None-Match={if_none_match} and colors={colors}")
+    logger.info(f"GET /api/displays/{id}/image with If-None-Match={if_none_match} and colors={color_model}")
     screen = await get_screen_by_id(id)
     if screen is None:
         raise HTTPException(status_code=404, detail="Screen not found or not parsable")
@@ -35,11 +35,11 @@ async def get_screen_image(request: Request, id: str, response: Response, if_non
     # determine color model
     color_model_dict = {c.id: c for c in app_config.epaper_color_models}
     color_model = None
-    if colors is not None:
-        if colors in color_model_dict.keys():
-            color_model = color_model_dict[colors]
+    if color_model is not None:
+        if color_model in color_model_dict.keys():
+            color_model = color_model_dict[color_model]
         else:
-            logger.info(f"Unknown color model {colors} in request, using default. Available models: {color_model_dict.keys()}")
+            logger.info(f"Unknown color model {color_model} in request, using default. Available models: {color_model_dict.keys()}")
 
     # update the image if needed
     await screen.update_if_needed(color_model=color_model)

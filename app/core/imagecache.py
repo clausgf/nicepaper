@@ -47,7 +47,7 @@ class ImageCache:
         if color_model:
             palette_image = await self._generate_palette_image(rgb_image, color_model)
             palette_filename = os.path.join(self.image_dir, f"{color_model.id}.png")
-            palette_image.save(palette_filename, format="PNG", compress_level=9)
+            palette_image.save(palette_filename, format="PNG", bits=8, compress_level=9)
 
 
     async def get_image_path(self, color_model: Optional[ColorModel] = None) -> str:
