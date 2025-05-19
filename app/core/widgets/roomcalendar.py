@@ -21,7 +21,7 @@ class RoomCalendarWidget(Widget):
         self.id = self.config.room_number + "-" + self.config.room_name + "-" + hashlib.sha256(long_id.encode()).hexdigest()[:8]
         if not self.config.size:
             self.config.size = (600,400)
-            logger.size(f"Widget {self.id} has no size, assuming {self.config.size}")
+            logger.info(f"Widget {self.id} has no size, assuming {self.config.size}")
         self.date_format_long = self.config.date_format_long or app_config.roomcalendar_date_format_long
         self.date_format = self.config.date_format or app_config.roomcalendar_date_format_short
         self.time_format = self.config.time_format or app_config.roomcalendar_time_format
