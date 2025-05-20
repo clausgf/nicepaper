@@ -95,8 +95,13 @@ class DrawingContext:
         self.draw.line( xys, *args, **params)
 
 
-    def textsize(self, text: str, font):
-        _, _, width, height = self.draw.textbbox((0,0), text, font)
+    def textsize(self, text: str, font ,mode: str | None = None):
+        if mode:      
+            size_img = Image.new(mode, self.size)
+            size_draw = ImageDraw.Draw(size_img)
+            _, _, width, height = size_draw.textbbox((0,0), text, font)
+        else:
+            _, _, width, height = self.draw.textbbox((0,0), text, font)
         return width, height
 
 
@@ -159,8 +164,7 @@ class DrawingContext:
             size = (0, 0)
 
         # align/position the text inside the box
-        width, height = self.textsize(text, font)
-
+        width, height = self.textsize(text, font,"1")
         if alignment[0] == 'l':
             x = self.origin[0] + position[0]
         elif alignment[0] == 'c':
