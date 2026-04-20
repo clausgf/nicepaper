@@ -53,10 +53,15 @@ async def get_from_ical(id: str, url: str, extract_organizer_from_summary: bool 
         #     if component.name == "VEVENT":
         events = recurring_ical_events.of(cal).between(start_date, end_date)
         for event in events:
+            logger.error(event)
             dtstart = event.get('DTSTART').dt
             dtend = event.get('DTEND').dt
             organizer = event.get('ORGANIZER')
             summary = event.get('SUMMARY')
+            if isinstance(dtstart,datetime.date):
+                dtstart = datetime.datetime.combine(dtstart,datetime.time(0,0,0,tzinfo=ZoneInfo(app_config.timezone)))
+            if isinstance(dtend,datetime.date):
+                dtend = datetime.datetime.combine(dtend,datetime.time(0,0,0,tzinfo=ZoneInfo(app_config.timezone)))
             if dtstart is None or dtend is None or summary is None:
                 continue
             if dtend < start_date:

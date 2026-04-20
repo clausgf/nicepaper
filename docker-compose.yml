@@ -6,6 +6,7 @@ services:
   epaper-nice:
     networks:
       - caddy_network
+    restart: unless-stopped
     volumes:
       - ./app:/home/iot/app # mounting local app directory
       - ./data:/home/iot/data
