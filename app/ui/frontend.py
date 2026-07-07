@@ -35,12 +35,11 @@ item_types = {
     ]},
 }
 
-def get_action_link(item_type: str, action: str, filename: str = '') -> str:
-    action = (action for action in item_types[item_type]['actions'] if action['id'] == 'edit').__next__()
+def get_action_link(item_type: str, action_id: str, filename: str = '') -> str:
+    action = next((a for a in item_types[item_type]['actions'] if a['id'] == action_id), None)
     if action is None:
         return '/'
-    link = action['link'].format(filename)
-    return link
+    return action['link'].format(filename)
 
 
 def get_sourcecode(classes_list):
@@ -106,7 +105,7 @@ def show_files(item_type: str, dir: str):
             ui.button(icon='add', on_click=lambda: add_file()).props('size=sm round outline')
 
         # list of files
-        file_list = os.listdir(dir)
+        file_list = sorted(os.listdir(dir))
         with ui.list().style('width: 100%').props('bordered separator'):
             #ui.item_label('Files').props('header').classes('text-bold')
             #ui.separator()
@@ -145,22 +144,23 @@ def show_files(item_type: str, dir: str):
 
     async def add_file():
         filename = await add_file_dialog
+        if filename and not filename.endswith('.json'):
+            filename += '.json'
         if not filename or not check_filename(filename):
             ui.notify('Canceled adding new file.', type='negative')
             return
-        if not filename.endswith('.json'):
-            filename += '.json'
         if os.path.exists(os.path.join(dir, filename)):
             ui.notify(f'File "{filename}" already exists.', type='negative')
             return
 
         # determine default data
-        if item_type == 'screens':
-            data = ScreenModel()
-        elif item_type == 'schedules':
-            data = UpdateScheduleModel()
+        if item_type == 'screen':
+            data = ScreenModel(size=(800, 480))
+        elif item_type == 'schedule':
+            data = UpdateScheduleModel(name=os.path.splitext(filename)[0], schedules=[])
         else:
-            data = {}
+            ui.notify(f'Unknown item type "{item_type}".', type='negative')
+            return
 
         # write default data to file
         with open(os.path.join(dir, filename), 'w') as f:
@@ -249,8 +249,9 @@ def page_screens():
 
 @ui.page('/screens/{filename}')
 async def page_screen_edit(filename: str):
-    with frame_with_json_editor(f'screen', app_config.screen_dir, filename, ScreenModel):
+    with frame_with_json_editor('screen', app_config.screen_dir, filename, ScreenModel):
         ui.separator()
+        color_models = [cm.id for cm in app_config.epaper_color_models]
         with ui.tabs().classes('w-full') as tabs:
             model_tab = ui.tab('Model source')
             rgb_tab = ui.tab('RGB')
@@ -259,7 +260,6 @@ async def page_screen_edit(filename: str):
             with ui.tab_panel(model_tab):
                 classes = (ScreenModel, WidgetModel, TextWidgetModel, DateWidgetModel, RoomCalendarWidgetModel)
                 ui.code(get_sourcecode(classes), language='python').classes('w-full')
-                color_models = [cm.id for cm in app_config.epaper_color_models]
             with ui.tab_panel(rgb_tab):
                 screen_image(f'/../api/screen/{os.path.splitext(filename)[0]}/image.png')
             for i, tab in enumerate(palette_tabs):
@@ -275,7 +275,7 @@ def page_schedules():
 
 @ui.page('/schedules/{filename}')
 async def page_schedule_edit(filename: str):
-    with frame_with_json_editor(f'schedule', app_config.schedule_dir, filename, UpdateScheduleModel):
+    with frame_with_json_editor('schedule', app_config.schedule_dir, filename, UpdateScheduleModel):
         classes = (UpdateScheduleModel, WeeklyScheduleModel, TimeModel)
         ui.code(get_sourcecode(classes), language='python').classes('w-full')
 
