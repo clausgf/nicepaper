@@ -18,6 +18,10 @@ class Config(BaseSettings):
     Application settings.
     """
     # basic app settings
+    # secret for NiceGUI browser session storage; override via the
+    # STORAGE_SECRET environment variable in production
+    storage_secret: str = "geheim"
+
     font_path: DirectoryPath = "resources/fonts"
     icon_path: DirectoryPath = "resources/icons"
 
