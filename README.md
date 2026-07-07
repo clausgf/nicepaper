@@ -92,12 +92,35 @@ Settings live in `app/config.py` and can be overridden with environment
 variables (pydantic-settings), e.g.:
 
 - `STORAGE_SECRET`: secret for NiceGUI browser session storage.
-- `AUTH_USER_HEADERS`: JSON list of request headers carrying the
-  username forwarded by an authenticating reverse proxy (defaults match
-  oauth2-proxy: `X-Forwarded-Preferred-Username`, `X-Forwarded-User`,
-  `X-Forwarded-Email`). The UI shows the first non-empty value.
-- `AUTH_LOGOUT_URL`: logout link shown in the user menu, e.g.
-  `/oauth2/sign_out`; unset hides the entry.
+
+### Authentication
+
+`AUTH_PROVIDER` selects how the UI authenticates users:
+
+- `proxy` (default): an authenticating reverse proxy in front of the
+  app (e.g. Caddy with oauth2-proxy) handles the login; the app reads
+  the forwarded identity from request headers.
+  - `AUTH_USER_HEADERS`: JSON list of headers carrying the username
+    (defaults match oauth2-proxy: `X-Forwarded-Preferred-Username`,
+    `X-Forwarded-User`, `X-Forwarded-Email`); the first non-empty
+    value is shown in the UI.
+  - `AUTH_LOGOUT_URL`: logout link shown in the user menu, e.g.
+    `/oauth2/sign_out`; unset hides the entry.
+  - The headers are only trustworthy when the app is reachable
+    exclusively through the proxy.
+- `password`: built-in login page. Users live in an htpasswd file with
+  bcrypt hashes (`AUTH_HTPASSWD_FILE`, default `data/htpasswd`),
+  maintained with the standard Apache tool:
+
+  ```
+  htpasswd -c -B data/htpasswd alice   # create file and first user
+  htpasswd -B data/htpasswd bob        # add/update further users
+  ```
+
+  Only bcrypt entries (`-B`) are accepted; the file is re-read on each
+  login attempt, so changes apply without a restart. Set a strong
+  `STORAGE_SECRET`, since it signs the session cookie.
+- `none`: no authentication (local development).
 
 ## Tests
 

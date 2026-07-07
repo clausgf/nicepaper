@@ -22,16 +22,26 @@ class Config(BaseSettings):
     # STORAGE_SECRET environment variable in production
     storage_secret: str = "geheim"
 
-    # authentication via reverse proxy (e.g. oauth2-proxy): headers that
-    # carry the authenticated username, first non-empty one wins
+    # authentication provider:
+    #   "proxy"    - identity forwarded by an authenticating reverse proxy
+    #   "password" - built-in login page against an htpasswd file
+    #   "none"     - no authentication (local development)
+    auth_provider: Literal["none", "proxy", "password"] = "proxy"
+
+    # proxy provider: headers that carry the authenticated username,
+    # first non-empty one wins (defaults match oauth2-proxy)
     auth_user_headers: List[str] = [
         "X-Forwarded-Preferred-Username",
         "X-Forwarded-User",
         "X-Forwarded-Email",
     ]
-    # URL that ends the proxy session, e.g. "/oauth2/sign_out";
-    # None hides the logout entry
+    # proxy provider: URL that ends the proxy session,
+    # e.g. "/oauth2/sign_out"; None hides the logout entry
     auth_logout_url: Optional[str] = None
+
+    # password provider: htpasswd file with bcrypt entries,
+    # maintained with 'htpasswd -B'
+    auth_htpasswd_file: str = "data/htpasswd"
 
     font_path: DirectoryPath = "resources/fonts"
     icon_path: DirectoryPath = "resources/icons"

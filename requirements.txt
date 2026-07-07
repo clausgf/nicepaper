@@ -11,5 +11,6 @@ recurring-ical-events
 aiohttp
 aiofiles
 python-dateutil
+bcrypt
 pytest
 httpx

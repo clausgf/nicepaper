@@ -1,7 +1,9 @@
+import asyncio
 from contextlib import contextmanager
 import datetime
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter
+from fastapi.responses import RedirectResponse
 from nicegui import context, ui
 import os
 import json
@@ -10,7 +12,7 @@ from pydantic import BaseModel, ValidationError
 from babel.dates import format_datetime, get_timezone
 
 
-from app.auth import get_logout_url, get_username
+from app.auth import PasswordAuthProvider, get_auth_provider
 from app.config import app_config
 from app.models.screenmodel import DateWidgetModel, RoomCalendarWidgetModel, ScreenModel, TextWidgetModel, WidgetModel
 from app.models.updateschedulemodel import TimeModel, UpdateScheduleModel, WeeklyScheduleModel
@@ -52,14 +54,19 @@ def get_sourcecode(classes_list):
 
 
 def user_menu():
-    username = get_username(context.client.request)
-    logout_url = get_logout_url()
+    provider = get_auth_provider()
+    username = provider.get_user(context.client.request)
+
+    def do_logout():
+        provider.logout()
+        ui.navigate.to(provider.logout_url() or '/')
+
     with ui.button(username or '', icon='person').props('flat color=white'):
         with ui.menu():
             if not username:
                 ui.menu_item('Not signed in').props('disable')
-            if logout_url:
-                with ui.menu_item(on_click=lambda: ui.navigate.to(logout_url)).classes('items-center gap-x-2'):
+            if provider.logout_url():
+                with ui.menu_item(on_click=do_logout).classes('items-center gap-x-2'):
                     ui.icon('logout').props('size=large')
                     ui.label('Logout')
 
@@ -69,6 +76,22 @@ def screen_image(url: str):
     with ui.row().classes('w-full items-center justify-between'):
         ui.label(f'URL: ...{url[4:]}').classes('italic')
         ui.button('Refresh', icon='refresh').on('click', lambda img=img: img.force_reload())
+
+
+def login_redirect():
+    """
+    Server-side redirect to the login page for unauthenticated users, or
+    None if the page may be shown. Call at the top of every protected
+    page: 'if (redirect := login_redirect()): return redirect'. A
+    server-side redirect ensures the page content is never rendered
+    into the response for unauthenticated users.
+    """
+    provider = get_auth_provider()
+    request = context.client.request
+    if provider.login_required and provider.get_user(request) is None:
+        root_path = request.scope.get('root_path', '') if request else ''
+        return RedirectResponse(f"{root_path}/login")
+    return None
 
 
 @contextmanager
@@ -243,14 +266,43 @@ def frame_with_json_editor(item_type: str, dir: str, filename: str, modelClass: 
             return False, str(e)
 
 
+@ui.page('/login')
+def page_login():
+    provider = get_auth_provider()
+    if not isinstance(provider, PasswordAuthProvider) or provider.get_user():
+        root_path = context.client.request.scope.get('root_path', '') if context.client.request else ''
+        return RedirectResponse(f"{root_path}/")
+
+    with ui.card().classes('absolute-center items-stretch'):
+        ui.label('Epaper Doorsign Manager').classes('text-h6')
+        username = ui.input('Username').props('autofocus')
+        password = ui.input('Password', password=True, password_toggle_button=True)
+
+        async def try_login():
+            # bcrypt verification is CPU bound, keep it off the event loop
+            if await asyncio.to_thread(provider.verify, username.value, password.value):
+                provider.login(username.value)
+                ui.navigate.to('/')
+            else:
+                ui.notify('Wrong username or password', type='negative')
+
+        username.on('keydown.enter', try_login)
+        password.on('keydown.enter', try_login)
+        ui.button('Log in', on_click=try_login).classes('w-full')
+
+
 @ui.page('/screens')
 def page_screens():
+    if (redirect := login_redirect()):
+        return redirect
     with frame('Select a screen to edit or add a new one', 'screen', app_config.screen_dir):
         show_files('screen', app_config.screen_dir)
 
 
 @ui.page('/screens/{filename}')
 async def page_screen_edit(filename: str):
+    if (redirect := login_redirect()):
+        return redirect
     with frame_with_json_editor('screen', app_config.screen_dir, filename, ScreenModel):
         ui.separator()
         color_models = [cm.id for cm in app_config.epaper_color_models]
@@ -271,12 +323,16 @@ async def page_screen_edit(filename: str):
 
 @ui.page('/schedules')
 def page_schedules():
+    if (redirect := login_redirect()):
+        return redirect
     with frame('Select a schedule to edit or add a new one', 'schedule', app_config.schedule_dir):
         show_files('schedule', app_config.schedule_dir)
 
 
 @ui.page('/schedules/{filename}')
 async def page_schedule_edit(filename: str):
+    if (redirect := login_redirect()):
+        return redirect
     with frame_with_json_editor('schedule', app_config.schedule_dir, filename, UpdateScheduleModel):
         classes = (UpdateScheduleModel, WeeklyScheduleModel, TimeModel)
         ui.code(get_sourcecode(classes), language='python').classes('w-full')
@@ -284,6 +340,8 @@ async def page_schedule_edit(filename: str):
 
 @ui.page('/')
 def page_home():
+    if (redirect := login_redirect()):
+        return redirect
     with frame('Main Menu'):
         with ui.row():
             for item in main_menu:
