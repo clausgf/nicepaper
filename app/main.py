@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from nicegui import ui
 
 from app.api.endpoints import router as api_router
@@ -7,15 +6,10 @@ from app.config import app_config
 from app.ui.frontend import router as ui_router
 
 
+# No CORS middleware: the UI is served same-origin behind the reverse
+# proxy and the e-paper displays are not browsers, so nothing needs
+# cross-origin access.
 app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 app.include_router(api_router, prefix="/api")
 app.include_router(ui_router, prefix="/ui")
