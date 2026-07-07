@@ -9,7 +9,18 @@ from app.config import app_config
 from app.util import logger
 
 
-session = aiohttp.ClientSession(raise_for_status=True)
+_session: aiohttp.ClientSession | None = None
+
+
+def _get_session() -> aiohttp.ClientSession:
+    """
+    Create the shared HTTP session lazily: a ClientSession must be
+    created inside a running event loop.
+    """
+    global _session
+    if _session is None or _session.closed:
+        _session = aiohttp.ClientSession(raise_for_status=True)
+    return _session
 
 
 async def get_from_ical(id: str, url: str, extract_organizer_from_summary: bool = True):
@@ -34,7 +45,7 @@ async def get_from_ical(id: str, url: str, extract_organizer_from_summary: bool 
         'last_update': datetime.datetime.now(ZoneInfo(app_config.timezone)).isoformat(),
         'events': []
     }
-    async with session.get(url) as response:
+    async with _get_session().get(url) as response:
         response_text = await response.text()
         response_status = response.status
         logger.info(f"Ical {id} response status: {response_status}")
@@ -53,7 +64,7 @@ async def get_from_ical(id: str, url: str, extract_organizer_from_summary: bool 
         #     if component.name == "VEVENT":
         events = recurring_ical_events.of(cal).between(start_date, end_date)
         for event in events:
-            logger.error(event)
+            logger.debug(event)
             dtstart = event.get('DTSTART').dt
             dtend = event.get('DTEND').dt
             organizer = event.get('ORGANIZER')
@@ -77,7 +88,7 @@ async def get_from_ical(id: str, url: str, extract_organizer_from_summary: bool 
             data['events'].append({
                 "dtstart": dtstart.isoformat(),
                 "dtend": dtend.isoformat(),
-                "organizer": organizer.strip(),
+                "organizer": str(organizer).strip() if organizer else "",
                 "summary": summary.strip()
             })
 
@@ -85,6 +96,6 @@ async def get_from_ical(id: str, url: str, extract_organizer_from_summary: bool 
     with open(cache_filename, "w") as cache_file:
         json.dump(data, cache_file)
 
-    logger.debug(f"{id} collected {len(data)} events")
+    logger.debug(f"{id} collected {len(data['events'])} events")
     #logger.debug(f"... collected data='{data}'")
     return data['events']

@@ -210,15 +210,16 @@ class DrawingContext:
         lines = text.split("\n")
         i = 0
         while i < len(lines):
-            w, _ = self.textsize(line[i], font)
+            w, _ = self.textsize(lines[i], font)
             if w > size[0]:
                 # split line at last possible space
                 l, r = lines[i], ''
-                while w > size[0]:
-                    l, _, r_new = lines[i].rpartition(" ")
-                    r = r_new + r
-                    w, _ = self.textsize(l, font)[0]
-                lines[i] = l
-                lines.insert(i+1, r)
+                while w > size[0] and ' ' in l:
+                    l, _, r_new = l.rpartition(" ")
+                    r = r_new if not r else r_new + " " + r
+                    w, _ = self.textsize(l, font)
+                if r:
+                    lines[i] = l
+                    lines.insert(i+1, r)
             i += 1
         return lines

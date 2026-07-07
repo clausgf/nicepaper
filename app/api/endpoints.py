@@ -36,10 +36,11 @@ async def get_screen_image(request: Request, id: str, response: Response, if_non
     color_model_dict = {c.id: c for c in app_config.epaper_color_models}
     #color_model = None
     if color_model is not None:
-        if color_model in color_model_dict.keys():
+        if color_model in color_model_dict:
             color_model = color_model_dict[color_model]
         else:
-            logger.info(f"Unknown color model {color_model} in request, using default. Available models: {color_model_dict.keys()}")
+            logger.info(f"Unknown color model {color_model} in request, using default. Available models: {list(color_model_dict.keys())}")
+            color_model = None
 
     # update the image if needed
     await screen.update_if_needed(color_model=color_model)
