@@ -1,11 +1,8 @@
 import datetime
 from zoneinfo import ZoneInfo
-from fastapi import APIRouter, HTTPException, Header, Request, Response, status
-import os
-import json
-from typing import List, Optional
+from fastapi import APIRouter, HTTPException, Header, Path, Query, Response, status
+from typing import Optional
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
 
 from app.config import app_config
 from app.util import logger, clean_path_parameter
@@ -13,21 +10,61 @@ from app.core.screen import get_screen_by_id
 
 router = APIRouter()
 
+_color_model_ids = ", ".join(c.id for c in app_config.epaper_color_models)
 
-@router.get("/health")
+
+@router.get(
+    "/health",
+    summary="Health check",
+    tags=["status"],
+)
 async def health_check():
+    """Liveness probe for monitoring. Always returns `{"status": "ok"}`."""
     return {"status": "ok"}
 
 
 @router.get(
     "/screen/{id}/image.png",
     summary="Get the current image for a screen",
-    response_description="PNG image"
+    tags=["screens"],
+    response_class=FileResponse,
+    responses={
+        200: {
+            "content": {"image/png": {}},
+            "description": (
+                "The rendered screen image. The `ETag` header identifies this "
+                "image version; `Cache-Control: max-age` tells the display how "
+                "many seconds the image stays valid at most."
+            ),
+        },
+        status.HTTP_304_NOT_MODIFIED: {
+            "description": "The image has not changed since the version given in `If-None-Match`.",
+        },
+        404: {"description": "No screen configuration exists for this id."},
+    },
 )
-async def get_screen_image(request: Request, id: str, response: Response, if_none_match: Optional[str] = Header(None), color_model: Optional[str] = None):
+async def get_screen_image(
+    id: str = Path(description="Screen id: name of the screen's JSON file without extension."),
+    if_none_match: Optional[str] = Header(
+        None,
+        description="`ETag` of the image version the display already has; if it is still current, the response is `304 Not Modified`.",
+    ),
+    color_model: Optional[str] = Query(
+        None,
+        description=f"Quantize the image to an e-paper palette. Available: {_color_model_ids}. Omitted or unknown values return the RGB image.",
+    ),
+):
+    """
+    Render (if needed) and return the current PNG image for a screen.
+
+    The image is re-rendered when the screen configuration changed or the
+    previous image expired; otherwise it is served from the cache. Displays
+    should poll this endpoint, send the last `ETag` as `If-None-Match` and
+    sleep for `Cache-Control: max-age` seconds between polls.
+    """
     # determine rendering
     id = clean_path_parameter(id)
-    logger.info(f"GET /api/displays/{id}/image with If-None-Match={if_none_match} and colors={color_model}")
+    logger.info(f"GET /api/screen/{id}/image.png with If-None-Match={if_none_match} and color_model={color_model}")
     screen = await get_screen_by_id(id)
     if screen is None:
         raise HTTPException(status_code=404, detail="Screen not found or not parsable")

@@ -9,7 +9,18 @@ from app.ui.frontend import router as ui_router
 # No CORS middleware: the UI is served same-origin behind the reverse
 # proxy and the e-paper displays are not browsers, so nothing needs
 # cross-origin access.
-app = FastAPI()
+app = FastAPI(
+    title="Epaper Doorsign Manager",
+    description=(
+        "Renders screens (e.g. door signs with room calendars) as PNG images "
+        "for e-paper displays.\n\n"
+        "Displays poll `/api/screen/{id}/image.png` and should send the last "
+        "`ETag` as `If-None-Match` and respect `Cache-Control: max-age` to "
+        "avoid unnecessary downloads. Screens and update schedules are "
+        "managed as JSON files via the NiceGUI frontend at `/ui`."
+    ),
+    version="0.1.0",
+)
 
 app.include_router(api_router, prefix="/api")
 app.include_router(ui_router, prefix="/ui")
