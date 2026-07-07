@@ -15,4 +15,4 @@ RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 WORKDIR /home/iot/
 
-ENTRYPOINT ["uvicorn", "app.main:app", "--reload", "--log-level", "debug", "--host", "0.0.0.0", "--port", "8080", "--root-path", "/epaper"]
+ENTRYPOINT ["uvicorn", "app.main:app", "--reload", "--log-level", "info", "--host", "0.0.0.0", "--port", "8080", "--root-path", "/epaper"]
