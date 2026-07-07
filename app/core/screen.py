@@ -135,23 +135,60 @@ class Screen:
         return next_update, image
 
 
-async def get_screen_by_id(id: str) -> Screen:
+# cache of screen instances, invalidated by the mtime of the underlying
+# screen and schedule files (source of truth stays on disk, so edits via
+# the UI as well as direct file changes are picked up)
+_screens: dict[str, Screen] = {}
+
+
+def _file_mtime(path: str) -> Optional[datetime.datetime]:
+    try:
+        return datetime.datetime.fromtimestamp(os.path.getmtime(path), tz=ZoneInfo("UTC"))
+    except OSError:
+        return None
+
+
+def _schedule_file(schedule_id: Optional[str]) -> str:
+    return os.path.join(app_config.schedule_dir, f"{schedule_id}.json")
+
+
+def _schedule_changed(screen: Screen) -> bool:
+    schedule_mtime = _file_mtime(_schedule_file(screen.config.update_schedule_id))
+    if screen.update_schedule is None:
+        # reload if the configured schedule file has appeared since
+        return schedule_mtime is not None
+    return schedule_mtime != screen.update_schedule.config_mtime
+
+
+async def get_screen_by_id(id: str) -> Optional[Screen]:
     """
-    Get a screen instance by its id.
+    Get a screen instance by its id, reusing a cached instance as long as
+    neither the screen file nor its schedule file changed.
     """
-    # load screen model from file
     screen_model_file = os.path.join(app_config.screen_dir, f"{id}.json")
+    config_mtime = _file_mtime(screen_model_file)
+    if config_mtime is None:
+        logger.info(f"Screen model file {screen_model_file} not found")
+        _screens.pop(id, None)
+        return None
+
+    cached = _screens.get(id)
+    if cached is not None and cached.config_mtime == config_mtime and not _schedule_changed(cached):
+        return cached
+
+    # (re)load screen model from file
     try:
         async with aiofiles.open(screen_model_file, 'r') as f:
             j = await f.read()
         config = ScreenModel(**json.loads(j))
-        config_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(screen_model_file), tz=ZoneInfo("UTC"))
     except Exception as e:
         logger.info(f"Error reading screen model file {screen_model_file}: {e}")
+        _screens.pop(id, None)
         return None
 
     # create a screen instance
     update_schedule = await get_schedule_by_id(config.update_schedule_id)
     screen = Screen(id, config, config_mtime, update_schedule)
+    _screens[id] = screen
 
     return screen
