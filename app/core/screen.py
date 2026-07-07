@@ -85,7 +85,7 @@ class Screen:
         update_needed = False
         meta = await self.get_metadata()
         now = datetime.datetime.now(ZoneInfo(app_config.timezone))
-        logger.info(f"Checking update for screen {self.id} now={now.isoformat()} config_mtime={self.config_mtime.isoformat()} meta.expires_at={meta.expires_at.isoformat() if meta else None} meta.last_update_at={meta.last_update_at.isoformat() if meta else None} meta.version={meta.version if meta else None}")
+        logger.info(f"Checking update for screen {self.id} now={now.isoformat()} config_mtime={self.config_mtime.isoformat()} meta.expires_at={meta.expires_at if meta else None} meta.last_update_at={meta.last_update_at if meta else None} meta.version={meta.version if meta else None}")
         update_needed = update_needed or meta is None or meta.expires_at is None or meta.last_update_at is None
         update_needed = update_needed or self.config_mtime > meta.last_update_at
         update_needed = update_needed or now > meta.expires_at  #  TODO: does it make sense not to regenerate on every request and use the expires only for controlling the client wakeup?
@@ -120,9 +120,6 @@ class Screen:
         if self.update_schedule:
             next_update = self.update_schedule.get_next_update()
 
-        p0 = (0, 0)
-        p1 = (self.config.size[0]-1, self.config.size[1]-1)
-        ctx.draw.rectangle([p0, p1], outline=(0,0,255)) # TODO remove
         for w in self.widgets:
             widget_update = await w.draw(ctx)
             if widget_update:

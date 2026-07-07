@@ -5,7 +5,9 @@ from pydantic import BaseModel, Field
 
 class ImageMetadata(BaseModel):
     last_update_at: datetime.datetime
-    expires_at: datetime.datetime
+    # expires_at is None when neither an update schedule nor a widget
+    # provides a next update time
+    expires_at: Optional[datetime.datetime] = None
     version: str
 
 

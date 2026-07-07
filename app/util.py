@@ -4,7 +4,7 @@ import re
 logger = logging.getLogger('uvicorn.error')
 
 
-filename_regex_str = r'^[a-zA-Z0-9_\-+]+.[a-zA-Z0-9]+$'
+filename_regex_str = r'^[a-zA-Z0-9_\-+]+\.[a-zA-Z0-9]+$'
 
 
 def check_filename(filename: str) -> bool:

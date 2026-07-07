@@ -20,10 +20,7 @@ class DateWidget(Widget):
         await super().draw(ctx)
         timezone = get_timezone(app_config.timezone)
         now = datetime.now(timezone)
-        if self.config.date_format:
-            format = format_date(now, format=self.config.date_format, locale=app_config.locale)
-        else:
-            format = app_config.date_format
+        format = self.config.date_format or app_config.date_format
         text = format_date(now, format=format, locale=app_config.locale)
 
         ctx.draw_text(position=(0,0),
