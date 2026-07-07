@@ -48,17 +48,17 @@ epaper-nice
 │   ├── fonts/
 │   └── icons/
 ├── Dockerfile / docker-compose.yml
-└── requirements.txt
+└── pyproject.toml / uv.lock
 ```
 
 ## Installation
 
-1. Clone the repository and create a virtual environment:
+The project is managed with [uv](https://docs.astral.sh/uv/).
+
+1. Clone the repository and install the dependencies:
 
    ```
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
+   uv sync
    ```
 
 2. Create the runtime data directories:
@@ -72,7 +72,7 @@ epaper-nice
 Start the application from the repository root:
 
 ```
-uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
 ```
 
 - Management UI: `http://127.0.0.1:8000/ui`
@@ -139,8 +139,11 @@ variables (pydantic-settings), e.g.:
 
 ## Tests
 
+Unit tests live next to the code (`test_*.py`), acceptance tests that
+exercise the HTTP API end-to-end are in `app/test_acceptance.py`:
+
 ```
-pytest app
+uv run pytest app
 ```
 
 ## TODO / Open points

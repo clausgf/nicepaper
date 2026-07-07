@@ -1,0 +1,31 @@
+[project]
+name = "epaper-nice"
+version = "0.1.0"
+description = "Renders screens (e.g. door signs with room calendars) as PNG images for e-paper displays; FastAPI backend with a NiceGUI management UI"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "nicegui",
+    "uvicorn",
+    "pydantic",
+    "pydantic-settings",
+    "pillow",
+    "babel",
+    "icalendar",
+    "recurring-ical-events",
+    "aiohttp",
+    "aiofiles",
+    "python-dateutil",
+    "bcrypt",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "httpx",
+]
+
+[tool.uv]
+# the app is run from source (uvicorn app.main:app), not installed as a package
+package = false
