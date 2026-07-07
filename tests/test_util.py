@@ -1,4 +1,4 @@
-from .util import check_filename
+from app.util import check_filename
 
 
 def test_check_filename_accepts_simple_names():

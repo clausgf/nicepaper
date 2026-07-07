@@ -29,3 +29,7 @@ dev = [
 [tool.uv]
 # the app is run from source (uvicorn app.main:app), not installed as a package
 package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

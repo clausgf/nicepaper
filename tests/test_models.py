@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-from .screenmodel import ScreenModel, TextWidgetModel, RoomCalendarWidgetModel
+from app.models.screenmodel import ScreenModel, TextWidgetModel, RoomCalendarWidgetModel
 
 
 def test_screen_model_valid():

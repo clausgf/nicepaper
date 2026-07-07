@@ -39,11 +39,13 @@ epaper-nice
 │   ├── models/               # pydantic models for screens and schedules
 │   ├── config.py             # application settings
 │   └── main.py               # FastAPI app wiring
+├── tests                     # pytest suite (unit + acceptance)
 ├── data                      # runtime data (not in git)
 │   ├── screens/              # screen configuration JSON files
 │   ├── schedules/            # update schedule JSON files
 │   ├── images/               # rendered image cache
 │   └── ical/                 # iCal feed cache
+├── examples                  # example configuration files to copy into data/
 ├── resources
 │   ├── fonts/
 │   └── icons/
@@ -139,11 +141,11 @@ variables (pydantic-settings), e.g.:
 
 ## Tests
 
-Unit tests live next to the code (`test_*.py`), acceptance tests that
-exercise the HTTP API end-to-end are in `app/test_acceptance.py`:
+All tests live in `tests/`; acceptance tests that exercise the HTTP API
+end-to-end are in `tests/test_acceptance.py`, the rest are unit tests:
 
 ```
-uv run pytest app
+uv run pytest
 ```
 
 ## TODO / Open points
