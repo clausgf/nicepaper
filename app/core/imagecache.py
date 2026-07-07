@@ -1,3 +1,4 @@
+import asyncio
 import glob
 import json
 import os
@@ -34,7 +35,7 @@ class ImageCache:
 
         # save new image
         filename = os.path.join(self.image_dir, "rgb.png")
-        rgb_image.save(filename, format="PNG", compress_level=9)
+        await asyncio.to_thread(rgb_image.save, filename, format="PNG", compress_level=9)
 
         # save metadata
         self.metadata = metadata
@@ -45,9 +46,8 @@ class ImageCache:
 
         # save quantized images
         if color_model:
-            palette_image = await self._generate_palette_image(rgb_image, color_model)
             palette_filename = os.path.join(self.image_dir, f"{color_model.id}.png")
-            palette_image.save(palette_filename, format="PNG", bits=8, compress_level=9)
+            await asyncio.to_thread(self._quantize_and_save, rgb_image, color_model, palette_filename)
 
 
     async def get_image_path(self, color_model: Optional[ColorModel] = None) -> str:
@@ -64,13 +64,17 @@ class ImageCache:
         if os.path.exists(palette_filename):
             return palette_filename
         
-        rgb_image = Image.open(rgb_filename)
-        palette_image = await self._generate_palette_image(rgb_image, color_model)
-        palette_image.save(palette_filename, format="PNG", compress_level=9)
+        rgb_image = await asyncio.to_thread(Image.open, rgb_filename)
+        await asyncio.to_thread(self._quantize_and_save, rgb_image, color_model, palette_filename)
         return palette_filename
-        
 
-    async def _generate_palette_image(self, rgb_image: Image.Image, color_model: ColorModel) -> Image.Image:
+
+    def _quantize_and_save(self, rgb_image: Image.Image, color_model: ColorModel, palette_filename: str):
+        palette_image = self._generate_palette_image(rgb_image, color_model)
+        palette_image.save(palette_filename, format="PNG", bits=8, compress_level=9)
+
+
+    def _generate_palette_image(self, rgb_image: Image.Image, color_model: ColorModel) -> Image.Image:
         logger.info(f"Generating palette image for {color_model.id}")
         # generate image with the right color model
         palette = [value for color in color_model.palette for value in color]
@@ -85,7 +89,7 @@ class ImageCache:
         filename = await self.get_image_path(color_model)
         if filename is None:
             return None
-        return Image.open(filename)
+        return await asyncio.to_thread(Image.open, filename)
 
 
     async def get_metadata(self) -> ImageMetadata:

@@ -1,9 +1,8 @@
+import asyncio
 import datetime
 import hashlib
-import io
 import json
 import os
-import uuid
 from zoneinfo import ZoneInfo
 from PIL import Image
 from typing import Optional
@@ -102,10 +101,9 @@ class Screen:
 
         expires_at, rgb_image = await self._create_image()
 
-        # create a hash for the image
-        with io.BytesIO() as byte_stream:
-            rgb_image.save(byte_stream, format="PNG")
-            version  = hashlib.sha256(byte_stream.getvalue()).hexdigest()
+        # create a hash of the raw pixel data as version/etag
+        version = await asyncio.to_thread(
+            lambda: hashlib.sha256(rgb_image.tobytes()).hexdigest())
 
         meta = ImageMetadata(last_update_at=now, expires_at=expires_at, version=version)
         await self.image_cache.put_data(rgb_image, meta, color_model)

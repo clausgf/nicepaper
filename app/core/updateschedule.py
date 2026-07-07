@@ -2,6 +2,7 @@ import datetime
 import json
 import os
 from zoneinfo import ZoneInfo
+import aiofiles
 from dateutil.rrule import rrule, DAILY, MO, TU, WE, TH, FR, SA, SU
 from app.config import app_config
 from app.util import logger
@@ -51,8 +52,8 @@ async def get_schedule_by_id(schedule_id: str) -> UpdateSchedule:
     # load schedule model from file
     schedule_model_file = os.path.join(app_config.schedule_dir, f"{schedule_id}.json")
     try:
-        with open(schedule_model_file, 'r') as f:
-            j = json.load(f)
+        async with aiofiles.open(schedule_model_file, 'r') as f:
+            j = json.loads(await f.read())
         config = UpdateScheduleModel(**j)
         config_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(schedule_model_file), tz=ZoneInfo("UTC"))
     except Exception as e:
