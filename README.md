@@ -86,6 +86,19 @@ extension.
 Alternatively use Docker: adjust `PUID`/`PGID` in `docker-compose.yml`
 and run `docker compose up --build`.
 
+## Configuration
+
+Settings live in `app/config.py` and can be overridden with environment
+variables (pydantic-settings), e.g.:
+
+- `STORAGE_SECRET`: secret for NiceGUI browser session storage.
+- `AUTH_USER_HEADERS`: JSON list of request headers carrying the
+  username forwarded by an authenticating reverse proxy (defaults match
+  oauth2-proxy: `X-Forwarded-Preferred-Username`, `X-Forwarded-User`,
+  `X-Forwarded-Email`). The UI shows the first non-empty value.
+- `AUTH_LOGOUT_URL`: logout link shown in the user menu, e.g.
+  `/oauth2/sign_out`; unset hides the entry.
+
 ## Tests
 
 ```

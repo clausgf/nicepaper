@@ -2,7 +2,7 @@ from contextlib import contextmanager
 import datetime
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter
-from nicegui import ui
+from nicegui import context, ui
 import os
 import json
 import inspect
@@ -10,6 +10,7 @@ from pydantic import BaseModel, ValidationError
 from babel.dates import format_datetime, get_timezone
 
 
+from app.auth import get_logout_url, get_username
 from app.config import app_config
 from app.models.screenmodel import DateWidgetModel, RoomCalendarWidgetModel, ScreenModel, TextWidgetModel, WidgetModel
 from app.models.updateschedulemodel import TimeModel, UpdateScheduleModel, WeeklyScheduleModel
@@ -51,15 +52,16 @@ def get_sourcecode(classes_list):
 
 
 def user_menu():
-    with ui.button(icon='person').props('flat color=white'):
-        with ui.menu() as menu:
-            with ui.menu_item().classes('items-center gap-x-2'):
-                ui.icon('settings').props('size=large')
-                ui.label('Settings') #.on('click', lambda: ui.dialog('Settings').show())
-            ui.separator()
-            with ui.menu_item().classes('items-center gap-x-2'):
-                ui.icon('logout').props('size=large')
-                ui.label('Logout')
+    username = get_username(context.client.request)
+    logout_url = get_logout_url()
+    with ui.button(username or '', icon='person').props('flat color=white'):
+        with ui.menu():
+            if not username:
+                ui.menu_item('Not signed in').props('disable')
+            if logout_url:
+                with ui.menu_item(on_click=lambda: ui.navigate.to(logout_url)).classes('items-center gap-x-2'):
+                    ui.icon('logout').props('size=large')
+                    ui.label('Logout')
 
 
 def screen_image(url: str):

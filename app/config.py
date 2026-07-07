@@ -22,6 +22,17 @@ class Config(BaseSettings):
     # STORAGE_SECRET environment variable in production
     storage_secret: str = "geheim"
 
+    # authentication via reverse proxy (e.g. oauth2-proxy): headers that
+    # carry the authenticated username, first non-empty one wins
+    auth_user_headers: List[str] = [
+        "X-Forwarded-Preferred-Username",
+        "X-Forwarded-User",
+        "X-Forwarded-Email",
+    ]
+    # URL that ends the proxy session, e.g. "/oauth2/sign_out";
+    # None hides the logout entry
+    auth_logout_url: Optional[str] = None
+
     font_path: DirectoryPath = "resources/fonts"
     icon_path: DirectoryPath = "resources/icons"
 
