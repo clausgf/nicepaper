@@ -1,0 +1,19 @@
+{
+  "size": [400, 300],
+  "update_schedule_id": "default",
+  "widgets": [
+    {
+      "widget_type": "Text",
+      "position": [10, 10],
+      "size": [380, 40],
+      "text": "Welcome!",
+      "font": ["Ubuntu-Bold.ttf", 28]
+    },
+    {
+      "widget_type": "Date",
+      "position": [10, 60],
+      "size": [380, 30],
+      "date_format": "EEEE, dd. MMMM yyyy"
+    }
+  ]
+}

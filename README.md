@@ -67,11 +67,19 @@ The project is managed with [uv](https://docs.astral.sh/uv/).
    uv sync
    ```
 
-2. Create the runtime data directories:
+2. Create the runtime data directories and copy the example
+   configuration to get a working screen right away:
 
    ```
    mkdir -p data/screens data/schedules data/images data/ical
+   cp examples/schedules/default.json data/schedules/
+   cp examples/screens/simple.json data/screens/
    ```
+
+   `examples/screens/roomcalendar.json` shows the `RoomCalendar` widget;
+   edit its `ical_url` (and `examples/aliases.json`,
+   `examples/organizer_names.json` if needed) before copying it in, see
+   [Examples](#examples) below.
 
 ## Usage
 
@@ -87,7 +95,7 @@ uv run uvicorn app.main:app --reload
   (optional `?color_model=bw|bwr|gs4|c7|e6`)
 
 `<id>` is the name of a JSON file in `data/screens` without the
-extension.
+extension, or an alias from `data/aliases.json`.
 
 Alternatively use Docker: adjust `PUID`/`PGID` in `docker-compose.yml`
 and run `docker compose up --build`.
@@ -142,6 +150,28 @@ variables (pydantic-settings), e.g.:
   login attempt, so changes apply without a restart. Set a strong
   `STORAGE_SECRET`, since it signs the session cookie.
 - `none`: no authentication (local development).
+
+## Examples
+
+`examples/` holds ready-to-copy configuration files (git-tracked, unlike
+`data/`, so they double as living documentation of the JSON formats):
+
+- `examples/schedules/default.json`: a weekly update schedule (three
+  times on weekdays, once on weekends). Screens default to
+  `update_schedule_id: "default"`, so most setups need this file.
+- `examples/screens/simple.json`: a minimal screen with `Text` and
+  `Date` widgets, no external dependencies.
+- `examples/screens/roomcalendar.json`: a full-size door sign using the
+  `RoomCalendar` widget. Set `ical_url` to a real iCal feed before use.
+- `examples/aliases.json`: maps the alias `hallway` to the
+  `roomcalendar` screen, see [Display aliases](#features) above.
+- `examples/organizer_names.json`: example entries for
+  `organizer_names_file`, used to extract an organizer's name from an
+  event summary when the iCal feed has no `ORGANIZER` field.
+
+Copy the ones you need into the matching `data/` subdirectory (see
+[Installation](#installation)); they are plain screen/schedule files, so
+they also work as a starting point to edit in the management UI.
 
 ## Tests
 
