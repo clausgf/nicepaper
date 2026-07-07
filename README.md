@@ -108,6 +108,21 @@ variables (pydantic-settings), e.g.:
     `/oauth2/sign_out`; unset hides the entry.
   - The headers are only trustworthy when the app is reachable
     exclusively through the proxy.
+  - Deployment note (Caddy + oauth2-proxy): oauth2-proxy must be told
+    to expose the identity (`--set-xauthrequest`, and/or
+    `--pass-user-headers` when proxying through oauth2-proxy itself)
+    and Caddy's `forward_auth` block must forward it to the app, e.g.
+
+    ```
+    forward_auth oauth2-proxy:4180 {
+        uri /oauth2/auth
+        copy_headers X-Auth-Request-Preferred-Username>X-Forwarded-Preferred-Username X-Auth-Request-User>X-Forwarded-User X-Auth-Request-Email>X-Forwarded-Email
+    }
+    ```
+
+    Set `AUTH_LOGOUT_URL=/oauth2/sign_out` for a working logout entry.
+    After deploying, check once which of the configured headers
+    actually arrives and adjust `AUTH_USER_HEADERS` if needed.
 - `password`: built-in login page. Users live in an htpasswd file with
   bcrypt hashes (`AUTH_HTPASSWD_FILE`, default `data/htpasswd`),
   maintained with the standard Apache tool:
@@ -127,3 +142,23 @@ variables (pydantic-settings), e.g.:
 ```
 pytest app
 ```
+
+## TODO / Open points
+
+- **API keys for the display API**: `/api` is currently protected by
+  external middleware in front of the app. If that check should move
+  into the app, add an `ApiKeyAuthProvider` next to the existing
+  providers, enforced as a FastAPI dependency on the `/api` router
+  (`X-Api-Key` header). Proposed key management: a file
+  `data/api_keys.json` mapping a label per display to the SHA-256 hex
+  hash of its key, e.g. `{"display-r101": "<sha256-hex>"}`. Plain
+  SHA-256 is sufficient here (keys are high-entropy random strings, so
+  brute-forcing the hash is hopeless, and bcrypt would waste ~100 ms on
+  every image request). Generate a key and its hash with:
+
+  ```
+  python3 -c "import secrets, hashlib; k = secrets.token_urlsafe(32); print(k, hashlib.sha256(k.encode()).hexdigest())"
+  ```
+
+  Revocation = delete the line; one key per display so keys can be
+  revoked individually.
