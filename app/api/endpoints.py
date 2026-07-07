@@ -44,7 +44,7 @@ async def health_check():
     },
 )
 async def get_screen_image(
-    id: str = Path(description="Screen id: name of the screen's JSON file without extension."),
+    id: str = Path(description="Screen id (the screen's JSON file name without extension) or an alias defined in the alias file."),
     if_none_match: Optional[str] = Header(
         None,
         description="`ETag` of the image version the display already has; if it is still current, the response is `304 Not Modified`.",

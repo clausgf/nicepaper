@@ -19,6 +19,10 @@ the content actually changed.
   (`bw`, `bwr`, `gs4`, `c7`, `e6`) via the `color_model` query parameter.
 - **Update schedules**: JSON-configured schedules determine when a screen
   expires and is re-rendered.
+- **Display aliases**: an optional `data/aliases.json` file maps friendly
+  names to screen ids, e.g. `{"hallway": "epaper_43bw"}`, so a display
+  can be addressed by a stable name instead of the screen file name, and
+  several displays can share one screen.
 - **Management UI**: create, edit, validate and delete screen and
   schedule files with a JSON editor and live image previews.
 

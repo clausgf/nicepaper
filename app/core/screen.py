@@ -160,11 +160,31 @@ def _schedule_changed(screen: Screen) -> bool:
     return schedule_mtime != screen.update_schedule.config_mtime
 
 
+async def _resolve_alias(id: str) -> str:
+    """
+    Resolve a display alias to its target screen id, e.g. so a display
+    can be addressed as "hallway" instead of the screen file name. Falls
+    back to the given id unchanged if there is no alias file or no
+    matching entry.
+    """
+    if not app_config.alias_file or not os.path.exists(app_config.alias_file):
+        return id
+    try:
+        async with aiofiles.open(app_config.alias_file, 'r') as f:
+            aliases = json.loads(await f.read())
+    except (OSError, ValueError) as e:
+        logger.warning(f"Error reading alias file {app_config.alias_file}: {e}")
+        return id
+    return aliases.get(id, id)
+
+
 async def get_screen_by_id(id: str) -> Optional[Screen]:
     """
-    Get a screen instance by its id, reusing a cached instance as long as
-    neither the screen file nor its schedule file changed.
+    Get a screen instance by its id (or by an alias resolved via the
+    alias file), reusing a cached instance as long as neither the screen
+    file nor its schedule file changed.
     """
+    id = await _resolve_alias(id)
     screen_model_file = os.path.join(app_config.screen_dir, f"{id}.json")
     config_mtime = _file_mtime(screen_model_file)
     if config_mtime is None:

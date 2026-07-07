@@ -54,6 +54,11 @@ class Config(BaseSettings):
     ical_max_days: int = 30
     organizer_names_file: Optional[str] = "data/organizer_names.json"
 
+    # maps alias -> screen id, e.g. {"hallway": "epaper_43bw"}; lets a
+    # display be addressed by a friendly/stable name instead of the
+    # screen file name, and lets several displays share one screen
+    alias_file: Optional[str] = "data/aliases.json"
+
     no_appointments: str = "Keine Termine"
     next_appointment: str = "Nächster Termin"
     current_appointment: str = "Aktueller Termin"
