@@ -1,5 +1,5 @@
 import datetime
-from typing import List, Optional, Tuple, Union, Literal
+from typing import Annotated, List, Optional, Tuple, Union, Literal
 from pydantic import BaseModel, Field
 
 
@@ -41,7 +41,13 @@ class RoomCalendarWidgetModel(WidgetModel):
     room_name: str
     ical_url: str
 
-AnyWidget = Union[DateWidgetModel, TextWidgetModel, RoomCalendarWidgetModel]
+# discriminated union: widget_type selects the concrete model and a
+# missing/unknown widget_type is a validation error instead of silently
+# matching the first union member
+AnyWidget = Annotated[
+    Union[DateWidgetModel, TextWidgetModel, RoomCalendarWidgetModel],
+    Field(discriminator="widget_type"),
+]
 
 
 class ScreenModel(BaseModel):

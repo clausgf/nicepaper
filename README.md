@@ -1,64 +1,93 @@
-# FastAPI and NiceGUI Application
+# Epaper Doorsign Manager
 
-This project is a web application built using FastAPI for the backend API and NiceGUI for the user interface.
+A web application that renders screens (e.g. door signs with room
+calendars) as PNG images for e-paper displays. It is built with FastAPI
+(REST API for the displays) and NiceGUI (management UI).
 
-## Project Structure
+Displays poll the API for their image; the server renders screens from
+JSON configuration files, caches the result and answers with proper
+`ETag`/`Cache-Control` headers so displays only download new images when
+the content actually changed.
+
+## Features
+
+- **Screens**: JSON-configured layouts made of widgets (`Text`, `Date`,
+  `RoomCalendar`) rendered onto an RGB canvas with Pillow.
+- **Room calendar widget**: fetches an iCal feed (with recurring event
+  expansion), caches it and shows the current/next appointments.
+- **Color models**: rendered images can be quantized to e-paper palettes
+  (`bw`, `bwr`, `gs4`, `c7`, `e6`) via the `color_model` query parameter.
+- **Update schedules**: JSON-configured schedules determine when a screen
+  expires and is re-rendered.
+- **Management UI**: create, edit, validate and delete screen and
+  schedule files with a JSON editor and live image previews.
+
+## Project structure
 
 ```
 epaper-nice
 ├── app
-│   ├── api
-│   │   ├── __init__.py
-│   │   └── endpoints.py
-│   ├── ui
-│   │   ├── __init__.py
-│   │   └── endpoints.py
+│   ├── api/endpoints.py      # REST API for the displays
+│   ├── ui/frontend.py        # NiceGUI management frontend
 │   ├── core
-│   │   └── buissneslogic.py
-│   ├── models
-│   │   └── models.py
-│   └── config.py
-│   └── main.py
-├── data
-│   └── example.json
-├── README.md
-├── requirements.txt
-└── docker-compose.yml
+│   │   ├── screen.py         # screen rendering
+│   │   ├── imagecache.py     # image + metadata cache, palette quantization
+│   │   ├── drawingcontext.py # drawing helpers (fonts, text, alignment)
+│   │   ├── updateschedule.py # update schedule evaluation
+│   │   ├── widgets/          # Text, Date, RoomCalendar widgets
+│   │   └── datasources/      # iCal feed loading and caching
+│   ├── models/               # pydantic models for screens and schedules
+│   ├── config.py             # application settings
+│   └── main.py               # FastAPI app wiring
+├── data                      # runtime data (not in git)
+│   ├── screens/              # screen configuration JSON files
+│   ├── schedules/            # update schedule JSON files
+│   ├── images/               # rendered image cache
+│   └── ical/                 # iCal feed cache
+├── resources
+│   ├── fonts/
+│   └── icons/
+├── Dockerfile / docker-compose.yml
+└── requirements.txt
 ```
 
 ## Installation
 
-1. Clone the repository:
-   ```
-   git clone https://github.com/username/repositoryname.git
-   cd repositoryname
-   ```
+1. Clone the repository and create a virtual environment:
 
-2. Create a virtual environment:
    ```
-   python -m venv venv
-   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-   ```
-
-3. Install the required packages:
-   ```
+   python -m venv .venv
+   source .venv/bin/activate
    pip install -r requirements.txt
+   ```
+
+2. Create the runtime data directories:
+
+   ```
+   mkdir -p data/screens data/schedules data/images data/ical
    ```
 
 ## Usage
 
-1. Start the application:
-   ```
-   uvicorn app.main:app --reload
-   ```
+Start the application from the repository root:
 
-2. Access the API at `http://127.0.0.1:8000/api` and the NiceGUI interface at `http://127.0.0.1:8000/ui`.
+```
+uvicorn app.main:app --reload
+```
 
-## Features
+- Management UI: `http://127.0.0.1:8000/ui`
+- API docs: `http://127.0.0.1:8000/docs`
+- Display image: `http://127.0.0.1:8000/api/screen/<id>/image.png`
+  (optional `?color_model=bw|bwr|gs4|c7|e6`)
 
-- Manage JSON files in the `data` directory.
-- User-friendly interface for selecting and editing JSON files.
+`<id>` is the name of a JSON file in `data/screens` without the
+extension.
 
-## Contributing
+Alternatively use Docker: adjust `PUID`/`PGID` in `docker-compose.yml`
+and run `docker compose up --build`.
 
-Feel free to submit issues or pull requests for improvements and bug fixes.
+## Tests
+
+```
+pytest app
+```

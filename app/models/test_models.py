@@ -2,11 +2,10 @@ import pytest
 from pydantic import ValidationError
 from .screenmodel import ScreenModel, TextWidgetModel, RoomCalendarWidgetModel
 
+
 def test_screen_model_valid():
     valid_data = {
-        "name": "Main Screen",
-        "description": "This is the main screen",
-        "count": 2,
+        "size": [400, 300],
         "widgets": [
             {
                 "widget_type": "Text",
@@ -25,16 +24,20 @@ def test_screen_model_valid():
         ]
     }
     screen = ScreenModel(**valid_data)
-    assert screen.name == "Main Screen"
+    assert screen.size == (400, 300)
     assert len(screen.widgets) == 2
     assert isinstance(screen.widgets[0], TextWidgetModel)
     assert isinstance(screen.widgets[1], RoomCalendarWidgetModel)
 
+
+def test_screen_model_missing_size():
+    with pytest.raises(ValidationError):
+        ScreenModel(widgets=[])
+
+
 def test_screen_model_invalid_widget_type():
     invalid_data = {
-        "name": "Main Screen",
-        "description": "This is the main screen",
-        "count": 2,
+        "size": [400, 300],
         "widgets": [
             {
                 "position": [0, 0],
@@ -44,15 +47,13 @@ def test_screen_model_invalid_widget_type():
             }
         ]
     }
-    with pytest.raises(ValidationError) as exc_info:
+    with pytest.raises(ValidationError):
         ScreenModel(**invalid_data)
-    #assert "unexpected value; permitted: 'Text', 'RoomCalendar'" in str(exc_info.value)
+
 
 def test_screen_model_missing_widget_type():
     invalid_data = {
-        "name": "Main Screen",
-        "description": "This is the main screen",
-        "count": 2,
+        "size": [400, 300],
         "widgets": [
             {
                 "position": [0, 0],
@@ -62,13 +63,12 @@ def test_screen_model_missing_widget_type():
     }
     with pytest.raises(ValidationError) as exc_info:
         ScreenModel(**invalid_data)
-    assert "field required" in str(exc_info.value).lower()
+    assert "widget_type" in str(exc_info.value)
+
 
 def test_screen_model_textwidget_missing_text():
     invalid_data = {
-        "name": "Main Screen",
-        "description": "This is the main screen",
-        "count": 2,
+        "size": [400, 300],
         "widgets": [
             {
                 "widget_type": "Text",
@@ -80,3 +80,14 @@ def test_screen_model_textwidget_missing_text():
     with pytest.raises(ValidationError) as exc_info:
         ScreenModel(**invalid_data)
     assert "field required" in str(exc_info.value).lower()
+
+
+def test_widget_alignment_pattern():
+    base = {
+        "widget_type": "Text",
+        "position": [0, 0],
+        "text": "x",
+    }
+    assert TextWidgetModel(**base, alignment="ct").alignment == "ct"
+    with pytest.raises(ValidationError):
+        TextWidgetModel(**base, alignment="xx")

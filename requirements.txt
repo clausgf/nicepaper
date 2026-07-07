@@ -2,10 +2,14 @@ FastAPI
 NiceGUI
 uvicorn
 pydantic
-jsonschema
-pytest
 pydantic-settings
+jsonschema
 Pillow
 babel
 icalendar
 recurring-ical-events
+aiohttp
+aiofiles
+python-dateutil
+pytest
+httpx
