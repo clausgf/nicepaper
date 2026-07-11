@@ -16,7 +16,3 @@ class WeeklyScheduleModel(BaseModel):
     by_months: List[Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]] = Field(default_factory=lambda: list(ALL_MONTHS))
     by_weekdays: List[Literal["MO", "TU", "WE", "TH", "FR", "SA", "SU"]] = Field(default_factory=lambda: list(ALL_WEEKDAYS))
     times: List[TimeModel] = Field(description="List of times an update is scheduled")
-
-class UpdateScheduleModel(BaseModel):
-    name: str
-    schedules: List[WeeklyScheduleModel]

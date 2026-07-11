@@ -8,14 +8,14 @@ from nicegui import context, ui
 import os
 import json
 import inspect
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 from babel.dates import format_datetime, get_timezone
 
 
 from app.auth import PasswordAuthProvider, get_auth_provider
 from app.config import app_config
 from app.models.screenmodel import DateWidgetModel, RoomCalendarWidgetModel, ScreenModel, TextWidgetModel, WidgetModel
-from app.models.updateschedulemodel import TimeModel, UpdateScheduleModel, WeeklyScheduleModel
+from app.models.updateschedulemodel import TimeModel, WeeklyScheduleModel
 from app.util import check_filename
 
 
@@ -178,18 +178,18 @@ def show_files(item_type: str, dir: str):
             ui.notify(f'File "{filename}" already exists.', type='negative')
             return
 
-        # determine default data
+        # determine default content
         if item_type == 'screen':
-            data = ScreenModel(size=(800, 480))
+            content = ScreenModel(size=(800, 480)).model_dump_json(indent=2)
         elif item_type == 'schedule':
-            data = UpdateScheduleModel(name=os.path.splitext(filename)[0], schedules=[])
+            content = '[]'  # a schedule file is a plain List[WeeklyScheduleModel]
         else:
             ui.notify(f'Unknown item type "{item_type}".', type='negative')
             return
 
-        # write default data to file
+        # write default content to file
         with open(os.path.join(dir, filename), 'w') as f:
-            f.write(data.model_dump_json(indent=2))
+            f.write(content)
 
         show_files.refresh(item_type, dir)
         ui.notify(f'File "{filename}" added.', type='positive')
@@ -197,7 +197,7 @@ def show_files(item_type: str, dir: str):
 
 
 @contextmanager
-def frame_with_json_editor(item_type: str, dir: str, filename: str, modelClass: BaseModel):
+def frame_with_json_editor(item_type: str, dir: str, filename: str, modelClass: type[BaseModel] | TypeAdapter):
     # check filename to consist of alphanumeric characters and underscores
     if not filename or not check_filename(filename) or not filename.endswith('.json'):
         ui.notify(f'Invalid file name: "{filename}".', type='negative')
@@ -260,7 +260,10 @@ def frame_with_json_editor(item_type: str, dir: str, filename: str, modelClass: 
     def validate_json(content):
         try:
             data = json.loads(content)
-            modelClass(**data)
+            if isinstance(modelClass, TypeAdapter):
+                modelClass.validate_python(data)
+            else:
+                modelClass(**data)
             return True, "Valid JSON"
         except (json.JSONDecodeError, ValidationError) as e:
             return False, str(e)
@@ -333,8 +336,8 @@ def page_schedules():
 async def page_schedule_edit(filename: str):
     if (redirect := login_redirect()):
         return redirect
-    with frame_with_json_editor('schedule', app_config.schedule_dir, filename, UpdateScheduleModel):
-        classes = (UpdateScheduleModel, WeeklyScheduleModel, TimeModel)
+    with frame_with_json_editor('schedule', app_config.schedule_dir, filename, TypeAdapter(list[WeeklyScheduleModel])):
+        classes = (WeeklyScheduleModel, TimeModel)
         ui.code(get_sourcecode(classes), language='python').classes('w-full')
 
 
