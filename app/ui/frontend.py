@@ -371,7 +371,9 @@ async def page_schedule_edit(filename: str):
                     ui.label('Weekly rule').classes('text-subtitle1')
                     ui.button(icon='delete').props('color=negative dense flat').on_click(
                         lambda _, k=key: delete_rule(k))
-                form.render_field('by_weekdays').classes('w-full')
+                # checkbox_group returns a composite _CheckboxGroup, not a
+                # ui.element either -- same no-.classes()-chaining rule as 'times'
+                form.render_field('by_weekdays', widget_type='ui.checkbox_group', props='inline')
                 form.render_field('by_months').classes('w-full')
                 # 'times' resolves to an editgrid widget (ModelGrid/EditGridWrapper),
                 # a plain wrapper object, not a ui.element -- no .classes() to chain
