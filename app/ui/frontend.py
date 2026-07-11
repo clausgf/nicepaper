@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import contextmanager
 import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
@@ -8,14 +9,17 @@ from nicegui import context, ui
 import os
 import json
 import inspect
-from pydantic import BaseModel, TypeAdapter, ValidationError
+from pydantic import BaseModel, ValidationError
 from babel.dates import format_datetime, get_timezone
+from niceview.dataadapter import JsonListAdapter
+from niceview.form import ModelForm
+from niceview.util import confirm_dialog
 
 
 from app.auth import PasswordAuthProvider, get_auth_provider
 from app.config import app_config
 from app.models.screenmodel import DateWidgetModel, RoomCalendarWidgetModel, ScreenModel, TextWidgetModel, WidgetModel
-from app.models.updateschedulemodel import TimeModel, WeeklyScheduleModel
+from app.models.updateschedulemodel import WeeklyScheduleModel
 from app.util import check_filename
 
 
@@ -197,7 +201,7 @@ def show_files(item_type: str, dir: str):
 
 
 @contextmanager
-def frame_with_json_editor(item_type: str, dir: str, filename: str, modelClass: type[BaseModel] | TypeAdapter):
+def frame_with_json_editor(item_type: str, dir: str, filename: str, modelClass: type[BaseModel]):
     # check filename to consist of alphanumeric characters and underscores
     if not filename or not check_filename(filename) or not filename.endswith('.json'):
         ui.notify(f'Invalid file name: "{filename}".', type='negative')
@@ -260,10 +264,7 @@ def frame_with_json_editor(item_type: str, dir: str, filename: str, modelClass: 
     def validate_json(content):
         try:
             data = json.loads(content)
-            if isinstance(modelClass, TypeAdapter):
-                modelClass.validate_python(data)
-            else:
-                modelClass(**data)
+            modelClass(**data)
             return True, "Valid JSON"
         except (json.JSONDecodeError, ValidationError) as e:
             return False, str(e)
@@ -334,11 +335,84 @@ def page_schedules():
 
 @ui.page('/schedules/{filename}')
 async def page_schedule_edit(filename: str):
+    """
+    Edit a schedule as a card per weekly rule (WeeklyScheduleModel), backed
+    by a niceview JsonListAdapter over the schedule file. Each card is an
+    autosaving ModelForm bound to one list item; fields are placed by hand
+    (niceview has no generic "card grid" widget, nor should it: which
+    fields go where is inherently an application layout decision, not
+    something a form library can generalize).
+    """
     if (redirect := login_redirect()):
         return redirect
-    with frame_with_json_editor('schedule', app_config.schedule_dir, filename, TypeAdapter(list[WeeklyScheduleModel])):
-        classes = (WeeklyScheduleModel, TimeModel)
-        ui.code(get_sourcecode(classes), language='python').classes('w-full')
+
+    if not filename or not check_filename(filename) or not filename.endswith('.json'):
+        ui.notify(f'Invalid file name: "{filename}".', type='negative')
+        ui.navigate.to(get_action_link('schedule', 'list'))
+        return
+
+    schedule_path = Path(app_config.schedule_dir) / filename
+    if not schedule_path.exists():
+        ui.notify(f'File "{filename}" does not exist.', type='negative')
+        ui.navigate.to(get_action_link('schedule', 'list'))
+        return
+
+    adapter = JsonListAdapter(WeeklyScheduleModel, schedule_path)
+
+    @ui.refreshable
+    def rule_cards():
+        rules = list(adapter.items())
+        if not rules:
+            ui.label('No weekly rules yet — add one below.').classes('italic')
+        for key, _item in rules:
+            form = ModelForm.from_adapter(WeeklyScheduleModel, adapter, key, autosave=True)
+            with ui.card().classes('w-full q-mb-md'):
+                with ui.row().classes('w-full items-center justify-between'):
+                    ui.label('Weekly rule').classes('text-subtitle1')
+                    ui.button(icon='delete').props('color=negative dense flat').on_click(
+                        lambda _, k=key: delete_rule(k))
+                form.render_field('by_weekdays').classes('w-full')
+                form.render_field('by_months').classes('w-full')
+                # 'times' resolves to an editgrid widget (ModelGrid/EditGridWrapper),
+                # a plain wrapper object, not a ui.element -- no .classes() to chain
+                form.render_field('times')
+                form.render_nonfield_errors()
+
+    async def delete_rule(key: str):
+        if not await confirm_dialog('Delete rule', 'Delete this weekly rule? This cannot be undone.',
+                                     ok_label='Delete', ok_color='negative'):
+            return
+        adapter.delete(key)
+        rule_cards.refresh()
+        ui.notify('Rule deleted', type='positive')
+
+    def add_rule():
+        adapter.create(WeeklyScheduleModel(times=[]))
+        rule_cards.refresh()
+
+    with frame(f'Edit schedule {filename}', 'schedule', app_config.schedule_dir):
+        with ui.row().classes('w-full place-content-end'):
+            ui.button('Delete File', on_click=lambda: delete_schedule_file())
+        rule_cards()
+        ui.button('Add Rule', icon='add', on_click=lambda: add_rule()).props('color=primary')
+
+    with ui.dialog().style('width: 400px') as confirm_delete_file_dialog, ui.card():
+        ui.label('Delete file').classes('text-h6 center')
+        ui.label(f'Are you sure you want to delete "{filename}"?')
+        with ui.row().classes('w-full place-content-end'):
+            ui.space()
+            ui.button('Cancel', on_click=lambda: confirm_delete_file_dialog.submit(False)).props('color=green')
+            ui.button('Confirm', on_click=lambda: confirm_delete_file_dialog.submit(True)).props('color=red')
+
+    async def delete_schedule_file():
+        confirm = await confirm_delete_file_dialog
+        if confirm:
+            os.remove(schedule_path)
+            ui.notify(f'File "{filename}" deleted.', type='positive')
+            show_files.refresh('schedule', app_config.schedule_dir)
+            ui.navigate.to(get_action_link('schedule', 'list'))
+        else:
+            ui.notify(f'Canceled deleting "{filename}".', type='negative')
 
 
 @ui.page('/')
