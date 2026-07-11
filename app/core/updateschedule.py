@@ -6,7 +6,7 @@ import aiofiles
 from dateutil.rrule import rrule, DAILY, MO, TU, WE, TH, FR, SA, SU
 from app.config import app_config
 from app.util import logger
-from app.models.updateschedulemodel import UpdateScheduleModel
+from app.models.updateschedulemodel import ALL_WEEKDAYS, UpdateScheduleModel
 
 
 class UpdateSchedule:
@@ -23,20 +23,14 @@ class UpdateSchedule:
         now = datetime.datetime.now(ZoneInfo(app_config.timezone))
         next_update = None
 
-        weekdays = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
-
         for s in self.config.schedules:
             for t in s.times:
-                # determine weekdays als integer list (MO=0, TU=1, ...)
-                by_weekdays = None
-                if s.by_weekdays:
-                    by_weekdays = [ weekdays.index(wd) for wd in s.by_weekdays ]
+                # by_months/by_weekdays are never None (see WeeklyScheduleModel);
+                # an empty list behaves the same as "all" in dateutil.rrule, not
+                # "none", so no special-casing is needed here either way
+                by_weekdays = [ALL_WEEKDAYS.index(wd) for wd in s.by_weekdays]
 
                 for dt in rrule(freq=DAILY, dtstart=now, until=now + datetime.timedelta(days=future_days), bymonth=s.by_months, byweekday=by_weekdays):
-                    # if s.by_months and dt.month not in s.by_months:
-                    #     continue
-                    # if s.by_weekdays and weekdays[dt.weekday()] not in s.by_weekdays:
-                    #     continue
                     dt = dt.replace(hour=int(t.time[:2]), minute=int(t.time[3:]), second=0, microsecond=0)
                     if dt > now and (not next_update or dt < next_update):
                         next_update = dt
