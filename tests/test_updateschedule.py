@@ -5,21 +5,29 @@ import os
 import uuid
 from zoneinfo import ZoneInfo
 
+import pytest
+from pydantic import ValidationError
+
 from app.config import app_config
 from app.core.updateschedule import UpdateSchedule, get_schedule_by_id
-from app.models.updateschedulemodel import ALL_MONTHS, ALL_WEEKDAYS, TimeModel, WeeklyScheduleModel
+from app.models.updateschedulemodel import ALL_MONTHS, ALL_WEEKDAYS, WeeklyScheduleModel
 
 
 def test_weekly_schedule_defaults_to_all_months_and_weekdays():
-    s = WeeklyScheduleModel(times=[TimeModel(time="06:00")])
+    s = WeeklyScheduleModel(times=["06:00"])
     assert s.by_months == ALL_MONTHS
     assert s.by_weekdays == ALL_WEEKDAYS
+
+
+def test_weekly_schedule_rejects_invalid_time():
+    with pytest.raises(ValidationError):
+        WeeklyScheduleModel(times=["25:99"])
 
 
 def test_get_next_update_unconstrained_finds_a_time_within_a_day():
     now = datetime.datetime.now(ZoneInfo(app_config.timezone))
     soon = (now + datetime.timedelta(minutes=2)).strftime("%H:%M")
-    schedules = [WeeklyScheduleModel(times=[TimeModel(time=soon)])]
+    schedules = [WeeklyScheduleModel(times=[soon])]
     schedule = UpdateSchedule("t", schedules, now)
 
     next_update = schedule.get_next_update()
@@ -32,7 +40,7 @@ def test_get_next_update_unconstrained_finds_a_time_within_a_day():
 def test_get_next_update_respects_weekday_restriction():
     now = datetime.datetime.now(ZoneInfo(app_config.timezone))
     other_weekday = ALL_WEEKDAYS[(now.weekday() + 1) % 7]
-    schedules = [WeeklyScheduleModel(by_weekdays=[other_weekday], times=[TimeModel(time="00:01")])]
+    schedules = [WeeklyScheduleModel(by_weekdays=[other_weekday], times=["00:01"])]
     schedule = UpdateSchedule("t", schedules, now)
 
     next_update = schedule.get_next_update()
@@ -46,7 +54,7 @@ def test_get_schedule_by_id_reads_plain_list_file():
     schedule_file = os.path.join(app_config.schedule_dir, f"{schedule_id}.json")
     with open(schedule_file, "w") as f:
         json.dump([
-            {"type": "weekly", "by_weekdays": ["MO"], "times": [{"time": "06:00"}]},
+            {"type": "weekly", "by_weekdays": ["MO"], "times": ["06:00"]},
         ], f)
     try:
         schedule = asyncio.run(get_schedule_by_id(schedule_id))

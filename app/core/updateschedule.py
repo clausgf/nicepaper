@@ -35,7 +35,7 @@ class UpdateSchedule:
                 by_weekdays = [ALL_WEEKDAYS.index(wd) for wd in s.by_weekdays]
 
                 for dt in rrule(freq=DAILY, dtstart=now, until=now + datetime.timedelta(days=future_days), bymonth=s.by_months, byweekday=by_weekdays):
-                    dt = dt.replace(hour=int(t.time[:2]), minute=int(t.time[3:]), second=0, microsecond=0)
+                    dt = dt.replace(hour=int(t[:2]), minute=int(t[3:]), second=0, microsecond=0)
                     if dt > now and (not next_update or dt < next_update):
                         next_update = dt
                         break

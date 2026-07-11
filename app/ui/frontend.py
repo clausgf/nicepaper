@@ -375,9 +375,9 @@ async def page_schedule_edit(filename: str):
                 # ui.element itself -- style its .widget (the row/column) instead
                 form.render_field('by_weekdays', widget_type='checkbox_group', props='inline').widget.classes('w-full')
                 form.render_field('by_months').classes('w-full')
-                # 'times' resolves to an editgrid widget (ModelGrid/EditGridWrapper),
-                # a plain wrapper object, not a ui.element -- no .classes() to chain
-                form.render_field('times')
+                # times: List[Annotated[str, pattern]] -> ui.input_chips, a real
+                # ui.element (unlike checkbox_group/editgrid), so .classes() works
+                form.render_field('times').classes('w-full')
                 form.render_nonfield_errors()
 
     async def delete_rule(key: str):
