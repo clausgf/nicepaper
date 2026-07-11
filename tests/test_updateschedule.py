@@ -24,6 +24,11 @@ def test_weekly_schedule_rejects_invalid_time():
         WeeklyScheduleModel(times=["25:99"])
 
 
+def test_weekly_schedule_sorts_times():
+    s = WeeklyScheduleModel(times=["18:00", "06:00", "12:00"])
+    assert s.times == ["06:00", "12:00", "18:00"]
+
+
 def test_get_next_update_unconstrained_finds_a_time_within_a_day():
     now = datetime.datetime.now(ZoneInfo(app_config.timezone))
     soon = (now + datetime.timedelta(minutes=2)).strftime("%H:%M")
@@ -54,13 +59,13 @@ def test_get_schedule_by_id_reads_plain_list_file():
     schedule_file = os.path.join(app_config.schedule_dir, f"{schedule_id}.json")
     with open(schedule_file, "w") as f:
         json.dump([
-            {"type": "weekly", "by_weekdays": ["MO"], "times": ["06:00"]},
+            {"type": "weekly", "by_weekdays": ["Mon"], "times": ["06:00"]},
         ], f)
     try:
         schedule = asyncio.run(get_schedule_by_id(schedule_id))
         assert schedule is not None
         assert len(schedule.schedules) == 1
-        assert schedule.schedules[0].by_weekdays == ["MO"]
+        assert schedule.schedules[0].by_weekdays == ["Mon"]
         assert schedule.schedules[0].by_months == ALL_MONTHS
     finally:
         os.remove(schedule_file)

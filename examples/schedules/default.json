@@ -1,12 +1,12 @@
 [
   {
     "type": "weekly",
-    "by_weekdays": ["MO", "TU", "WE", "TH", "FR"],
+    "by_weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri"],
     "times": ["06:00", "12:00", "18:00"]
   },
   {
     "type": "weekly",
-    "by_weekdays": ["SA", "SU"],
+    "by_weekdays": ["Sat", "Sun"],
     "times": ["08:00"]
   }
 ]
