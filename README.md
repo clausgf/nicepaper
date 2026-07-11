@@ -17,14 +17,17 @@ the content actually changed.
   expansion), caches it and shows the current/next appointments.
 - **Color models**: rendered images can be quantized to e-paper palettes
   (`bw`, `bwr`, `gs4`, `c7`, `e6`) via the `color_model` query parameter.
-- **Update schedules**: JSON-configured schedules determine when a screen
+- **Update schedules**: a schedule file is a plain JSON list of weekly
+  rules (weekdays, months, times of day) that determine when a screen
   expires and is re-rendered.
 - **Display aliases**: an optional `data/aliases.json` file maps friendly
   names to screen ids, e.g. `{"hallway": "epaper_43bw"}`, so a display
   can be addressed by a stable name instead of the screen file name, and
   several displays can share one screen.
-- **Management UI**: create, edit, validate and delete screen and
-  schedule files with a JSON editor and live image previews.
+- **Management UI**: create and delete screen and schedule files, edit
+  screens with a validated JSON editor and live image previews, edit
+  schedules as a card per weekly rule with checkboxes/multiselects and
+  inline validation.
 
 ## Project structure
 
@@ -66,6 +69,13 @@ The project is managed with [uv](https://docs.astral.sh/uv/).
    ```
    uv sync
    ```
+
+   The schedule editor's card UI is built on
+   [niceview](https://github.com/clausgf/niceview), pinned in `uv.lock`
+   as a git dependency (pre-1.0, no PyPI release yet) — `uv sync` needs
+   network access to GitHub the first time. Run
+   `uv lock --upgrade-package niceview && uv sync` to pick up upstream
+   changes.
 
 2. Create the runtime data directories and copy the example
    configuration to get a working screen right away:

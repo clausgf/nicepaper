@@ -372,8 +372,8 @@ async def page_schedule_edit(filename: str):
                     ui.button(icon='delete').props('color=negative dense flat').on_click(
                         lambda _, k=key: delete_rule(k))
                 # checkbox_group returns a composite CheckboxGroup, not a
-                # ui.element itself -- style its .container instead
-                form.render_field('by_weekdays', widget_type='checkbox_group', props='inline').container.classes('w-full')
+                # ui.element itself -- style its .widget (the row/column) instead
+                form.render_field('by_weekdays', widget_type='checkbox_group', props='inline').widget.classes('w-full')
                 form.render_field('by_months').classes('w-full')
                 # 'times' resolves to an editgrid widget (ModelGrid/EditGridWrapper),
                 # a plain wrapper object, not a ui.element -- no .classes() to chain
