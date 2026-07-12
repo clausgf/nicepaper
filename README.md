@@ -24,10 +24,12 @@ the content actually changed.
   names to screen ids, e.g. `{"hallway": "epaper_43bw"}`, so a display
   can be addressed by a stable name instead of the screen file name, and
   several displays can share one screen.
-- **Management UI**: create and delete screen and schedule files, edit
-  screens with a validated JSON editor and live image previews, edit
-  schedules as a card per weekly rule with checkboxes/multiselects and
-  inline validation.
+- **Management UI**: two top-level tabs, Screens and Schedules. Create
+  and delete files, edit screens with a validated JSON editor and live
+  image previews, edit schedules as a card per weekly rule with
+  checkboxes/multiselects and inline validation. No built-in
+  authentication — put it behind an authenticating reverse proxy if the
+  UI shouldn't be open to anyone who can reach it.
 
 ## Project structure
 
@@ -117,49 +119,10 @@ variables (pydantic-settings), e.g.:
 
 - `STORAGE_SECRET`: secret for NiceGUI browser session storage.
 
-### Authentication
-
-`AUTH_PROVIDER` selects how the UI authenticates users:
-
-- `proxy` (default): an authenticating reverse proxy in front of the
-  app (e.g. Caddy with oauth2-proxy) handles the login; the app reads
-  the forwarded identity from request headers.
-  - `AUTH_USER_HEADERS`: JSON list of headers carrying the username
-    (defaults match oauth2-proxy: `X-Forwarded-Preferred-Username`,
-    `X-Forwarded-User`, `X-Forwarded-Email`); the first non-empty
-    value is shown in the UI.
-  - `AUTH_LOGOUT_URL`: logout link shown in the user menu, e.g.
-    `/oauth2/sign_out`; unset hides the entry.
-  - The headers are only trustworthy when the app is reachable
-    exclusively through the proxy.
-  - Deployment note (Caddy + oauth2-proxy): oauth2-proxy must be told
-    to expose the identity (`--set-xauthrequest`, and/or
-    `--pass-user-headers` when proxying through oauth2-proxy itself)
-    and Caddy's `forward_auth` block must forward it to the app, e.g.
-
-    ```
-    forward_auth oauth2-proxy:4180 {
-        uri /oauth2/auth
-        copy_headers X-Auth-Request-Preferred-Username>X-Forwarded-Preferred-Username X-Auth-Request-User>X-Forwarded-User X-Auth-Request-Email>X-Forwarded-Email
-    }
-    ```
-
-    Set `AUTH_LOGOUT_URL=/oauth2/sign_out` for a working logout entry.
-    After deploying, check once which of the configured headers
-    actually arrives and adjust `AUTH_USER_HEADERS` if needed.
-- `password`: built-in login page. Users live in an htpasswd file with
-  bcrypt hashes (`AUTH_HTPASSWD_FILE`, default `data/htpasswd`),
-  maintained with the standard Apache tool:
-
-  ```
-  htpasswd -c -B data/htpasswd alice   # create file and first user
-  htpasswd -B data/htpasswd bob        # add/update further users
-  ```
-
-  Only bcrypt entries (`-B`) are accepted; the file is re-read on each
-  login attempt, so changes apply without a restart. Set a strong
-  `STORAGE_SECRET`, since it signs the session cookie.
-- `none`: no authentication (local development).
+There is no built-in authentication (the previous htpasswd/reverse-proxy
+provider setup was removed — nice4iot integration, if pursued, handles
+auth on its own). Put the UI behind an authenticating reverse proxy if
+it shouldn't be reachable by anyone who can reach the host.
 
 ## Examples
 
@@ -196,8 +159,7 @@ uv run pytest
 
 - **API keys for the display API**: `/api` is currently protected by
   external middleware in front of the app. If that check should move
-  into the app, add an `ApiKeyAuthProvider` next to the existing
-  providers, enforced as a FastAPI dependency on the `/api` router
+  into the app, enforce it as a FastAPI dependency on the `/api` router
   (`X-Api-Key` header). Proposed key management: a file
   `data/api_keys.json` mapping a label per display to the SHA-256 hex
   hash of its key, e.g. `{"display-r101": "<sha256-hex>"}`. Plain

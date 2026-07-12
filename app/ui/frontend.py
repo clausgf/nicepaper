@@ -1,11 +1,9 @@
-import asyncio
 from contextlib import contextmanager
 import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter
-from fastapi.responses import RedirectResponse
-from nicegui import context, ui
+from nicegui import ui
 import os
 import json
 import inspect
@@ -16,7 +14,6 @@ from niceview.form import ModelForm
 from niceview.util import confirm_dialog
 
 
-from app.auth import PasswordAuthProvider, get_auth_provider
 from app.config import app_config
 from app.models.screenmodel import DateWidgetModel, RoomCalendarWidgetModel, ScreenModel, TextWidgetModel, WidgetModel
 from app.models.updateschedulemodel import WeeklyScheduleModel
@@ -25,11 +22,9 @@ from app.util import check_filename
 
 router = APIRouter()
 
-main_menu = [
-    {'label': 'Home', 'icon': 'home', 'link': '/'},
-    {'label': 'Screens', 'icon': 'image', 'link': '/screens'},
-    {'label': 'Schedules', 'icon': 'calendar_today', 'link': '/schedules'},
-]
+# top-level navigation: two tabs, each its own route (not client-side
+# panel switching), so /screens and /schedules stay deep-linkable
+TAB_ROUTES = {'Screens': '/screens', 'Schedules': '/schedules'}
 
 item_types = {
     "screen": {'plural': 'screens', 'actions': [
@@ -57,24 +52,6 @@ def get_sourcecode(classes_list):
     return source
 
 
-def user_menu():
-    provider = get_auth_provider()
-    username = provider.get_user(context.client.request)
-
-    def do_logout():
-        provider.logout()
-        ui.navigate.to(provider.logout_url() or '/')
-
-    with ui.button(username or '', icon='person').props('flat color=white'):
-        with ui.menu():
-            if not username:
-                ui.menu_item('Not signed in').props('disable')
-            if provider.logout_url():
-                with ui.menu_item(on_click=do_logout).classes('items-center gap-x-2'):
-                    ui.icon('logout').props('size=large')
-                    ui.label('Logout')
-
-
 def screen_image(url: str):
     img = ui.image(url)
     with ui.row().classes('w-full items-center justify-between'):
@@ -82,36 +59,18 @@ def screen_image(url: str):
         ui.button('Refresh', icon='refresh').on('click', lambda img=img: img.force_reload())
 
 
-def login_redirect():
-    """
-    Server-side redirect to the login page for unauthenticated users, or
-    None if the page may be shown. Call at the top of every protected
-    page: 'if (redirect := login_redirect()): return redirect'. A
-    server-side redirect ensures the page content is never rendered
-    into the response for unauthenticated users.
-    """
-    provider = get_auth_provider()
-    request = context.client.request
-    if provider.login_required and provider.get_user(request) is None:
-        root_path = request.scope.get('root_path', '') if request else ''
-        return RedirectResponse(f"{root_path}/login")
-    return None
-
-
 @contextmanager
-def frame(navigation_title: str, sidemenu_item_type: str = None, sidemenu_dir: str = None):
+def frame(navigation_title: str, active_tab: str = None):
     """Page frame to share the same styling and navigation across all pages."""
+    def on_tab_change(e):
+        if e.value != active_tab:
+            ui.navigate.to(TAB_ROUTES[e.value])
+
     with ui.header(elevated=True).style('background-color: #3874c8').classes('items-center justify-between'):
-        ui.button(on_click=lambda: left_drawer.toggle(), icon='menu').props('flat color=white')
         ui.label('Epaper Doorsign Manager').classes('font-bold')
-        user_menu()
-    with ui.left_drawer(fixed=False).style('background-color: #ebf1fa').props('bordered') as left_drawer:
-        # main menu
-        with ui.row().classes('w-full items-center'):
-            for item in main_menu:
-                ui.button(item['label'], icon=item['icon']).on('click', lambda l=item['link']: ui.navigate.to(l)).props('size=sm dense')
-        ui.separator()
-        show_files(sidemenu_item_type, sidemenu_dir)
+        with ui.tabs(value=active_tab, on_change=on_tab_change).props('dense indicator-color=white').classes('text-white'):
+            ui.tab('Screens')
+            ui.tab('Schedules')
     with ui.column().classes('w-full'):
         ui.label(navigation_title).classes('text-h5')
         ui.separator()
@@ -120,56 +79,47 @@ def frame(navigation_title: str, sidemenu_item_type: str = None, sidemenu_dir: s
 
 @ui.refreshable
 def show_files(item_type: str, dir: str):
-    if item_type is None or dir is None:
-        ui.label('No items.').classes('italic')
-        return
+    # header with button to add new file
+    with ui.row().classes('w-full items-center justify-between'):
+        plural = item_types[item_type]['plural']
+        ui.label(f'{plural.capitalize()}').classes('text-h6')
+        ui.button(icon='add', on_click=lambda: add_file()).props('size=sm round outline')
 
-    # show list of files in the directory
-    with ui.column().classes('w-full'):
+    # list of files
+    file_list = sorted(os.listdir(dir))
+    with ui.list().style('width: 100%').props('bordered separator'):
+        for filename in file_list:
+            with ui.item(on_click=lambda l=get_action_link(item_type, 'edit', filename): ui.navigate.to(l)):
+                with ui.item_section().props('avatar'):
+                    ui.icon('description')
+                with ui.item_section():
+                    ui.item_label(filename)
 
-        # header with button to add new file
-        with ui.row().classes('w-full items-center justify-between'):
-            plural = item_types[item_type]['plural']
-            ui.label(f'{plural.capitalize()}').classes('text-h6')
-            ui.button(icon='add', on_click=lambda: add_file()).props('size=sm round outline')
+                    # determine last modified date
+                    fn = os.path.join(dir, filename)
+                    mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fn), tz=ZoneInfo("UTC"))
+                    dt_format = app_config.date_format + ' ' + app_config.time_format
+                    mtime_str = format_datetime(mtime, format=dt_format, tzinfo=get_timezone(app_config.timezone), locale=app_config.locale)
 
-        # list of files
-        file_list = sorted(os.listdir(dir))
-        with ui.list().style('width: 100%').props('bordered separator'):
-            #ui.item_label('Files').props('header').classes('text-bold')
-            #ui.separator()
-            for filename in file_list:
-                with ui.item(on_click=lambda l=get_action_link(item_type, 'edit', filename): ui.navigate.to(l)):
-                    with ui.item_section().props('avatar'):
-                        ui.icon('description')
-                    with ui.item_section():
-                        ui.item_label(filename)
+                    # determine file size
+                    size = os.path.getsize(os.path.join(dir, filename))
+                    if size < 1024:
+                        size_str = f'{size} B'
+                    elif size < 1024**2:
+                        size_str = f'{size/1024:.1f} KB'
+                    else:
+                        size_str = f'{size/1024**2:.1f} MB'
 
-                        # determine last modified date
-                        fn = os.path.join(dir, filename)
-                        mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fn), tz=ZoneInfo("UTC"))
-                        dt_format = app_config.date_format + ' ' + app_config.time_format
-                        mtime_str = format_datetime(mtime, format=dt_format, tzinfo=get_timezone(app_config.timezone), locale=app_config.locale)
+                    ui.item_label(mtime_str + ', ' + size_str).props('caption').classes('italic')
 
-                        # determine file size
-                        size = os.path.getsize(os.path.join(dir, filename))
-                        if size < 1024:
-                            size_str = f'{size} B'
-                        elif size < 1024**2:
-                            size_str = f'{size/1024:.1f} KB'
-                        else:
-                            size_str = f'{size/1024**2:.1f} MB'
-
-                        ui.item_label(mtime_str + ', ' + size_str).props('caption').classes('italic')
-
-        # dialog for adding file and entering file name
-        with ui.dialog().style('width: 1800px') as add_file_dialog, ui.card():
-            ui.label(f'Add new {item_type}').classes('text-h6 center')
-            new_filename = ui.input("Enter the name of the new file").props('placeholder=filename.json').classes('w-full')
-            with ui.row().classes('w-full place-content-end'):
-                ui.space()
-                ui.button('Cancel', on_click=lambda: add_file_dialog.submit(None))
-                ui.button('Add', on_click=lambda: add_file_dialog.submit(new_filename.value))
+    # dialog for adding file and entering file name
+    with ui.dialog().style('width: 1800px') as add_file_dialog, ui.card():
+        ui.label(f'Add new {item_type}').classes('text-h6 center')
+        new_filename = ui.input("Enter the name of the new file").props('placeholder=filename.json').classes('w-full')
+        with ui.row().classes('w-full place-content-end'):
+            ui.space()
+            ui.button('Cancel', on_click=lambda: add_file_dialog.submit(None))
+            ui.button('Add', on_click=lambda: add_file_dialog.submit(new_filename.value))
 
     async def add_file():
         filename = await add_file_dialog
@@ -202,6 +152,8 @@ def show_files(item_type: str, dir: str):
 
 @contextmanager
 def frame_with_json_editor(item_type: str, dir: str, filename: str, modelClass: type[BaseModel]):
+    active_tab = 'Screens' if item_type == 'screen' else 'Schedules'
+
     # check filename to consist of alphanumeric characters and underscores
     if not filename or not check_filename(filename) or not filename.endswith('.json'):
         ui.notify(f'Invalid file name: "{filename}".', type='negative')
@@ -221,7 +173,7 @@ def frame_with_json_editor(item_type: str, dir: str, filename: str, modelClass: 
         content = f.read()
 
     # create editor for file content
-    with frame(f'Edit {item_type.lower()} {filename}', item_type, dir):
+    with frame(f'Edit {item_type.lower()} {filename}', active_tab):
         editor = ui.codemirror(language='json', theme='material')
         editor.set_value(content)
         with ui.row().classes('w-full place-content-end'):
@@ -238,7 +190,7 @@ def frame_with_json_editor(item_type: str, dir: str, filename: str, modelClass: 
             ui.space()
             ui.button('Cancel', on_click=lambda: confirm_delete_dialog.submit(False)).props('color=green')
             ui.button('Confirm', on_click=lambda: confirm_delete_dialog.submit(True)).props('color=red')
-    
+
     async def delete_file():
         confirm = await confirm_delete_dialog
         if confirm:
@@ -270,43 +222,19 @@ def frame_with_json_editor(item_type: str, dir: str, filename: str, modelClass: 
             return False, str(e)
 
 
-@ui.page('/login')
-def page_login():
-    provider = get_auth_provider()
-    if not isinstance(provider, PasswordAuthProvider) or provider.get_user():
-        root_path = context.client.request.scope.get('root_path', '') if context.client.request else ''
-        return RedirectResponse(f"{root_path}/")
-
-    with ui.card().classes('absolute-center items-stretch'):
-        ui.label('Epaper Doorsign Manager').classes('text-h6')
-        username = ui.input('Username').props('autofocus')
-        password = ui.input('Password', password=True, password_toggle_button=True)
-
-        async def try_login():
-            # bcrypt verification is CPU bound, keep it off the event loop
-            if await asyncio.to_thread(provider.verify, username.value, password.value):
-                provider.login(username.value)
-                ui.navigate.to('/')
-            else:
-                ui.notify('Wrong username or password', type='negative')
-
-        username.on('keydown.enter', try_login)
-        password.on('keydown.enter', try_login)
-        ui.button('Log in', on_click=try_login).classes('w-full')
+@ui.page('/')
+def page_home():
+    ui.navigate.to('/screens')
 
 
 @ui.page('/screens')
 def page_screens():
-    if (redirect := login_redirect()):
-        return redirect
-    with frame('Select a screen to edit or add a new one', 'screen', app_config.screen_dir):
+    with frame('Select a screen to edit or add a new one', 'Screens'):
         show_files('screen', app_config.screen_dir)
 
 
 @ui.page('/screens/{filename}')
 async def page_screen_edit(filename: str):
-    if (redirect := login_redirect()):
-        return redirect
     with frame_with_json_editor('screen', app_config.screen_dir, filename, ScreenModel):
         ui.separator()
         color_models = [cm.id for cm in app_config.epaper_color_models]
@@ -327,9 +255,7 @@ async def page_screen_edit(filename: str):
 
 @ui.page('/schedules')
 def page_schedules():
-    if (redirect := login_redirect()):
-        return redirect
-    with frame('Select a schedule to edit or add a new one', 'schedule', app_config.schedule_dir):
+    with frame('Select a schedule to edit or add a new one', 'Schedules'):
         show_files('schedule', app_config.schedule_dir)
 
 
@@ -343,9 +269,6 @@ async def page_schedule_edit(filename: str):
     fields go where is inherently an application layout decision, not
     something a form library can generalize).
     """
-    if (redirect := login_redirect()):
-        return redirect
-
     if not filename or not check_filename(filename) or not filename.endswith('.json'):
         ui.notify(f'Invalid file name: "{filename}".', type='negative')
         ui.navigate.to(get_action_link('schedule', 'list'))
@@ -392,7 +315,7 @@ async def page_schedule_edit(filename: str):
         adapter.create(WeeklyScheduleModel(times=[]))
         rule_cards.refresh()
 
-    with frame(f'Edit schedule {filename}', 'schedule', app_config.schedule_dir):
+    with frame(f'Edit schedule {filename}', 'Schedules'):
         with ui.row().classes('w-full place-content-end'):
             ui.button('Delete File', on_click=lambda: delete_schedule_file())
         rule_cards()
@@ -415,15 +338,3 @@ async def page_schedule_edit(filename: str):
             ui.navigate.to(get_action_link('schedule', 'list'))
         else:
             ui.notify(f'Canceled deleting "{filename}".', type='negative')
-
-
-@ui.page('/')
-def page_home():
-    if (redirect := login_redirect()):
-        return redirect
-    with frame('Main Menu'):
-        with ui.row():
-            for item in main_menu:
-                ui.button(item['label'], icon=item['icon']).on('click', lambda l=item['link']: ui.navigate.to(l)).props('size=xl stack').classes('w-48 h-32')
-            ui.space()
-

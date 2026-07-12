@@ -17,7 +17,6 @@ dependencies = [
     "aiohttp",
     "aiofiles",
     "python-dateutil",
-    "bcrypt",
     "niceview",
 ]
 
