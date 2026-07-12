@@ -5,10 +5,10 @@ from pydantic import Field
 import datetime
 from babel.dates import format_datetime, get_timezone
 
-from app.config import app_config
-from app.models.screenmodel import RoomCalendarWidgetModel
-from app.core.datasources.ical import get_from_ical
-from app.util import logger
+from extensions.epaper.config import app_config
+from extensions.epaper.models.screenmodel import RoomCalendarWidgetModel
+from extensions.epaper.core.datasources.ical import get_from_ical
+from extensions.epaper.util import logger
 from ..drawingcontext import DrawingContext
 from .base import Widget
 
@@ -59,7 +59,8 @@ class RoomCalendarWidget(Widget):
     async def draw(self, ctx: DrawingContext) -> datetime.datetime:
         await super().draw(ctx)
         now = datetime.datetime.now(ZoneInfo(app_config.timezone))
-        events = await get_from_ical(self.id, self.config.ical_url, extract_organizer_from_summary=True)
+        events = await get_from_ical(ctx.paths.ical_dir, ctx.paths.organizer_names_file,
+                                      self.id, self.config.ical_url, extract_organizer_from_summary=True)
         next_change = None
 
         x_inset = 10

@@ -18,4 +18,4 @@ ENV UV_LINK_MODE=copy \
 COPY --chown=${PUID}:${PGID} pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
-ENTRYPOINT ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--reload", "--log-level", "info", "--host", "0.0.0.0", "--port", "8080", "--root-path", "/epaper"]
+ENTRYPOINT ["uv", "run", "--no-sync", "uvicorn", "main:app", "--reload", "--log-level", "info", "--host", "0.0.0.0", "--port", "8080", "--root-path", "/epaper"]

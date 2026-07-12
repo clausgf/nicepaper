@@ -11,7 +11,7 @@
       "python": "${workspaceFolder}/.venv/bin/python",
       "module": "uvicorn",
       "cwd": "${workspaceFolder}",
-      "args": ["app.main:app", "--reload"],
+      "args": ["main:app", "--reload"],
       "jinja": true
     }
   ]

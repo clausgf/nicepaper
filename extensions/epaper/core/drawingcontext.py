@@ -3,8 +3,8 @@ import math
 from typing import Tuple
 from PIL import Image, ImageFont, ImageDraw, ImageColor
 
-from app.util import logger
-from app.config import app_config
+from extensions.epaper.util import logger
+from extensions.epaper.config import app_config
 
 
 class FontResourceManager:
@@ -61,7 +61,7 @@ icon_resource_manager = IconResourceManager(app_config.icon_path)
 
 class DrawingContext:
 
-    def __init__(self, image, color_background: Tuple[int, int, int], color_primary: Tuple[int, int, int], font_model):
+    def __init__(self, image, color_background: Tuple[int, int, int], color_primary: Tuple[int, int, int], font_model, paths=None):
         self.img = image
         self.draw = ImageDraw.Draw(image)
         self.font_provider = font_resource_manager
@@ -72,6 +72,10 @@ class DrawingContext:
         self.font = self.get_font(font_model[0], font_model[1])
         self.origin = (0,0)
         self.size = image.size
+        # per-root file locations (screens/schedules/ical cache/...), so
+        # widgets that need to read/write files (e.g. RoomCalendarWidget's
+        # ical cache) work the same standalone and as a nice4iot extension
+        self.paths = paths
 
 
     def get_font(self, name, size):

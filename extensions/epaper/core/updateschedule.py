@@ -6,9 +6,10 @@ from zoneinfo import ZoneInfo
 import aiofiles
 import pydantic
 from dateutil.rrule import rrule, DAILY
-from app.config import app_config
-from app.util import logger
-from app.models.updateschedulemodel import ALL_WEEKDAYS, WeeklyScheduleModel
+from extensions.epaper.config import app_config
+from extensions.epaper.util import logger
+from extensions.epaper.models.updateschedulemodel import ALL_WEEKDAYS, WeeklyScheduleModel
+from extensions.epaper.paths import EpaperPaths
 
 _schedules_adapter = pydantic.TypeAdapter(List[WeeklyScheduleModel])
 
@@ -43,12 +44,12 @@ class UpdateSchedule:
         return next_update
 
 
-async def get_schedule_by_id(schedule_id: str) -> UpdateSchedule:
+async def get_schedule_by_id(paths: EpaperPaths, schedule_id: str) -> UpdateSchedule:
     """
     Get a schedule instance by its id. The schedule file is a plain JSON
     list of weekly schedule rules (List[WeeklyScheduleModel]).
     """
-    schedule_model_file = os.path.join(app_config.schedule_dir, f"{schedule_id}.json")
+    schedule_model_file = paths.schedule_dir / f"{schedule_id}.json"
     try:
         async with aiofiles.open(schedule_model_file, 'r') as f:
             j = json.loads(await f.read())

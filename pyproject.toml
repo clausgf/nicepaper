@@ -1,7 +1,11 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "epaper-nice"
 version = "0.1.0"
-description = "Renders screens (e.g. door signs with room calendars) as PNG images for e-paper displays; FastAPI backend with a NiceGUI management UI"
+description = "Renders screens (e.g. door signs with room calendars) as PNG images for e-paper displays; FastAPI backend with a NiceGUI management UI, installable as a nice4iot extension (extensions.epaper) or run standalone"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -26,13 +30,34 @@ dev = [
     "httpx",
 ]
 
+[tool.hatch.build.targets.wheel]
+# only extensions/epaper is packaged (not extensions/ itself), which is
+# what keeps the extensions namespace package __init__.py-free after
+# installation (see nice4iot's docs/extensions.md); main.py and the
+# standalone-only bits (data/, examples/, tests/) are not part of the
+# installable package, only of this repo
+packages = ["extensions/epaper"]
+
+[tool.hatch.build.targets.wheel.force-include]
+# bundle fonts/icons as package data so font_path/icon_path resolve
+# correctly regardless of the process's cwd, e.g. when installed as a
+# dependency inside nice4iot's own environment
+"extensions/epaper/resources" = "extensions/epaper/resources"
+
 [tool.uv]
-# the app is run from source (uvicorn app.main:app), not installed as a package
+# don't build/install epaper-nice's own wheel into its own .venv --
+# standalone/dev just runs from source (uv run uvicorn main:app), and
+# the Docker image locks+installs *dependencies* before the source is
+# even copied in (see Dockerfile). This is purely local to this repo's
+# own venv: when another project (e.g. nice4iot) adds epaper-nice as a
+# dependency, its own uv build uses [build-system]/[tool.hatch...]
+# above regardless of this flag.
 package = false
 
 [tool.uv.sources]
 # pre-1.0, no PyPI release; uv.lock pins the exact commit (same pattern
-# as nice4iot). Re-run 'uv lock -P niceview' to pick up upstream changes.
+# as nice4iot). Re-run 'uv lock --upgrade-package niceview' to pick up
+# upstream changes.
 niceview = { git = "https://github.com/clausgf/niceview.git" }
 
 [tool.pytest.ini_options]

@@ -1,9 +1,9 @@
 from typing import Optional, Tuple, List, Literal
 from pydantic import BaseModel
 
-from app.core.drawingcontext import DrawingContext
-from app.models.screenmodel import WidgetModel
-from app.util import logger
+from extensions.epaper.core.drawingcontext import DrawingContext
+from extensions.epaper.models.screenmodel import WidgetModel
+from extensions.epaper.util import logger
 
 
 class Widget:

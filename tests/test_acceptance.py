@@ -12,8 +12,7 @@ import pytest
 from PIL import Image
 from fastapi.testclient import TestClient
 
-from app.config import app_config
-from app.main import app
+from main import app, STANDALONE_PATHS
 
 
 @pytest.fixture(scope="module")
@@ -25,7 +24,7 @@ def client():
 def screen_id():
     """A screen configuration file on disk, removed after the test."""
     screen_id = f"acceptance-{uuid.uuid4().hex[:8]}"
-    screen_file = os.path.join(app_config.screen_dir, f"{screen_id}.json")
+    screen_file = os.path.join(STANDALONE_PATHS.screen_dir, f"{screen_id}.json")
     with open(screen_file, "w") as f:
         json.dump({
             "size": [400, 300],
@@ -37,7 +36,7 @@ def screen_id():
     yield screen_id
     if os.path.exists(screen_file):
         os.remove(screen_file)
-    shutil.rmtree(os.path.join(app_config.image_dir, screen_id), ignore_errors=True)
+    shutil.rmtree(os.path.join(STANDALONE_PATHS.image_dir, screen_id), ignore_errors=True)
 
 
 def test_health(client):
@@ -68,7 +67,7 @@ def test_screen_change_produces_new_image(client, screen_id):
     r = client.get(f"/api/screen/{screen_id}/image.png")
     etag = r.headers["etag"]
 
-    screen_file = os.path.join(app_config.screen_dir, f"{screen_id}.json")
+    screen_file = os.path.join(STANDALONE_PATHS.screen_dir, f"{screen_id}.json")
     with open(screen_file) as f:
         config = json.load(f)
     config["widgets"][0]["text"] = "Changed text"

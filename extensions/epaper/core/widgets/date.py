@@ -3,9 +3,9 @@ from pydantic import Field
 from babel.dates import format_date, get_timezone
 from datetime import datetime
 
-from app.config import app_config
-from app.models.screenmodel import DateWidgetModel
-from app.util import logger
+from extensions.epaper.config import app_config
+from extensions.epaper.models.screenmodel import DateWidgetModel
+from extensions.epaper.util import logger
 from ..drawingcontext import DrawingContext
 from .base import Widget
 

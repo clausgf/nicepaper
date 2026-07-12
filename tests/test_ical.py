@@ -1,7 +1,7 @@
 import datetime
 from zoneinfo import ZoneInfo
 
-from app.core.datasources.ical import _extract_events
+from extensions.epaper.core.datasources.ical import _extract_events
 
 
 ICS = """BEGIN:VCALENDAR

@@ -1,0 +1,70 @@
+"""
+Page assembly for standalone mode only: header/tabs-nav chrome and the
+@ui.page routes. Never imported by the nice4iot extension entry point
+(extensions/epaper/__init__.py) -- there, nice4iot owns the page chrome
+and only the content functions in ui/panels.py are reused.
+"""
+from contextlib import contextmanager
+from nicegui import ui
+
+from extensions.epaper.paths import EpaperPaths
+from extensions.epaper.ui.panels import file_list, schedule_editor, screen_editor
+
+# top-level navigation: two tabs, each its own route (not client-side
+# panel switching), so /screens and /schedules stay deep-linkable
+TAB_ROUTES = {'Screens': '/screens', 'Schedules': '/schedules'}
+
+
+@contextmanager
+def frame(navigation_title: str, active_tab: str = None):
+    """Page frame to share the same styling and navigation across all pages."""
+    def on_tab_change(e):
+        if e.value != active_tab:
+            ui.navigate.to(TAB_ROUTES[e.value])
+
+    with ui.header(elevated=True).style('background-color: #3874c8').classes('items-center justify-between'):
+        ui.label('Epaper Doorsign Manager').classes('font-bold')
+        with ui.tabs(value=active_tab, on_change=on_tab_change).props('dense indicator-color=white').classes('text-white'):
+            ui.tab('Screens')
+            ui.tab('Schedules')
+    with ui.column().classes('w-full'):
+        ui.label(navigation_title).classes('text-h5')
+        ui.separator()
+        yield
+
+
+def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
+    """
+    Register the standalone @ui.page routes. Call once, before ui.run_with().
+    image_base_url is the display API's screen-image prefix, e.g.
+    '/../api/screen' (see main.py).
+    """
+
+    @ui.page('/')
+    def page_home():
+        ui.navigate.to('/screens')
+
+    @ui.page('/screens')
+    def page_screens():
+        with frame('Select a screen to edit or add a new one', 'Screens'):
+            file_list(paths.screen_dir, 'screen',
+                      on_select=lambda f: ui.navigate.to(f'/screens/{f}'),
+                      on_add=lambda f: ui.navigate.to(f'/screens/{f}'))
+
+    @ui.page('/screens/{filename}')
+    def page_screen_edit(filename: str):
+        with frame(f'Edit screen {filename}', 'Screens'):
+            screen_editor(paths, filename, image_base_url,
+                          on_deleted=lambda: ui.navigate.to('/screens'))
+
+    @ui.page('/schedules')
+    def page_schedules():
+        with frame('Select a schedule to edit or add a new one', 'Schedules'):
+            file_list(paths.schedule_dir, 'schedule',
+                      on_select=lambda f: ui.navigate.to(f'/schedules/{f}'),
+                      on_add=lambda f: ui.navigate.to(f'/schedules/{f}'))
+
+    @ui.page('/schedules/{filename}')
+    def page_schedule_edit(filename: str):
+        with frame(f'Edit schedule {filename}', 'Schedules'):
+            schedule_editor(paths, filename, on_deleted=lambda: ui.navigate.to('/schedules'))

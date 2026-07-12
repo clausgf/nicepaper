@@ -1,8 +1,8 @@
 from typing import Literal, Optional
 from pydantic import Field
 
-from app.models.screenmodel import TextWidgetModel
-from app.util import logger
+from extensions.epaper.models.screenmodel import TextWidgetModel
+from extensions.epaper.util import logger
 from ..drawingcontext import DrawingContext
 from .base import Widget
 

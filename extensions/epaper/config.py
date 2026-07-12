@@ -1,6 +1,14 @@
+import importlib.resources
 from typing import List, Optional, Tuple
-from pydantic import BaseModel, DirectoryPath
+from pydantic import BaseModel, DirectoryPath, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _resource_dir(name: str) -> str:
+    # bundled inside the extensions.epaper package (see pyproject.toml package-data),
+    # so this resolves correctly whether epaper-nice runs standalone (cwd = repo root)
+    # or is installed as a dependency inside another process (e.g. nice4iot)
+    return str(importlib.resources.files(__package__) / "resources" / name)
 
 
 class ColorModel(BaseModel):
@@ -15,28 +23,19 @@ class ColorModel(BaseModel):
 
 class Config(BaseSettings):
     """
-    Application settings.
+    Application settings that are the same for every screen regardless of
+    which project/root it belongs to. File locations (screens, schedules,
+    images, ...) are per-root and computed via paths.EpaperPaths instead.
     """
-    # basic app settings
     # secret for NiceGUI browser session storage; override via the
     # STORAGE_SECRET environment variable in production
     storage_secret: str = "geheim"
 
-    font_path: DirectoryPath = "resources/fonts"
-    icon_path: DirectoryPath = "resources/icons"
+    font_path: DirectoryPath = Field(default_factory=lambda: _resource_dir("fonts"))
+    icon_path: DirectoryPath = Field(default_factory=lambda: _resource_dir("icons"))
 
-    image_dir: DirectoryPath = "data/images"
-    screen_dir: DirectoryPath = "data/screens"
-    schedule_dir: DirectoryPath = "data/schedules"
-    ical_dir: DirectoryPath = "data/ical"
     ical_update_interval_s: int = 600
     ical_max_days: int = 30
-    organizer_names_file: Optional[str] = "data/organizer_names.json"
-
-    # maps alias -> screen id, e.g. {"hallway": "epaper_43bw"}; lets a
-    # display be addressed by a friendly/stable name instead of the
-    # screen file name, and lets several displays share one screen
-    alias_file: Optional[str] = "data/aliases.json"
 
     no_appointments: str = "Keine Termine"
     next_appointment: str = "Nächster Termin"
@@ -54,12 +53,6 @@ class Config(BaseSettings):
     color_background: Optional[Tuple[int, int, int]] = (255, 255, 255)
     color_primary: Optional[Tuple[int, int, int]] = (0, 0, 0)
 
-    # epaper_display_types: List[EpaperDisplayType] = [
-    #     EpaperDisplayType(id='gdew042t2', name='Good Display GDEW042T2/Waveshare 4.2" 4 Grayscale', size=(400, 300), palette=[(255, 255, 255), (0, 0, 0)]),
-    #     EpaperDisplayType(id='gdeh075z90', name='Good Display GDEW075Z90/Waveshare 7.5" BWR', size=(880, 528), palette=[(255, 255, 255), (0, 0, 0), (255, 0, 0)]),
-    #     #EpaperDisplayType(id='epd_7.5', name='7.5 inch', size=(640, 384), palette=[(255, 255, 255), (0, 0, 0)]),
-    #     #EpaperDisplayType(id='epd_7.5c', name='7.5 inch color', size=(640, 384), palette=[(255, 255, 255), (0, 0, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255)]),
-    # ]
     epaper_color_models: List[ColorModel] = [
         ColorModel(id='bw', name='Black on white', palette=[(0,0,0), (255,255,255)]),
         ColorModel(id='bwr', name='Black/Red on white', palette=[(0,0,0), (255,255,255), (255,0,0)]),

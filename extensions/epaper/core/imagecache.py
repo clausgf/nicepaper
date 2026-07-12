@@ -2,14 +2,15 @@ import asyncio
 import glob
 import json
 import os
+from pathlib import Path
 from PIL import Image
 from typing import Optional
 
 import aiofiles
 
-from app.config import ColorModel, app_config
-from app.models.screenmodel import ImageMetadata
-from app.util import logger
+from extensions.epaper.config import ColorModel
+from extensions.epaper.models.screenmodel import ImageMetadata
+from extensions.epaper.util import logger
 
 
 class ImageCache:
@@ -20,9 +21,9 @@ class ImageCache:
     right palette.
     """
 
-    def __init__(self, screen_id: str):
+    def __init__(self, base_image_dir: Path, screen_id: str):
         self.screen_id = screen_id
-        self.image_dir = os.path.join(app_config.image_dir, screen_id)
+        self.image_dir = os.path.join(base_image_dir, screen_id)
         self.metadata = None
         self.dither = False
         os.makedirs(self.image_dir, exist_ok=True)

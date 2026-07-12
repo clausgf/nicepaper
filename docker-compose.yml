@@ -8,9 +8,9 @@ services:
       - caddy_network
     restart: unless-stopped
     volumes:
-      - ./app:/home/iot/app # mounting local app directory
+      - ./extensions:/home/iot/extensions # mounting local extensions.epaper package (includes resources/)
+      - ./main.py:/home/iot/main.py # standalone entry point
       - ./data:/home/iot/data
-      - ./resources:/home/iot/resources
     build: 
       context: .
       args:

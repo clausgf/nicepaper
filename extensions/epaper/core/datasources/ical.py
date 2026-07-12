@@ -2,13 +2,15 @@ import asyncio
 import datetime
 import json
 import os
+from pathlib import Path
+from typing import Optional
 from zoneinfo import ZoneInfo
 import aiofiles
 import aiohttp
 from icalendar import Calendar
 import recurring_ical_events
-from app.config import app_config
-from app.util import logger
+from extensions.epaper.config import app_config
+from extensions.epaper.util import logger
 
 
 _session: aiohttp.ClientSession | None = None
@@ -87,10 +89,11 @@ def _extract_events(ical_text: str, start_date: datetime.datetime, end_date: dat
     return result
 
 
-async def get_from_ical(id: str, url: str, extract_organizer_from_summary: bool = True):
+async def get_from_ical(ical_dir: Path, organizer_names_file: Optional[Path], id: str, url: str,
+                         extract_organizer_from_summary: bool = True):
     # load data from cache
     data = None
-    cache_filename = os.path.join(app_config.ical_dir, f"{id}.json")
+    cache_filename = os.path.join(ical_dir, f"{id}.json")
     if os.path.exists(cache_filename):
         async with aiofiles.open(cache_filename, "r") as cache_file:
             data = json.loads(await cache_file.read())
@@ -113,8 +116,8 @@ async def get_from_ical(id: str, url: str, extract_organizer_from_summary: bool 
     end_date = start_date + datetime.timedelta(days=app_config.ical_max_days)
 
     organizer_names = []
-    if app_config.organizer_names_file and extract_organizer_from_summary:
-        async with aiofiles.open(app_config.organizer_names_file, "r") as org_file:
+    if organizer_names_file and os.path.exists(organizer_names_file) and extract_organizer_from_summary:
+        async with aiofiles.open(organizer_names_file, "r") as org_file:
             organizer_names = json.loads(await org_file.read())
 
     events = await asyncio.to_thread(
