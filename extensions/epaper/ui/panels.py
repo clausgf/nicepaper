@@ -101,6 +101,25 @@ def _render_row(form: ModelForm, *field_names: str, props: str = 'outlined dense
             form.render_field(name, props=props).classes('flex-grow')
 
 
+def _rename_file(dir: Path, old_path: Path, new_name: str) -> tuple[bool, str]:
+    """Validate and perform renaming old_path to new_name within dir.
+    Returns (success, a user-facing notification message). Shared between
+    screen_editor's and schedule_editor's rename dialogs (each has its own
+    local `rename_file()` closure as the button handler -- named
+    differently from this module-level helper on purpose, since a nested
+    `async def rename_file()` referencing a same-named module-level
+    function would instead recurse into itself)."""
+    if not new_name.endswith('.json'):
+        new_name += '.json'
+    if not check_filename(new_name):
+        return False, f'Invalid file name: "{new_name}".'
+    new_path = dir / new_name
+    if new_path.exists():
+        return False, f'File "{new_name}" already exists.'
+    old_path.rename(new_path)
+    return True, f'Renamed to "{new_name}".'
+
+
 def screen_image_view(url: str):
     img = ui.image(url).classes('q-pa-none')
     with ui.row().classes('w-full items-center justify-between q-pa-none'):
@@ -228,6 +247,7 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
         ui.button(icon='arrow_back').props('round dense').on_click(on_back)
         ui.label(filename.strip('.json')).classes('text-h6')
         ui.space()
+        ui.button(icon='edit').props('round dense').on_click(lambda: rename_file())
         ui.button(icon='delete').props('round dense color=negative').on_click(lambda: delete_file())
 
     with ui.card().tight().classes('w-full'):
@@ -381,6 +401,24 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
 
     editor_area()
 
+    with ui.dialog().style('width: 400px') as rename_dialog, ui.card():
+        ui.label('Rename file').classes('text-h6 center')
+        new_name_input = ui.input('New name', value=os.path.splitext(filename)[0]).classes('w-full')
+        with ui.row().classes('w-full place-content-end'):
+            ui.space()
+            ui.button('Cancel', on_click=lambda: rename_dialog.submit(None))
+            ui.button('Rename', on_click=lambda: rename_dialog.submit(new_name_input.value))
+
+    async def rename_file():
+        new_name = await rename_dialog
+        if not new_name:
+            ui.notify('Canceled renaming.', type='negative')
+            return
+        success, message = _rename_file(paths.screen_dir, screen_path, new_name)
+        ui.notify(message, type='positive' if success else 'negative')
+        if success:
+            on_deleted()
+
     with ui.dialog().style('width: 400px') as confirm_delete_dialog, ui.card():
         ui.label('Delete file').classes('text-h6 center')
         ui.label(f'Are you sure you want to delete "{filename}"?')
@@ -425,6 +463,7 @@ def schedule_editor(paths: EpaperPaths, filename: str, on_back: Callable[[], Non
         ui.button(icon='arrow_back').props('round dense color=primary').on_click(on_back)
         ui.label(filename.strip('.json')).classes('text-h6')
         ui.space()
+        ui.button(icon='edit').props('round dense').on_click(lambda: rename_file())
         ui.button(icon='delete').props('round dense color=negative').on_click(lambda: delete_schedule_file())
 
     @ui.refreshable
@@ -462,6 +501,24 @@ def schedule_editor(paths: EpaperPaths, filename: str, on_back: Callable[[], Non
 
     rule_cards()
     ui.button('Add Rule', icon='add', on_click=lambda: add_rule()).props('color=primary')
+
+    with ui.dialog().style('width: 400px') as rename_dialog, ui.card():
+        ui.label('Rename file').classes('text-h6 center')
+        new_name_input = ui.input('New name', value=os.path.splitext(filename)[0]).classes('w-full')
+        with ui.row().classes('w-full place-content-end'):
+            ui.space()
+            ui.button('Cancel', on_click=lambda: rename_dialog.submit(None))
+            ui.button('Rename', on_click=lambda: rename_dialog.submit(new_name_input.value))
+
+    async def rename_file():
+        new_name = await rename_dialog
+        if not new_name:
+            ui.notify('Canceled renaming.', type='negative')
+            return
+        success, message = _rename_file(paths.schedule_dir, schedule_path, new_name)
+        ui.notify(message, type='positive' if success else 'negative')
+        if success:
+            on_deleted()
 
     with ui.dialog().style('width: 400px') as confirm_delete_file_dialog, ui.card():
         ui.label('Delete file').classes('text-h6 center')
