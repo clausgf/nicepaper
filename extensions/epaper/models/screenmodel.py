@@ -33,7 +33,7 @@ class ImageMetadata(BaseModel):
 
 
 class WidgetModel(BaseModel):
-    widget_type: Literal["Text", "Date", "RoomCalendar", "WeatherNow", "WeatherForecast", "WeatherPrecipitation", "WeatherTemperature"]
+    widget_type: Literal["Text", "Date", "RoomCalendar", "WeatherNow", "WeatherForecast", "WeatherChart"]
 
     # Tuple[int, int] fields (position/size) aren't renderable by niceview
     # (an unrecognised field type falls back to a plain ui.input bound to
@@ -45,7 +45,8 @@ class WidgetModel(BaseModel):
     size_width: Optional[int] = Field(default=None, description="Leave empty for automatic width.")
     size_height: Optional[int] = Field(default=None, description="Leave empty for automatic height.")
     init_background: Optional[bool] = True
-    clipping: Optional[bool] = False
+    clipping: Optional[bool] = Field(default=False, description="Cut off content that overflows this widget's size instead of letting it bleed into neighboring widgets.")
+    show_bounding_box: Optional[bool] = Field(default=False, description="Draw an outline around this widget's box. Useful while laying out a screen.")
     font_name: Optional[str] = Field(default=None, description="Font file name. Leave empty to use the screen's default font.")
     font_size: Optional[int] = Field(default=None, description="Font size in points. Leave empty to use the screen's default font.")
 
@@ -111,14 +112,21 @@ class WeatherForecastWidgetModel(WeatherWidgetModel):
     forecast_hours: int = Field(default=24, description="How many hours ahead the forecast strip covers.")
 
 
-class WeatherPrecipitationWidgetModel(WeatherWidgetModel):
-    widget_type: Literal["WeatherPrecipitation"] = "WeatherPrecipitation"
-    forecast_hours: int = Field(default=24, description="How many hours ahead the precipitation chart covers.")
+WeatherMetric = Literal["temperature", "precipitation", "humidity", "pressure"]
 
 
-class WeatherTemperatureWidgetModel(WeatherWidgetModel):
-    widget_type: Literal["WeatherTemperature"] = "WeatherTemperature"
-    forecast_hours: int = Field(default=24, description="How many hours ahead the temperature chart covers.")
+class WeatherChartWidgetModel(WeatherWidgetModel):
+    """One configurable chart instead of separate precipitation/temperature
+    widgets: primary_metric always drawn (solid, accent-colored, its own
+    left Y axis); secondary_metric optional (dashed, black, its own right
+    Y axis) -- e.g. temperature + precipitation combined in one chart.
+    Which metric renders as bars vs. a line is fixed per metric (only
+    precipitation is bursty/mostly-zero enough to read better as bars),
+    not separately configurable."""
+    widget_type: Literal["WeatherChart"] = "WeatherChart"
+    primary_metric: WeatherMetric = Field(default="temperature", description="Always shown; solid line/bars, left Y axis.")
+    secondary_metric: Optional[WeatherMetric] = Field(default=None, description="Shown alongside primary_metric if set; dashed, right Y axis.")
+    forecast_hours: int = Field(default=24, description="How many hours ahead the chart covers.")
 
 # discriminated union: widget_type selects the concrete model and a
 # missing/unknown widget_type is a validation error instead of silently
@@ -126,8 +134,7 @@ class WeatherTemperatureWidgetModel(WeatherWidgetModel):
 AnyWidget = Annotated[
     Union[
         DateWidgetModel, TextWidgetModel, RoomCalendarWidgetModel,
-        WeatherNowWidgetModel, WeatherForecastWidgetModel,
-        WeatherPrecipitationWidgetModel, WeatherTemperatureWidgetModel,
+        WeatherNowWidgetModel, WeatherForecastWidgetModel, WeatherChartWidgetModel,
     ],
     Field(discriminator="widget_type"),
 ]

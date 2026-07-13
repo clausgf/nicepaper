@@ -23,23 +23,15 @@
       "forecast_hours": 24
     },
     {
-      "widget_type": "WeatherPrecipitation",
+      "widget_type": "WeatherChart",
       "position_x": 0,
       "position_y": 240,
-      "size_width": 390,
+      "size_width": 800,
       "size_height": 200,
       "latitude": 52.52,
       "longitude": 13.405,
-      "forecast_hours": 24
-    },
-    {
-      "widget_type": "WeatherTemperature",
-      "position_x": 410,
-      "position_y": 240,
-      "size_width": 390,
-      "size_height": 200,
-      "latitude": 52.52,
-      "longitude": 13.405,
+      "primary_metric": "temperature",
+      "secondary_metric": "precipitation",
       "forecast_hours": 24
     }
   ]

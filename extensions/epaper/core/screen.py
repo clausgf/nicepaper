@@ -122,7 +122,19 @@ class Screen:
             next_update = self.update_schedule.get_next_update()
 
         for w in self.widgets:
-            widget_update = await w.draw(ctx)
+            if w.config.clipping and w.config.size:
+                # draw onto an isolated, size-bounded sub-image instead of
+                # the shared canvas: PIL silently drops anything a widget
+                # draws beyond an image's own bounds, so this clips
+                # overflow instead of letting it bleed into neighbors
+                sub_image = Image.new(mode="RGB", size=w.config.size, color=app_config.color_background)
+                sub_ctx = DrawingContext(sub_image, app_config.color_background, app_config.color_primary,
+                                          app_config.font, paths=self.paths)
+                widget_update = await w.draw(sub_ctx)
+                image.paste(sub_image, w.config.position)
+            else:
+                ctx.origin = w.config.position
+                widget_update = await w.draw(ctx)
             if widget_update:
                 if next_update is None or widget_update < next_update:
                     next_update = widget_update

@@ -25,7 +25,7 @@ from niceview.util import confirm_dialog
 from extensions.epaper.config import app_config
 from extensions.epaper.models.screenmodel import (
     DateWidgetModel, RoomCalendarWidgetModel, ScreenModel, TextWidgetModel, WidgetModel,
-    WeatherForecastWidgetModel, WeatherNowWidgetModel, WeatherPrecipitationWidgetModel, WeatherTemperatureWidgetModel,
+    WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
 )
 from extensions.epaper.models.updateschedulemodel import WeeklyScheduleModel
 from extensions.epaper.paths import EpaperPaths
@@ -42,8 +42,7 @@ WIDGET_MODELS: dict[str, type[WidgetModel]] = {
     'RoomCalendar': RoomCalendarWidgetModel,
     'WeatherNow': WeatherNowWidgetModel,
     'WeatherForecast': WeatherForecastWidgetModel,
-    'WeatherPrecipitation': WeatherPrecipitationWidgetModel,
-    'WeatherTemperature': WeatherTemperatureWidgetModel,
+    'WeatherChart': WeatherChartWidgetModel,
 }
 WIDGET_ICONS: dict[str, str] = {
     'Text': 'text_fields',
@@ -51,8 +50,7 @@ WIDGET_ICONS: dict[str, str] = {
     'RoomCalendar': 'calendar_month',
     'WeatherNow': 'wb_sunny',
     'WeatherForecast': 'view_column',
-    'WeatherPrecipitation': 'water_drop',
-    'WeatherTemperature': 'thermostat',
+    'WeatherChart': 'show_chart',
 }
 WIDGET_TITLES: dict[str, str] = {
     'Text': 'Text Widget',
@@ -60,8 +58,7 @@ WIDGET_TITLES: dict[str, str] = {
     'RoomCalendar': 'Room Calendar Widget',
     'WeatherNow': 'Weather (Now) Widget',
     'WeatherForecast': 'Weather (Forecast) Widget',
-    'WeatherPrecipitation': 'Weather (Precipitation) Widget',
-    'WeatherTemperature': 'Weather (Temperature) Widget',
+    'WeatherChart': 'Weather (Chart) Widget',
 }
 
 
@@ -73,8 +70,10 @@ def _widget_label(widget: WidgetModel) -> str:
         return widget.date_format or 'Date'
     if isinstance(widget, RoomCalendarWidgetModel):
         return widget.room_name or widget.room_number or '(room calendar)'
-    if isinstance(widget, (WeatherNowWidgetModel, WeatherForecastWidgetModel,
-                            WeatherPrecipitationWidgetModel, WeatherTemperatureWidgetModel)):
+    if isinstance(widget, WeatherChartWidgetModel):
+        metrics = widget.primary_metric + (f' + {widget.secondary_metric}' if widget.secondary_metric else '')
+        return metrics
+    if isinstance(widget, (WeatherNowWidgetModel, WeatherForecastWidgetModel)):
         return f'{widget.latitude:.2f}, {widget.longitude:.2f}'
     return widget.widget_type
 
@@ -90,8 +89,7 @@ def _default_widget(widget_type: str) -> WidgetModel:
     if widget_type == 'RoomCalendar':
         return RoomCalendarWidgetModel(position_x=0, position_y=0, room_number='', room_name='', ical_url='')
     if widget_type in WIDGET_MODELS and issubclass(WIDGET_MODELS[widget_type], (
-            WeatherNowWidgetModel, WeatherForecastWidgetModel,
-            WeatherPrecipitationWidgetModel, WeatherTemperatureWidgetModel)):
+            WeatherNowWidgetModel, WeatherForecastWidgetModel, WeatherChartWidgetModel)):
         return WIDGET_MODELS[widget_type](position_x=0, position_y=0, latitude=0.0, longitude=0.0)
     raise ValueError(f'Unknown widget type: {widget_type}')
 
@@ -108,7 +106,10 @@ def screen_image_view(url: str):
     with ui.row().classes('w-full items-center justify-between q-pa-none'):
         truncated_url = url if len(url) <= 40 else f'...{url[-38:]}'
         ui.label(f'URL: {truncated_url}').classes('italic').tooltip(url)
-        ui.button(icon='refresh').props('round dense size=sm').on('click', lambda img=img: img.force_reload())
+        with ui.row().classes('items-center gap-1'):
+            auto_refresh = ui.switch(value=True).props('dense size=sm').tooltip('Auto-Refresh')
+            ui.timer(3.0, lambda: img.force_reload() if auto_refresh.value else None)
+            ui.button(icon='refresh').props('round dense size=sm').on('click', lambda img=img: img.force_reload())
 
 
 @ui.refreshable
@@ -306,7 +307,7 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
             _render_row(form, 'size_width', 'size_height')
 
             ui.label('Appearance').classes('text-subtitle2')
-            _render_row(form, 'init_background', 'clipping', props='dense')
+            _render_row(form, 'init_background', 'clipping', 'show_bounding_box', props='dense')
             with ui.row().classes('w-full gap-2'):
                 form.render_field('font_name', widget_type='ui.select', select_options=font_names,
                                 props='outlined dense').classes('flex-grow')
@@ -325,8 +326,12 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
                 _render_row(form, 'date_format_long', 'date_format', 'time_format')
             elif isinstance(widget, WeatherNowWidgetModel):
                 _render_row(form, 'latitude', 'longitude')
-            elif isinstance(widget, (WeatherForecastWidgetModel, WeatherPrecipitationWidgetModel, WeatherTemperatureWidgetModel)):
+            elif isinstance(widget, WeatherForecastWidgetModel):
                 _render_row(form, 'latitude', 'longitude')
+                _render_row(form, 'forecast_hours')
+            elif isinstance(widget, WeatherChartWidgetModel):
+                _render_row(form, 'latitude', 'longitude')
+                _render_row(form, 'primary_metric', 'secondary_metric')
                 _render_row(form, 'forecast_hours')
             form.render_nonfield_errors()
 

@@ -2,8 +2,7 @@ import pytest
 from pydantic import ValidationError
 from extensions.epaper.models.screenmodel import (
     ScreenModel, TextWidgetModel, RoomCalendarWidgetModel,
-    WeatherNowWidgetModel, WeatherForecastWidgetModel,
-    WeatherPrecipitationWidgetModel, WeatherTemperatureWidgetModel,
+    WeatherNowWidgetModel, WeatherForecastWidgetModel, WeatherChartWidgetModel,
 )
 
 
@@ -152,16 +151,38 @@ def test_weather_forecast_widget_default_forecast_hours():
     assert widget.forecast_hours == 24
 
 
-@pytest.mark.parametrize("widget_type,model_cls", [
-    ("WeatherNow", WeatherNowWidgetModel),
-    ("WeatherForecast", WeatherForecastWidgetModel),
-    ("WeatherPrecipitation", WeatherPrecipitationWidgetModel),
-    ("WeatherTemperature", WeatherTemperatureWidgetModel),
+def test_weather_chart_widget_defaults():
+    widget = WeatherChartWidgetModel(position_x=0, position_y=0, latitude=52.52, longitude=13.405)
+    assert widget.primary_metric == "temperature"
+    assert widget.secondary_metric is None
+    assert widget.forecast_hours == 24
+
+
+def test_weather_chart_widget_invalid_metric_rejected():
+    with pytest.raises(ValidationError):
+        WeatherChartWidgetModel(position_x=0, position_y=0, latitude=52.52, longitude=13.405,
+                                 primary_metric="not_a_metric")
+
+
+def test_weather_chart_widget_combined_metrics():
+    widget = WeatherChartWidgetModel(position_x=0, position_y=0, latitude=52.52, longitude=13.405,
+                                      primary_metric="precipitation", secondary_metric="temperature")
+    assert widget.primary_metric == "precipitation"
+    assert widget.secondary_metric == "temperature"
+
+
+@pytest.mark.parametrize("widget_type,model_cls,extra", [
+    ("WeatherNow", WeatherNowWidgetModel, {}),
+    ("WeatherForecast", WeatherForecastWidgetModel, {}),
+    ("WeatherChart", WeatherChartWidgetModel, {"primary_metric": "precipitation", "secondary_metric": "temperature"}),
 ])
-def test_weather_widget_discriminated_union_round_trip(widget_type, model_cls):
+def test_weather_widget_discriminated_union_round_trip(widget_type, model_cls, extra):
     screen = ScreenModel(width=400, height=300, widgets=[
-        {"widget_type": widget_type, "position_x": 0, "position_y": 0, "latitude": 52.52, "longitude": 13.405},
+        {"widget_type": widget_type, "position_x": 0, "position_y": 0, "latitude": 52.52, "longitude": 13.405, **extra},
     ])
     assert isinstance(screen.widgets[0], model_cls)
     reloaded = ScreenModel.model_validate_json(screen.model_dump_json())
     assert isinstance(reloaded.widgets[0], model_cls)
+    if extra:
+        assert reloaded.widgets[0].primary_metric == "precipitation"
+        assert reloaded.widgets[0].secondary_metric == "temperature"

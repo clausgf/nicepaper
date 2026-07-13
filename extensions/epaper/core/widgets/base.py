@@ -10,6 +10,14 @@ class Widget:
     """
     Base class for all widget types:
     - widgets are drawn on a DrawingContext
+
+    Draws relative to ctx.origin, which the caller (Screen._create_image())
+    sets before calling draw() -- either the widget's absolute position on
+    the shared canvas, or (0, 0) when config.clipping is set and the
+    caller instead draws this widget onto an isolated, size-bounded
+    sub-image that gets pasted (and thereby clipped) afterwards, see
+    screen.py. Widgets never read self.config.position for drawing, only
+    ctx.origin, so the same widget code works unchanged in both cases.
     """
 
     def __init__(self, id: str, config: WidgetModel):
@@ -26,12 +34,13 @@ class Widget:
         """
         logger.debug(f"Drawing widget type {self.config.widget_type}::{self.id}@{self.config.position}s{self.config.size}")
 
-        ctx.origin = self.config.position
-        if self.config.init_background and self.config.size:
-            p0 = self.config.position
-            p1 = tuple(sum(x)-1 for x in zip(self.config.position, self.config.size))
-            ctx.draw.rectangle([p0, p1], fill=ctx.color_background)
-            #ctx.draw.rectangle([p0, p1], outline=(255,0,0))
+        if self.config.size:
+            p0 = ctx.origin
+            p1 = (ctx.origin[0] + self.config.size[0] - 1, ctx.origin[1] + self.config.size[1] - 1)
+            if self.config.init_background:
+                ctx.draw.rectangle([p0, p1], fill=ctx.color_background)
+            if self.config.show_bounding_box:
+                ctx.draw.rectangle([p0, p1], outline=ctx.color_primary)
         if self.config.font:
             self.font = ctx.get_font(self.config.font[0], self.config.font[1])
         else:

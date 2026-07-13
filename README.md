@@ -15,18 +15,24 @@ the content actually changed.
 ## Features
 
 - **Screens**: JSON-configured layouts made of widgets (`Text`, `Date`,
-  `RoomCalendar`, `WeatherNow`, `WeatherForecast`, `WeatherPrecipitation`,
-  `WeatherTemperature`) rendered onto an RGB canvas with Pillow.
+  `RoomCalendar`, `WeatherNow`, `WeatherForecast`, `WeatherChart`) rendered
+  onto an RGB canvas with Pillow.
 - **Room calendar widget**: fetches an iCal feed (with recurring event
   expansion), caches it and shows the current/next appointments.
 - **Weather widgets**: current conditions, an hourly forecast strip, and
-  precipitation/temperature charts, backed by
+  `WeatherChart` (one configurable bar/line chart -- `primary_metric`
+  always shown, `secondary_metric` optional on its own right Y axis, e.g.
+  temperature + precipitation combined), backed by
   [Open-Meteo](https://open-meteo.com) (no API key needed; uses the DWD
   ICON model for German/European locations). Icons reuse the bundled
   `fa-solid-900.ttf` (no new font/image assets). Charts are hand-drawn with
   Pillow, not a plotting library, so they render crisply on bilevel/limited
-  palettes instead of dithering — see
-  `extensions/epaper/core/charting.py`.
+  palettes instead of dithering, with gridlines/axis labels rounded to
+  nice human-friendly numbers — see `extensions/epaper/core/charting.py`.
+- **Widget clipping / debug outline**: a widget's `clipping` flag cuts off
+  content that overflows its box instead of letting it bleed into
+  neighboring widgets; `show_bounding_box` draws its box outline, handy
+  while laying out a screen.
 - **Color models**: rendered images can be quantized to e-paper palettes
   (`bw`, `bwr`, `gs4`, `c7`, `e6`) via the `color_model` query parameter.
 - **Update schedules**: a schedule file is a plain JSON list of weekly
@@ -247,9 +253,9 @@ it shouldn't be reachable by anyone who can reach the host.
   `Date` widgets, no external dependencies.
 - `examples/screens/roomcalendar.json`: a full-size door sign using the
   `RoomCalendar` widget. Set `ical_url` to a real iCal feed before use.
-- `examples/screens/weather.json`: all four `Weather*` widgets (current
-  conditions, forecast strip, precipitation and temperature charts) for
-  Berlin; adjust `latitude`/`longitude` for your location.
+- `examples/screens/weather.json`: all three `Weather*` widgets (current
+  conditions, forecast strip, and a combined temperature+precipitation
+  chart) for Berlin; adjust `latitude`/`longitude` for your location.
 - `examples/aliases.json`: maps the alias `hallway` to the
   `roomcalendar` screen, see [Display aliases](#features) above.
 - `examples/organizer_names.json`: example entries for
