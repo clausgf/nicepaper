@@ -40,6 +40,12 @@ def screen_id():
     shutil.rmtree(os.path.join(STANDALONE_PATHS.image_dir, screen_id), ignore_errors=True)
 
 
+def test_root_redirects_to_ui(client):
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code in (302, 307)
+    assert r.headers["location"] == "/ui"
+
+
 def test_display_poll_cycle(client, screen_id):
     """A display fetches its image, then polls with If-None-Match."""
     r = client.get(f"/api/screen/{screen_id}/image.png")
