@@ -179,19 +179,23 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
         y = to_y(primary_min + i * primary_step, 'primary')
         _draw_dotted_hline(ctx, plot_x0, plot_x0 + plot_w, y, fill=ctx.color_primary)
 
-    # axis min/max labels
+    # axis min/max labels -- anchored so they stay within [y0, y0+plot_h]
+    # (top label's box starts exactly at the chart's own top edge instead
+    # of being vertically centered on it, which would put half the text
+    # above the widget's box -- clipped outright when clipping=True, and
+    # overlapping whatever is drawn above it otherwise)
     label_font = ctx.get_font(*LABEL_FONT)
     y_bottom, y_top = to_y(primary_min, 'primary'), to_y(primary_max, 'primary')
-    ctx.draw_text((x0, int(y_bottom - 6)), size=(left_margin - 2, 12), text=_format_axis_value(primary_min),
-                  alignment='rc', font=label_font)
-    ctx.draw_text((x0, int(y_top - 6)), size=(left_margin - 2, 12), text=_format_axis_value(primary_max),
-                  alignment='rc', font=label_font)
+    ctx.draw_text((x0, int(y_bottom - 12)), size=(left_margin - 2, 12), text=_format_axis_value(primary_min),
+                  alignment='rb', font=label_font)
+    ctx.draw_text((x0, int(y_top)), size=(left_margin - 2, 12), text=_format_axis_value(primary_max),
+                  alignment='rt', font=label_font)
     if has_secondary:
         right_x = plot_x0 + plot_w + 2
-        ctx.draw_text((int(right_x), int(y_bottom - 6)), size=(right_margin - 2, 12),
-                      text=_format_axis_value(secondary_min), alignment='lc', font=label_font)
-        ctx.draw_text((int(right_x), int(y_top - 6)), size=(right_margin - 2, 12),
-                      text=_format_axis_value(secondary_max), alignment='lc', font=label_font)
+        ctx.draw_text((int(right_x), int(y_bottom - 12)), size=(right_margin - 2, 12),
+                      text=_format_axis_value(secondary_min), alignment='lb', font=label_font)
+        ctx.draw_text((int(right_x), int(y_top)), size=(right_margin - 2, 12),
+                      text=_format_axis_value(secondary_max), alignment='lt', font=label_font)
 
     accent = app_config.color_accent or ctx.color_primary
     bar_gap = 2
