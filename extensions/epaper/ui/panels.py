@@ -151,7 +151,7 @@ def file_list(dir: Path, item_type: str, on_select: Callable[[str], None], on_ad
                 with ui.item_section().props('avatar'):
                     ui.icon('description')
                 with ui.item_section():
-                    ui.item_label(filename.strip('.json'))
+                    ui.item_label(os.path.splitext(filename)[0])
 
                     fn = os.path.join(dir, filename)
                     mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fn), tz=ZoneInfo("UTC"))

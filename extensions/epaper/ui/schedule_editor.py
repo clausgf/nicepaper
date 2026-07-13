@@ -43,7 +43,7 @@ def schedule_editor(paths: EpaperPaths, filename: str, on_back: Callable[[], Non
 
     with ui.row().classes('w-full items-center gap-2'):
         ui.button(icon='arrow_back').props('round dense color=primary').on_click(on_back)
-        ui.label(filename.strip('.json')).classes('text-h6')
+        ui.label(os.path.splitext(filename)[0]).classes('text-h6')
         ui.space()
         ui.button(icon='edit').props('round dense').on_click(lambda: rename_file())
         ui.button(icon='delete').props('round dense color=negative').on_click(lambda: delete_schedule_file())
