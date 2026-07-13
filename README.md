@@ -15,9 +15,18 @@ the content actually changed.
 ## Features
 
 - **Screens**: JSON-configured layouts made of widgets (`Text`, `Date`,
-  `RoomCalendar`) rendered onto an RGB canvas with Pillow.
+  `RoomCalendar`, `WeatherNow`, `WeatherForecast`, `WeatherPrecipitation`,
+  `WeatherTemperature`) rendered onto an RGB canvas with Pillow.
 - **Room calendar widget**: fetches an iCal feed (with recurring event
   expansion), caches it and shows the current/next appointments.
+- **Weather widgets**: current conditions, an hourly forecast strip, and
+  precipitation/temperature charts, backed by
+  [Open-Meteo](https://open-meteo.com) (no API key needed; uses the DWD
+  ICON model for German/European locations). Icons reuse the bundled
+  `fa-solid-900.ttf` (no new font/image assets). Charts are hand-drawn with
+  Pillow, not a plotting library, so they render crisply on bilevel/limited
+  palettes instead of dithering — see
+  `extensions/epaper/core/charting.py`.
 - **Color models**: rendered images can be quantized to e-paper palettes
   (`bw`, `bwr`, `gs4`, `c7`, `e6`) via the `color_model` query parameter.
 - **Update schedules**: a schedule file is a plain JSON list of weekly
@@ -54,8 +63,9 @@ epaper-nice
 │   │   ├── imagecache.py        # image + metadata cache, palette quantization
 │   │   ├── drawingcontext.py    # drawing helpers (fonts, text, alignment)
 │   │   ├── updateschedule.py    # update schedule evaluation
-│   │   ├── widgets/             # Text, Date, RoomCalendar widgets
-│   │   └── datasources/         # iCal feed loading and caching
+│   │   ├── charting.py          # hand-rolled bar/line charts (no plotting library)
+│   │   ├── widgets/             # Text, Date, RoomCalendar, Weather* widgets
+│   │   └── datasources/         # iCal and Open-Meteo weather loading/caching
 │   ├── models/                  # pydantic models for screens and schedules
 │   ├── wire/huffman_de.py       # fixed German Huffman codebook (see below)
 │   └── resources/               # fonts/icons, bundled as package data
@@ -64,7 +74,8 @@ epaper-nice
 │   ├── screens/                  # screen configuration JSON files
 │   ├── schedules/                # update schedule JSON files
 │   ├── images/                   # rendered image cache
-│   └── ical/                     # iCal feed cache
+│   ├── ical/                     # iCal feed cache
+│   └── weather/                  # Open-Meteo forecast cache
 ├── examples                    # example configuration files to copy into data/
 ├── firmware/huffman_de.h       # generated C codebook, see Low-bandwidth rendering
 ├── Dockerfile / docker-compose.yml
@@ -211,6 +222,9 @@ Commonly overridden variables:
   screen/widget doesn't set its own.
 - `ICAL_UPDATE_INTERVAL_S`, `ICAL_MAX_DAYS`: iCal feed polling/lookahead for
   the `RoomCalendar` widget.
+- `WEATHER_UPDATE_INTERVAL_S`: Open-Meteo polling interval for the `Weather*`
+  widgets. `COLOR_ACCENT`: RGB color the chart widgets use for their primary
+  data series (defaults to red, the only accent the `bwr` color model has).
 
 See the `Config` class itself for the full list (every field is overridable
 the same way); complex fields (`epaper_color_models`, tuples) need their
@@ -233,6 +247,9 @@ it shouldn't be reachable by anyone who can reach the host.
   `Date` widgets, no external dependencies.
 - `examples/screens/roomcalendar.json`: a full-size door sign using the
   `RoomCalendar` widget. Set `ical_url` to a real iCal feed before use.
+- `examples/screens/weather.json`: all four `Weather*` widgets (current
+  conditions, forecast strip, precipitation and temperature charts) for
+  Berlin; adjust `latitude`/`longitude` for your location.
 - `examples/aliases.json`: maps the alias `hallway` to the
   `roomcalendar` screen, see [Display aliases](#features) above.
 - `examples/organizer_names.json`: example entries for

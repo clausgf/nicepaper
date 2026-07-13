@@ -23,7 +23,10 @@ from niceview.form import ModelForm
 from niceview.util import confirm_dialog
 
 from extensions.epaper.config import app_config
-from extensions.epaper.models.screenmodel import DateWidgetModel, RoomCalendarWidgetModel, ScreenModel, TextWidgetModel, WidgetModel
+from extensions.epaper.models.screenmodel import (
+    DateWidgetModel, RoomCalendarWidgetModel, ScreenModel, TextWidgetModel, WidgetModel,
+    WeatherForecastWidgetModel, WeatherNowWidgetModel, WeatherPrecipitationWidgetModel, WeatherTemperatureWidgetModel,
+)
 from extensions.epaper.models.updateschedulemodel import WeeklyScheduleModel
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.util import check_filename
@@ -37,16 +40,28 @@ WIDGET_MODELS: dict[str, type[WidgetModel]] = {
     'Text': TextWidgetModel,
     'Date': DateWidgetModel,
     'RoomCalendar': RoomCalendarWidgetModel,
+    'WeatherNow': WeatherNowWidgetModel,
+    'WeatherForecast': WeatherForecastWidgetModel,
+    'WeatherPrecipitation': WeatherPrecipitationWidgetModel,
+    'WeatherTemperature': WeatherTemperatureWidgetModel,
 }
 WIDGET_ICONS: dict[str, str] = {
     'Text': 'text_fields',
     'Date': 'event',
     'RoomCalendar': 'calendar_month',
+    'WeatherNow': 'wb_sunny',
+    'WeatherForecast': 'view_column',
+    'WeatherPrecipitation': 'water_drop',
+    'WeatherTemperature': 'thermostat',
 }
 WIDGET_TITLES: dict[str, str] = {
     'Text': 'Text Widget',
     'Date': 'Date Widget',
     'RoomCalendar': 'Room Calendar Widget',
+    'WeatherNow': 'Weather (Now) Widget',
+    'WeatherForecast': 'Weather (Forecast) Widget',
+    'WeatherPrecipitation': 'Weather (Precipitation) Widget',
+    'WeatherTemperature': 'Weather (Temperature) Widget',
 }
 
 
@@ -58,6 +73,9 @@ def _widget_label(widget: WidgetModel) -> str:
         return widget.date_format or 'Date'
     if isinstance(widget, RoomCalendarWidgetModel):
         return widget.room_name or widget.room_number or '(room calendar)'
+    if isinstance(widget, (WeatherNowWidgetModel, WeatherForecastWidgetModel,
+                            WeatherPrecipitationWidgetModel, WeatherTemperatureWidgetModel)):
+        return f'{widget.latitude:.2f}, {widget.longitude:.2f}'
     return widget.widget_type
 
 
@@ -71,6 +89,10 @@ def _default_widget(widget_type: str) -> WidgetModel:
         return DateWidgetModel(position_x=0, position_y=0)
     if widget_type == 'RoomCalendar':
         return RoomCalendarWidgetModel(position_x=0, position_y=0, room_number='', room_name='', ical_url='')
+    if widget_type in WIDGET_MODELS and issubclass(WIDGET_MODELS[widget_type], (
+            WeatherNowWidgetModel, WeatherForecastWidgetModel,
+            WeatherPrecipitationWidgetModel, WeatherTemperatureWidgetModel)):
+        return WIDGET_MODELS[widget_type](position_x=0, position_y=0, latitude=0.0, longitude=0.0)
     raise ValueError(f'Unknown widget type: {widget_type}')
 
 
@@ -301,6 +323,11 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
                 _render_row(form, 'room_number', 'room_name')
                 form.render_field('ical_url', props='outlined dense').classes('w-full')
                 _render_row(form, 'date_format_long', 'date_format', 'time_format')
+            elif isinstance(widget, WeatherNowWidgetModel):
+                _render_row(form, 'latitude', 'longitude')
+            elif isinstance(widget, (WeatherForecastWidgetModel, WeatherPrecipitationWidgetModel, WeatherTemperatureWidgetModel)):
+                _render_row(form, 'latitude', 'longitude')
+                _render_row(form, 'forecast_hours')
             form.render_nonfield_errors()
 
     def _open_detail(key: str) -> None:

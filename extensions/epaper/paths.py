@@ -32,6 +32,10 @@ class EpaperPaths:
         return self.root / "ical"
 
     @property
+    def weather_dir(self) -> Path:
+        return self.root / "weather"
+
+    @property
     def alias_file(self) -> Path:
         return self.root / "aliases.json"
 
@@ -40,5 +44,5 @@ class EpaperPaths:
         return self.root / "organizer_names.json"
 
     def ensure_dirs(self) -> None:
-        for d in (self.screen_dir, self.schedule_dir, self.image_dir, self.ical_dir):
+        for d in (self.screen_dir, self.schedule_dir, self.image_dir, self.ical_dir, self.weather_dir):
             d.mkdir(parents=True, exist_ok=True)

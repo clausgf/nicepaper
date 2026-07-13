@@ -1,6 +1,10 @@
 import pytest
 from pydantic import ValidationError
-from extensions.epaper.models.screenmodel import ScreenModel, TextWidgetModel, RoomCalendarWidgetModel
+from extensions.epaper.models.screenmodel import (
+    ScreenModel, TextWidgetModel, RoomCalendarWidgetModel,
+    WeatherNowWidgetModel, WeatherForecastWidgetModel,
+    WeatherPrecipitationWidgetModel, WeatherTemperatureWidgetModel,
+)
 
 
 def test_screen_model_valid():
@@ -134,3 +138,30 @@ def test_widget_alignment_pattern():
     assert TextWidgetModel(**base, alignment="ct").alignment == "ct"
     with pytest.raises(ValidationError):
         TextWidgetModel(**base, alignment="xx")
+
+
+def test_weather_now_widget_requires_coordinates():
+    with pytest.raises(ValidationError):
+        WeatherNowWidgetModel(position_x=0, position_y=0)
+    widget = WeatherNowWidgetModel(position_x=0, position_y=0, latitude=52.52, longitude=13.405)
+    assert widget.latitude == 52.52
+
+
+def test_weather_forecast_widget_default_forecast_hours():
+    widget = WeatherForecastWidgetModel(position_x=0, position_y=0, latitude=52.52, longitude=13.405)
+    assert widget.forecast_hours == 24
+
+
+@pytest.mark.parametrize("widget_type,model_cls", [
+    ("WeatherNow", WeatherNowWidgetModel),
+    ("WeatherForecast", WeatherForecastWidgetModel),
+    ("WeatherPrecipitation", WeatherPrecipitationWidgetModel),
+    ("WeatherTemperature", WeatherTemperatureWidgetModel),
+])
+def test_weather_widget_discriminated_union_round_trip(widget_type, model_cls):
+    screen = ScreenModel(width=400, height=300, widgets=[
+        {"widget_type": widget_type, "position_x": 0, "position_y": 0, "latitude": 52.52, "longitude": 13.405},
+    ])
+    assert isinstance(screen.widgets[0], model_cls)
+    reloaded = ScreenModel.model_validate_json(screen.model_dump_json())
+    assert isinstance(reloaded.widgets[0], model_cls)

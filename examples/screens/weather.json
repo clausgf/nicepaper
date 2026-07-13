@@ -1,0 +1,46 @@
+{
+  "width": 800,
+  "height": 480,
+  "update_schedule_id": "default",
+  "widgets": [
+    {
+      "widget_type": "WeatherNow",
+      "position_x": 0,
+      "position_y": 0,
+      "size_width": 400,
+      "size_height": 120,
+      "latitude": 52.52,
+      "longitude": 13.405
+    },
+    {
+      "widget_type": "WeatherForecast",
+      "position_x": 0,
+      "position_y": 130,
+      "size_width": 800,
+      "size_height": 100,
+      "latitude": 52.52,
+      "longitude": 13.405,
+      "forecast_hours": 24
+    },
+    {
+      "widget_type": "WeatherPrecipitation",
+      "position_x": 0,
+      "position_y": 240,
+      "size_width": 390,
+      "size_height": 200,
+      "latitude": 52.52,
+      "longitude": 13.405,
+      "forecast_hours": 24
+    },
+    {
+      "widget_type": "WeatherTemperature",
+      "position_x": 410,
+      "position_y": 240,
+      "size_width": 390,
+      "size_height": 200,
+      "latitude": 52.52,
+      "longitude": 13.405,
+      "forecast_hours": 24
+    }
+  ]
+}

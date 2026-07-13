@@ -33,7 +33,7 @@ class ImageMetadata(BaseModel):
 
 
 class WidgetModel(BaseModel):
-    widget_type: Literal["Text", "Date", "RoomCalendar"]
+    widget_type: Literal["Text", "Date", "RoomCalendar", "WeatherNow", "WeatherForecast", "WeatherPrecipitation", "WeatherTemperature"]
 
     # Tuple[int, int] fields (position/size) aren't renderable by niceview
     # (an unrecognised field type falls back to a plain ui.input bound to
@@ -95,11 +95,40 @@ class RoomCalendarWidgetModel(WidgetModel):
     room_name: str
     ical_url: str
 
+
+class WeatherWidgetModel(WidgetModel):
+    """Shared fields for the Open-Meteo-backed weather widgets below."""
+    latitude: float = Field(description="Latitude of the forecast location, e.g. 52.52.")
+    longitude: float = Field(description="Longitude of the forecast location, e.g. 13.405.")
+
+
+class WeatherNowWidgetModel(WeatherWidgetModel):
+    widget_type: Literal["WeatherNow"] = "WeatherNow"
+
+
+class WeatherForecastWidgetModel(WeatherWidgetModel):
+    widget_type: Literal["WeatherForecast"] = "WeatherForecast"
+    forecast_hours: int = Field(default=24, description="How many hours ahead the forecast strip covers.")
+
+
+class WeatherPrecipitationWidgetModel(WeatherWidgetModel):
+    widget_type: Literal["WeatherPrecipitation"] = "WeatherPrecipitation"
+    forecast_hours: int = Field(default=24, description="How many hours ahead the precipitation chart covers.")
+
+
+class WeatherTemperatureWidgetModel(WeatherWidgetModel):
+    widget_type: Literal["WeatherTemperature"] = "WeatherTemperature"
+    forecast_hours: int = Field(default=24, description="How many hours ahead the temperature chart covers.")
+
 # discriminated union: widget_type selects the concrete model and a
 # missing/unknown widget_type is a validation error instead of silently
 # matching the first union member
 AnyWidget = Annotated[
-    Union[DateWidgetModel, TextWidgetModel, RoomCalendarWidgetModel],
+    Union[
+        DateWidgetModel, TextWidgetModel, RoomCalendarWidgetModel,
+        WeatherNowWidgetModel, WeatherForecastWidgetModel,
+        WeatherPrecipitationWidgetModel, WeatherTemperatureWidgetModel,
+    ],
     Field(discriminator="widget_type"),
 ]
 

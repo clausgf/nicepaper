@@ -37,6 +37,9 @@ class Config(BaseSettings):
     ical_update_interval_s: int = 600
     ical_max_days: int = 30
 
+    weather_update_interval_s: int = 900
+    weather_error: str = "Fehler beim Abrufen der Wetterdaten"
+
     no_appointments: str = "Keine Termine"
     next_appointment: str = "Nächster Termin"
     current_appointment: str = "Aktueller Termin"
@@ -53,6 +56,11 @@ class Config(BaseSettings):
     font: Tuple[str, int] = ("Ubuntu-Regular.ttf", 16)
     color_background: Optional[Tuple[int, int, int]] = (255, 255, 255)
     color_primary: Optional[Tuple[int, int, int]] = (0, 0, 0)
+    # data-series accent color for chart widgets (e.g. WeatherTemperature):
+    # pure red is the only accent bwr has besides black/white, and an exact
+    # palette member of c7/e6 too, so it never dithers on any configured
+    # color model (see imagecache.py's Image.quantize())
+    color_accent: Optional[Tuple[int, int, int]] = (255, 0, 0)
 
     epaper_color_models: List[ColorModel] = [
         ColorModel(id='bw', name='Black on white', palette=[(0,0,0), (255,255,255)]),
