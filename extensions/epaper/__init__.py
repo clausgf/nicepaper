@@ -25,7 +25,9 @@ def register(app: FastAPI) -> None:
     from extensions.epaper.api.endpoints import build_extension_router
     from extensions.epaper.config import load_global_config, save_global_config
     from extensions.epaper.paths import EpaperPaths
-    from extensions.epaper.ui.panels import file_list, global_config_card, schedule_editor, screen_editor
+    from extensions.epaper.ui.panels import file_list, global_config_card
+    from extensions.epaper.ui.schedule_editor import schedule_editor
+    from extensions.epaper.ui.screen_editor import screen_editor
 
     def _paths_for_project(project_name: str) -> EpaperPaths:
         paths = EpaperPaths(root=extension_project_dir(project_name, 'epaper'))
