@@ -14,7 +14,7 @@ from fastapi.responses import RedirectResponse
 from nicegui import ui
 
 from extensions.epaper.api.endpoints import build_standalone_router
-from extensions.epaper.config import app_config
+from extensions.epaper.config import app_config, load_global_config
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.ui.standalone import register_standalone_pages
 
@@ -22,6 +22,9 @@ from extensions.epaper.ui.standalone import register_standalone_pages
 # nice4iot-extension split
 STANDALONE_PATHS = EpaperPaths(root=Path("data"))
 STANDALONE_PATHS.ensure_dirs()
+
+# must happen before ui.run_with() below, which reads app_config.storage_secret
+load_global_config(STANDALONE_PATHS.root / "global_config.json")
 
 # No CORS middleware: the UI is served same-origin behind the reverse
 # proxy and the e-paper displays are not browsers, so nothing needs

@@ -1,7 +1,19 @@
+"""
+app_config is a single shared GlobalConfig instance, mutated in place by
+load_global_config()/the global settings card rather than replaced --
+every module that does `from extensions.epaper.config import app_config`
+sees loaded/edited values automatically, without needing to change
+anything, as long as callers only ever setattr() its fields (never
+`app_config = ...` a new object).
+"""
 import importlib.resources
-from typing import List, Optional, Tuple
-from pydantic import BaseModel, DirectoryPath, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
+from pydantic import DirectoryPath, Field
+from pydantic_settings import BaseSettings
+
+from extensions.epaper.models.global_config import ColorModel, GlobalConfig
+
+__all__ = ["ColorModel", "GlobalConfig", "app_config", "resource_paths", "load_global_config", "save_global_config"]
 
 
 def _resource_dir(name: str) -> str:
@@ -11,64 +23,35 @@ def _resource_dir(name: str) -> str:
     return str(importlib.resources.files(__package__) / "resources" / name)
 
 
-class ColorModel(BaseModel):
-    """
-    Color model for the e-paper display.
-    """
-    id: str
-    name: str
-    palette: List[Tuple[int, int, int]]
-    background_color_index: int = 1
-
-
-class Config(BaseSettings):
-    """
-    Application settings that are the same for every screen regardless of
-    which project/root it belongs to. File locations (screens, schedules,
-    images, ...) are per-root and computed via paths.EpaperPaths instead.
-    """
-    # secret for NiceGUI browser session storage; override via the
-    # STORAGE_SECRET environment variable in production
-    storage_secret: str = "geheim"
-
+class _ResourcePaths(BaseSettings):
+    """Package-resource locations, resolved fresh via importlib.resources
+    on every process start -- deliberately not part of GlobalConfig (not
+    persisted/user-editable), see that module's docstring. Still
+    overridable via FONT_PATH/ICON_PATH env vars for advanced deployments,
+    matching the old Config class."""
     font_path: DirectoryPath = Field(default_factory=lambda: _resource_dir("fonts"))
     icon_path: DirectoryPath = Field(default_factory=lambda: _resource_dir("icons"))
 
-    ical_update_interval_s: int = 600
-    ical_max_days: int = 30
 
-    weather_update_interval_s: int = 900
-    weather_error: str = "Fehler beim Abrufen der Wetterdaten"
+resource_paths = _ResourcePaths()
 
-    no_appointments: str = "Keine Termine"
-    next_appointment: str = "Nächster Termin"
-    current_appointment: str = "Aktueller Termin"
-    further_appointments: str = "Weitere Termine"
-    ical_error: str = "Fehler beim Abrufen der Kalenderdaten"
-    roomcalendar_date_format_long: str = "EEEE, dd.MM.yyyy"
-    roomcalendar_date_format_short: str = "dd.MM.yy"
-    roomcalendar_time_format: str = "HH:mm"
-
-    locale: str = 'de_DE.utf8'
-    timezone: str = 'Europe/Berlin'
-    date_format: str = 'dd.MM.yy'
-    time_format: str = 'HH:mm'
-    font: Tuple[str, int] = ("Ubuntu-Regular.ttf", 16)
-    color_background: Optional[Tuple[int, int, int]] = (255, 255, 255)
-    color_primary: Optional[Tuple[int, int, int]] = (0, 0, 0)
-    # data-series accent color for chart widgets (e.g. WeatherTemperature):
-    # pure red is the only accent bwr has besides black/white, and an exact
-    # palette member of c7/e6 too, so it never dithers on any configured
-    # color model (see imagecache.py's Image.quantize())
-    color_accent: Optional[Tuple[int, int, int]] = (255, 0, 0)
-
-    epaper_color_models: List[ColorModel] = [
-        ColorModel(id='bw', name='Black on white', palette=[(0,0,0), (255,255,255)]),
-        ColorModel(id='bwr', name='Black/Red on white', palette=[(0,0,0), (255,255,255), (255,0,0)]),
-        ColorModel(id='gs4', name='4-Greyscale on white', palette=[(0,0,0), (255,255,255), (128,128,128), (192,192,192)]),
-        ColorModel(id='c7', name='7-color C7', palette=[(0,0,0), (255,255,255), (0,255,0), (0,0,255), (255,0,0), (255,255,0), (255,165,0)]),
-        ColorModel(id='e6', name='Spectra E6', palette=[(0,0,0), (255,255,255), (255,255,0), (255,0,0), (0,0,255), (0,255,0)]),
-    ]
+app_config = GlobalConfig()
 
 
-app_config = Config()
+def load_global_config(path: Path) -> None:
+    """Load persisted settings from `path` into the shared `app_config`
+    singleton IN PLACE (mutating its fields, not replacing the object) --
+    every module that already imported app_config sees the loaded values
+    without needing to change anything. Creates the file with the current
+    (default) values if it doesn't exist yet."""
+    if path.exists():
+        loaded = GlobalConfig.model_validate_json(path.read_text())
+        for field_name in GlobalConfig.model_fields:
+            setattr(app_config, field_name, getattr(loaded, field_name))
+    else:
+        save_global_config(path)
+
+
+def save_global_config(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(app_config.model_dump_json(indent=2))

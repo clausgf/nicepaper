@@ -4,7 +4,7 @@ from typing import Tuple
 from PIL import Image, ImageFont, ImageDraw, ImageColor
 
 from extensions.epaper.util import logger
-from extensions.epaper.config import app_config
+from extensions.epaper.config import resource_paths
 
 
 class FontResourceManager:
@@ -36,7 +36,7 @@ class FontResourceManager:
         return font
 
 
-font_resource_manager = FontResourceManager(app_config.font_path)
+font_resource_manager = FontResourceManager(resource_paths.font_path)
 
 
 class IconResourceManager:
@@ -56,7 +56,7 @@ class IconResourceManager:
         return image
 
 
-icon_resource_manager = IconResourceManager(app_config.icon_path)
+icon_resource_manager = IconResourceManager(resource_paths.icon_path)
 
 
 class DrawingContext:

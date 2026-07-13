@@ -22,7 +22,7 @@ from niceview.dataadapter import JsonAdapter, JsonListAdapter, ListAdapter
 from niceview.form import ModelForm
 from niceview.util import confirm_dialog
 
-from extensions.epaper.config import app_config
+from extensions.epaper.config import app_config, resource_paths, save_global_config
 from extensions.epaper.models.screenmodel import (
     DateWidgetModel, RoomCalendarWidgetModel, ScreenModel, TextWidgetModel, WidgetModel,
     WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
@@ -120,6 +120,54 @@ def _rename_file(dir: Path, old_path: Path, new_name: str) -> tuple[bool, str]:
     return True, f'Renamed to "{new_name}".'
 
 
+def global_config_card(persist: Callable[[], None]) -> None:
+    """
+    One editable card (as nice4iot's register_global_card() and the
+    standalone "Global" tab both expect a single project-independent card)
+    for the shared GlobalConfig singleton, app_config. ModelForm.from_item
+    binds directly to that object -- not a fresh copy from an adapter --
+    so autosave edits mutate app_config's own attributes in place: every
+    module that already did `from extensions.epaper.config import
+    app_config` sees the changes without needing to change anything.
+    `persist()` is the caller's job (write to the right JSON path for
+    standalone vs. the nice4iot extension); this function doesn't know or
+    care which.
+    """
+    font_names = sorted(p.name for p in resource_paths.font_path.glob('*') if p.is_file())
+    with ui.card().classes('w-full'):
+        ui.label('E-Paper Global Settings').classes('text-subtitle1')
+        form = ModelForm.from_item(app_config, exclude=['epaper_color_models'], on_change=lambda e: persist())
+
+        with ui.column().classes('w-full gap-2'):
+            ui.label('General').classes('text-subtitle2')
+            _render_row(form, 'locale', 'timezone')
+            _render_row(form, 'date_format', 'time_format')
+            form.render_field('storage_secret', props='outlined dense').classes('w-full')
+
+            ui.label('Font & Colors').classes('text-subtitle2')
+            with ui.row().classes('w-full gap-2'):
+                form.render_field('font_name', widget_type='ui.select', select_options=font_names,
+                                   props='outlined dense').classes('flex-grow')
+                form.render_field('font_size', props='outlined dense').classes('flex-grow')
+            with ui.row().classes('w-full gap-2'):
+                form.render_field('color_background', widget_type='ui.color_input', props='outlined dense').classes('flex-grow')
+                form.render_field('color_primary', widget_type='ui.color_input', props='outlined dense').classes('flex-grow')
+                form.render_field('color_accent', widget_type='ui.color_input', props='outlined dense').classes('flex-grow')
+
+            ui.label('iCal (Room Calendar)').classes('text-subtitle2')
+            _render_row(form, 'ical_update_interval_s', 'ical_max_days')
+            form.render_field('ical_error', props='outlined dense').classes('w-full')
+            _render_row(form, 'no_appointments', 'next_appointment')
+            _render_row(form, 'current_appointment', 'further_appointments')
+            _render_row(form, 'roomcalendar_date_format_long', 'roomcalendar_date_format_short', 'roomcalendar_time_format')
+
+            ui.label('Weather').classes('text-subtitle2')
+            form.render_field('weather_update_interval_s', props='outlined dense').classes('w-full')
+            form.render_field('weather_error', props='outlined dense').classes('w-full')
+
+            form.render_nonfield_errors()
+
+
 def screen_image_view(url: str):
     img = ui.image(url).classes('q-pa-none')
     with ui.row().classes('w-full items-center justify-between q-pa-none'):
@@ -163,9 +211,9 @@ def file_list(dir: Path, item_type: str, on_select: Callable[[str], None], on_ad
                     if size < 1024:
                         size_str = f'{size} B'
                     elif size < 1024**2:
-                        size_str = f'{size/1024:.1f} KB'
+                        size_str = f'{size/1024:.1f} kiB'
                     else:
-                        size_str = f'{size/1024**2:.1f} MB'
+                        size_str = f'{size/1024**2:.1f} MiB'
 
                     ui.item_label(mtime_str + ', ' + size_str).props('caption').classes('italic')
 
@@ -319,7 +367,7 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
                 ui.space()
                 ui.button(icon='delete').props('round dense size=sm color=negative').on_click(lambda: _delete_widget(key))
 
-            font_names = sorted(p.name for p in app_config.font_path.glob('*') if p.is_file())
+            font_names = sorted(p.name for p in resource_paths.font_path.glob('*') if p.is_file())
             form = ModelForm.from_adapter(model_cls, widgets_adapter, key, exclude=['widget_type'], autosave=True)
 
             ui.label('Layout').classes('text-subtitle2')

@@ -8,12 +8,14 @@ from contextlib import contextmanager
 from typing import Optional
 from nicegui import ui
 
+from extensions.epaper.config import save_global_config
 from extensions.epaper.paths import EpaperPaths
-from extensions.epaper.ui.panels import file_list, schedule_editor, screen_editor
+from extensions.epaper.ui.panels import file_list, global_config_card, schedule_editor, screen_editor
 
-# top-level navigation: two tabs, each its own route (not client-side
-# panel switching), so /screens and /schedules stay deep-linkable
-TAB_ROUTES = {'Screens': '/screens', 'Schedules': '/schedules'}
+# top-level navigation: tabs, each its own route (not client-side panel
+# switching), so /global, /screens and /schedules stay deep-linkable.
+# Global comes first (see register_standalone_pages).
+TAB_ROUTES = {'Global': '/global', 'Screens': '/screens', 'Schedules': '/schedules'}
 
 
 @contextmanager
@@ -28,6 +30,7 @@ def frame(navigation_title: Optional[str] = None, active_tab: str = None):
     with ui.header(elevated=True).style('background-color: #3874c8').classes('items-center justify-between'):
         ui.label('Epaper Doorsign Manager').classes('font-bold')
         with ui.tabs(value=active_tab, on_change=on_tab_change).props('dense indicator-color=white').classes('text-white'):
+            ui.tab('Global')
             ui.tab('Screens')
             ui.tab('Schedules')
     with ui.column().classes('w-full'):
@@ -47,6 +50,11 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
     @ui.page('/')
     def page_home():
         ui.navigate.to('/screens')
+
+    @ui.page('/global')
+    def page_global():
+        with frame(None, 'Global'):
+            global_config_card(persist=lambda: save_global_config(paths.root / "global_config.json"))
 
     @ui.page('/screens')
     def page_screens():

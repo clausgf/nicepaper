@@ -13,20 +13,36 @@ from fastapi import FastAPI
 
 
 def register(app: FastAPI) -> None:
+    from pathlib import Path
+
     from nicegui import ui
 
-    from app.extensions import mount_extension_router, register_project_card, register_project_page
+    from app.config import app_config as nice4iot_app_config
+    from app.extensions import mount_extension_router, register_global_card, register_project_card, register_project_page
     from app.paths import extension_project_dir
     from app.routes import project_url
 
     from extensions.epaper.api.endpoints import build_extension_router
+    from extensions.epaper.config import load_global_config, save_global_config
     from extensions.epaper.paths import EpaperPaths
-    from extensions.epaper.ui.panels import file_list, schedule_editor, screen_editor
+    from extensions.epaper.ui.panels import file_list, global_config_card, schedule_editor, screen_editor
 
     def _paths_for_project(project_name: str) -> EpaperPaths:
         paths = EpaperPaths(root=extension_project_dir(project_name, 'epaper'))
         paths.ensure_dirs()
         return paths
+
+    # --- Global (project-independent) config -------------------------------
+    # Sibling to nice4iot's own projects_dir (e.g. data/projects ->
+    # data/.epaper_global_config.json) since nice4iot has no built-in
+    # helper for project-independent extension storage.
+    _global_config_path = Path(nice4iot_app_config.projects_dir).parent / '.epaper_global_config.json'
+    load_global_config(_global_config_path)
+
+    def _global_card() -> None:
+        global_config_card(persist=lambda: save_global_config(_global_config_path))
+
+    register_global_card(_global_card)
 
     # --- REST -----------------------------------------------------------
     router = build_extension_router(_paths_for_project)
