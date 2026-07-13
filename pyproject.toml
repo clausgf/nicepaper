@@ -31,18 +31,29 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-# only extensions/epaper is packaged (not extensions/ itself), which is
-# what keeps the extensions namespace package __init__.py-free after
-# installation (see nice4iot's docs/extensions.md); main.py and the
-# standalone-only bits (data/, examples/, tests/) are not part of the
-# installable package, only of this repo
-packages = ["extensions/epaper"]
-
-[tool.hatch.build.targets.wheel.force-include]
-# bundle fonts/icons as package data so font_path/icon_path resolve
-# correctly regardless of the process's cwd, e.g. when installed as a
-# dependency inside nice4iot's own environment
-"extensions/epaper/resources" = "extensions/epaper/resources"
+# `packages = ["extensions/epaper"]` (the previous config) looks right but
+# isn't: hatchling's `packages` always strips down to the leaf directory
+# name as the wheel-root package, so it silently produced a flat `epaper/`
+# top-level package instead of `extensions/epaper/` -- verified by
+# building the wheel and listing its contents. That breaks nice4iot's
+# extension mechanism outright (it requires extensions/<name>/, see
+# nice4iot's docs/extensions.md and this package's __init__.py docstring)
+# and was the root cause of a build crash reported downstream ("second
+# file added to the wheel archive at the same path: epaper/resources/..."):
+# the force-include entry for resources got remapped through the same
+# leaf-stripping logic as `packages`, landing at the same final path as
+# the copy `packages` already included, hence the collision.
+#
+# `only-include` does not do any path stripping -- it copies the given
+# paths into the wheel verbatim, so `extensions/epaper/...` lands at
+# `extensions/epaper/...` in the wheel, `extensions/` itself has no
+# __init__.py (preserving the PEP 420 namespace package nice4iot's own
+# extensions share), and resources are only included once (no separate
+# force-include needed at all). Verified: built the wheel, listed its
+# contents (extensions/epaper/__init__.py present, no extensions/__init__.py,
+# no duplicate/leaked files), pip-installed it into a throwaway venv and
+# imported `extensions.epaper` successfully from outside this repo.
+only-include = ["extensions"]
 
 [tool.uv]
 # don't build/install epaper-nice's own wheel into its own .venv --
