@@ -56,6 +56,7 @@ epaper-nice
 │   │   ├── widgets/             # Text, Date, RoomCalendar widgets
 │   │   └── datasources/         # iCal feed loading and caching
 │   ├── models/                  # pydantic models for screens and schedules
+│   ├── wire/huffman_de.py       # fixed German Huffman codebook (see below)
 │   └── resources/               # fonts/icons, bundled as package data
 ├── tests                       # pytest suite (unit + acceptance)
 ├── data                        # standalone-mode runtime data (not in git)
@@ -64,6 +65,7 @@ epaper-nice
 │   ├── images/                   # rendered image cache
 │   └── ical/                     # iCal feed cache
 ├── examples                    # example configuration files to copy into data/
+├── firmware/huffman_de.h       # generated C codebook, see Low-bandwidth rendering
 ├── Dockerfile / docker-compose.yml
 └── pyproject.toml / uv.lock
 ```
@@ -157,6 +159,36 @@ This repository serves two purposes from the same code:
   on import of *any* of its submodules, so a module-level import there
   would break standalone mode outright (nice4iot's `app` package isn't
   installed/importable in that process).
+
+## Low-bandwidth rendering (work in progress)
+
+Besides the PNG image API, a second, very low-bandwidth rendering channel
+is planned for e.g. LoRaWAN displays: instead of shipping a rendered
+image, only widget *data* is sent (over MQTT to TTN) and the
+(self-built) device firmware renders the widgets locally. Only string
+fields (event titles, organizer names, ...) are meant to be compressed;
+numeric/enum fields (dates, times, weekdays) are cheap enough to pack
+directly without any coding.
+
+So far only the compression codec exists, not the wire format or
+transport: `extensions/epaper/wire/huffman_de.py` implements a *fixed*
+(non-adaptive) Huffman codebook for German text, so encoder and decoder
+never need to exchange a header — both must simply agree on the same
+static symbol table. The current table (`_WEIGHTS`) is a generic
+estimate from standard German letter frequencies, not yet derived from a
+real corpus of the strings it will actually carry; expect to retune it
+later. Characters outside the table fall back to raw UTF-8 bytes behind
+an ESCAPE symbol, so encoding never fails, just compresses worse.
+
+Since the device firmware is C, not Python, `firmware/huffman_de.h` is a
+generated, self-contained C header with the same codebook baked in as
+literal data (not recomputed from scratch in C, to rule out the two
+implementations ever disagreeing) plus a decode function — encoding only
+happens server-side. Regenerate it after editing `_WEIGHTS`:
+
+```
+uv run python -m extensions.epaper.wire.huffman_de
+```
 
 ## Configuration
 
