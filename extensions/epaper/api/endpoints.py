@@ -86,11 +86,6 @@ def build_standalone_router(paths: EpaperPaths) -> APIRouter:
     """
     router = APIRouter()
 
-    @router.get("/health", summary="Health check", tags=["status"])
-    async def health_check():
-        """Liveness probe for monitoring. Always returns `{"status": "ok"}`."""
-        return {"status": "ok"}
-
     @router.get(
         "/screen/{id}/image.png",
         summary="Get the current image for a screen",

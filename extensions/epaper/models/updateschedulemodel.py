@@ -10,7 +10,6 @@ TIME_PATTERN = r'^([01]\d|2[0-3]):[0-5]\d$'
 
 
 class WeeklyScheduleModel(BaseModel):
-    type: Literal["weekly"] = "weekly"
     # not Optional: a UI multiselect can only show "empty" or "populated",
     # not a separate "unset" state, so "no restriction" is expressed as
     # every value being selected by default rather than as None

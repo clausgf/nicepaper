@@ -17,9 +17,9 @@ from zoneinfo import ZoneInfo
 
 from nicegui import ui
 from nicegui.events import SortableEventArguments
-from pydantic import BaseModel
 from babel.dates import format_datetime, get_timezone
 from niceview.dataadapter import JsonAdapter, JsonListAdapter, ListAdapter
+from niceview.fieldinfo import FieldInfo
 from niceview.form import ModelForm
 from niceview.util import confirm_dialog
 
@@ -44,6 +44,11 @@ WIDGET_ICONS: dict[str, str] = {
     'Date': 'event',
     'RoomCalendar': 'calendar_month',
 }
+WIDGET_TITLES: dict[str, str] = {
+    'Text': 'Text Widget',
+    'Date': 'Date Widget',
+    'RoomCalendar': 'Room Calendar Widget',
+}
 
 
 def _widget_label(widget: WidgetModel) -> str:
@@ -62,72 +67,21 @@ def _default_widget(widget_type: str) -> WidgetModel:
     required fields -- filled in by the user in the detail form right
     after creation."""
     if widget_type == 'Text':
-        return TextWidgetModel(position=(0, 0), text='')
+        return TextWidgetModel(position_x=0, position_y=0, text='')
     if widget_type == 'Date':
-        return DateWidgetModel(position=(0, 0))
+        return DateWidgetModel(position_x=0, position_y=0)
     if widget_type == 'RoomCalendar':
-        return RoomCalendarWidgetModel(position=(0, 0), room_number='', room_name='', ical_url='')
+        return RoomCalendarWidgetModel(position_x=0, position_y=0, room_number='', room_name='', ical_url='')
     raise ValueError(f'Unknown widget type: {widget_type}')
 
 
-def _render_int_pair(item: BaseModel, field_name: str, title: str, labels: tuple[str, str],
-                      persist: Callable[[], None], allow_none: bool = False) -> None:
-    """
-    Two ui.number inputs bound to a Tuple[int, int] field (optionally
-    Optional[Tuple[int, int]] when allow_none), persisting via persist()
-    on change. niceview has no built-in tuple widget -- an unrecognised
-    field type falls back to a plain ui.input bound to a raw string,
-    which would silently store the wrong type here -- so position/size
-    fields are hand-rolled instead of going through ModelForm.render().
-    """
-    current = getattr(item, field_name)
-    with ui.row().classes('w-full items-center gap-2'):
-        ui.label(title).classes('text-caption w-28')
-        enabled = ui.switch(value=current is not None) if allow_none else None
-        a = ui.number(label=labels[0], value=(current[0] if current else 0), precision=0).classes('w-24')
-        b = ui.number(label=labels[1], value=(current[1] if current else 0), precision=0).classes('w-24')
-        if enabled is not None:
-            a.bind_enabled_from(enabled, 'value')
-            b.bind_enabled_from(enabled, 'value')
-
-        def _apply() -> None:
-            if enabled is not None and not enabled.value:
-                setattr(item, field_name, None)
-            else:
-                setattr(item, field_name, (int(a.value), int(b.value)))
-            persist()
-
-        a.on('blur', lambda: _apply())
-        b.on('blur', lambda: _apply())
-        if enabled is not None:
-            enabled.on_value_change(lambda: _apply())
-
-
-def _render_font_field(item: WidgetModel, persist: Callable[[], None]) -> None:
-    """Optional[Tuple[str, int]] font field: font file name (select, from
-    app_config.font_path) + point size. Same rationale as _render_int_pair
-    for not using ModelForm's generic field rendering."""
-    font_names = sorted(p.name for p in app_config.font_path.glob('*') if p.is_file())
-    current = item.font
-    with ui.row().classes('w-full items-center gap-2'):
-        ui.label('Font').classes('text-caption w-28')
-        enabled = ui.switch(value=current is not None)
-        name_select = ui.select(font_names, label='Font file',
-                                 value=(current[0] if current else (font_names[0] if font_names else None))).classes('w-60')
-        size_number = ui.number(label='Size', value=(current[1] if current else 16), precision=0, min=1).classes('w-20')
-        name_select.bind_enabled_from(enabled, 'value')
-        size_number.bind_enabled_from(enabled, 'value')
-
-        def _apply() -> None:
-            if enabled.value:
-                item.font = (name_select.value, int(size_number.value))
-            else:
-                item.font = None
-            persist()
-
-        enabled.on_value_change(lambda: _apply())
-        name_select.on_value_change(lambda: _apply())
-        size_number.on('blur', lambda: _apply())
+def _render_row(form: ModelForm, *field_names: str) -> None:
+    """Render several short fields side by side to save vertical space.
+    ui.row() wraps by default, so this stays mobile-friendly: fields drop
+    to their own line on narrow viewports instead of overflowing."""
+    with ui.row().classes('w-full gap-2'):
+        for name in field_names:
+            form.render_field(name).classes('flex-grow')
 
 
 def screen_image_view(url: str):
@@ -196,7 +150,7 @@ def file_list(dir: Path, item_type: str, on_select: Callable[[str], None], on_ad
                 return
 
             if item_type == 'screen':
-                content = ScreenModel(size=(800, 480)).model_dump_json(indent=2)
+                content = ScreenModel(width=800, height=480).model_dump_json(indent=2)
             elif item_type == 'schedule':
                 content = '[]'  # a schedule file is a plain List[WeeklyScheduleModel]
             else:
@@ -248,8 +202,10 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str, on_del
 
     state = {'view': 'list', 'key': None}
 
-    with ui.row().classes('w-full place-content-end'):
-        ui.button('Delete File', on_click=lambda: delete_file())
+    with ui.row().classes('w-full items-center gap-2'):
+        ui.label(filename).classes('text-h6')
+        ui.space()
+        ui.button(icon='delete').props('flat round color=negative').on_click(lambda: delete_file())
 
     ui.separator()
     color_models = [cm.id for cm in app_config.epaper_color_models]
@@ -275,13 +231,10 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str, on_del
 
     def _widget_list() -> None:
         ui.label('Screen settings').classes('text-subtitle1')
-        _render_int_pair(screen, 'size', 'Canvas size', ('Width', 'Height'), persist_screen)
-        schedule_input = ui.input('Update schedule id', value=screen.update_schedule_id or '').classes('w-60')
-
-        def _save_schedule_id() -> None:
-            screen.update_schedule_id = schedule_input.value or None
-            persist_screen()
-        schedule_input.on('blur', lambda: _save_schedule_id())
+        screen_form = ModelForm.from_item(screen, exclude=['widgets'], on_change=lambda e: persist_screen())
+        with ui.column().classes('w-full gap-2'):
+            _render_row(screen_form, 'width', 'height')
+            screen_form.render_field('update_schedule_id').classes('w-full')
 
         ui.separator()
         with ui.row().classes('w-full items-center justify-between'):
@@ -315,20 +268,34 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str, on_del
             return
         model_cls = WIDGET_MODELS[widget.widget_type]
 
-        with ui.row().classes('w-full items-center justify-between'):
-            ui.button('Back to list', icon='arrow_back', on_click=lambda: _back_to_list()).props('flat')
-            ui.button(icon='delete').props('color=negative dense flat').on_click(lambda: _delete_widget(key))
+        with ui.row().classes('w-full items-center gap-2'):
+            ui.button(icon='arrow_back').props('round color=primary').on_click(lambda: _back_to_list())
+            ui.label(WIDGET_TITLES[widget.widget_type]).classes('text-h6')
+            ui.space()
+            ui.button(icon='delete').props('flat round color=negative').on_click(lambda: _delete_widget(key))
 
-        ui.label(f'{widget.widget_type} widget').classes('text-h6')
-        _render_int_pair(widget, 'position', 'Position', ('X', 'Y'), persist_screen)
-        _render_int_pair(widget, 'size', 'Size', ('Width', 'Height'), persist_screen, allow_none=True)
-        _render_font_field(widget, persist_screen)
-
-        ui.separator()
-        form = ModelForm.from_adapter(model_cls, widgets_adapter, key,
-                                       exclude=['widget_type', 'position', 'size', 'font'], autosave=True)
+        font_names = sorted(p.name for p in app_config.font_path.glob('*') if p.is_file())
+        form = ModelForm.from_adapter(
+            model_cls, widgets_adapter, key, exclude=['widget_type'], autosave=True,
+            field_infos={'font_name': FieldInfo(select_options=font_names)},
+        )
         with ui.column().classes('w-full gap-2'):
-            form.render()
+            _render_row(form, 'position_x', 'position_y')
+            _render_row(form, 'size_width', 'size_height')
+            _render_row(form, 'font_name', 'font_size')
+            _render_row(form, 'init_background', 'clipping')
+            ui.separator()
+            if isinstance(widget, TextWidgetModel):
+                form.render_field('text').classes('w-full')
+                form.render_field('alignment').classes('w-32')
+            elif isinstance(widget, DateWidgetModel):
+                form.render_field('date_format').classes('w-full')
+                form.render_field('alignment').classes('w-32')
+            elif isinstance(widget, RoomCalendarWidgetModel):
+                _render_row(form, 'room_number', 'room_name')
+                form.render_field('ical_url').classes('w-full')
+                _render_row(form, 'date_format_long', 'date_format', 'time_format')
+            form.render_nonfield_errors()
 
     def _open_detail(key: str) -> None:
         state['view'] = 'detail'

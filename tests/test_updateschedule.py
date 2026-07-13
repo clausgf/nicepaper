@@ -61,7 +61,7 @@ def test_get_schedule_by_id_reads_plain_list_file(tmp_path):
     schedule_file = paths.schedule_dir / f"{schedule_id}.json"
     with open(schedule_file, "w") as f:
         json.dump([
-            {"type": "weekly", "by_weekdays": ["Mon"], "times": ["06:00"]},
+            {"by_weekdays": ["Mon"], "times": ["06:00"]},
         ], f)
 
     schedule = asyncio.run(get_schedule_by_id(paths, schedule_id))

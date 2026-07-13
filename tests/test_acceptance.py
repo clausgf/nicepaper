@@ -27,22 +27,17 @@ def screen_id():
     screen_file = os.path.join(STANDALONE_PATHS.screen_dir, f"{screen_id}.json")
     with open(screen_file, "w") as f:
         json.dump({
-            "size": [400, 300],
+            "width": 400,
+            "height": 300,
             "widgets": [
-                {"widget_type": "Text", "position": [10, 10], "size": [380, 30], "text": "Acceptance"},
-                {"widget_type": "Date", "position": [10, 50], "size": [380, 30]},
+                {"widget_type": "Text", "position_x": 10, "position_y": 10, "size_width": 380, "size_height": 30, "text": "Acceptance"},
+                {"widget_type": "Date", "position_x": 10, "position_y": 50, "size_width": 380, "size_height": 30},
             ],
         }, f)
     yield screen_id
     if os.path.exists(screen_file):
         os.remove(screen_file)
     shutil.rmtree(os.path.join(STANDALONE_PATHS.image_dir, screen_id), ignore_errors=True)
-
-
-def test_health(client):
-    r = client.get("/api/health")
-    assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
 
 
 def test_display_poll_cycle(client, screen_id):

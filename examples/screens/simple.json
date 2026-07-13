@@ -1,18 +1,24 @@
 {
-  "size": [400, 300],
+  "width": 400,
+  "height": 300,
   "update_schedule_id": "default",
   "widgets": [
     {
       "widget_type": "Text",
-      "position": [10, 10],
-      "size": [380, 40],
+      "position_x": 10,
+      "position_y": 10,
+      "size_width": 380,
+      "size_height": 40,
       "text": "Welcome!",
-      "font": ["Ubuntu-Bold.ttf", 28]
+      "font_name": "Ubuntu-Bold.ttf",
+      "font_size": 28
     },
     {
       "widget_type": "Date",
-      "position": [10, 60],
-      "size": [380, 30],
+      "position_x": 10,
+      "position_y": 60,
+      "size_width": 380,
+      "size_height": 30,
       "date_format": "EEEE, dd. MMMM yyyy"
     }
   ]

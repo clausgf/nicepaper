@@ -1,11 +1,14 @@
 {
-  "size": [800, 480],
+  "width": 800,
+  "height": 480,
   "update_schedule_id": "default",
   "widgets": [
     {
       "widget_type": "RoomCalendar",
-      "position": [0, 0],
-      "size": [800, 480],
+      "position_x": 0,
+      "position_y": 0,
+      "size_width": 800,
+      "size_height": 480,
       "room_number": "101",
       "room_name": "Conference Room",
       "ical_url": "https://example.com/calendar.ics"

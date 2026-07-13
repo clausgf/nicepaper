@@ -5,18 +5,23 @@ from extensions.epaper.models.screenmodel import ScreenModel, TextWidgetModel, R
 
 def test_screen_model_valid():
     valid_data = {
-        "size": [400, 300],
+        "width": 400,
+        "height": 300,
         "widgets": [
             {
                 "widget_type": "Text",
-                "position": [0, 0],
-                "size": [100, 200],
+                "position_x": 0,
+                "position_y": 0,
+                "size_width": 100,
+                "size_height": 200,
                 "text": "Welcome to the main screen"
             },
             {
                 "widget_type": "RoomCalendar",
-                "position": [1, 1],
-                "size": [300, 400],
+                "position_x": 1,
+                "position_y": 1,
+                "size_width": 300,
+                "size_height": 400,
                 "room_number": "101",
                 "room_name": "Conference Room",
                 "ical_url": "http://example.com/calendar.ics"
@@ -27,6 +32,8 @@ def test_screen_model_valid():
     assert screen.size == (400, 300)
     assert len(screen.widgets) == 2
     assert isinstance(screen.widgets[0], TextWidgetModel)
+    assert screen.widgets[0].position == (0, 0)
+    assert screen.widgets[0].size == (100, 200)
     assert isinstance(screen.widgets[1], RoomCalendarWidgetModel)
 
 
@@ -37,11 +44,14 @@ def test_screen_model_missing_size():
 
 def test_screen_model_invalid_widget_type():
     invalid_data = {
-        "size": [400, 300],
+        "width": 400,
+        "height": 300,
         "widgets": [
             {
-                "position": [0, 0],
-                "size": [100, 200],
+                "position_x": 0,
+                "position_y": 0,
+                "size_width": 100,
+                "size_height": 200,
                 "widget_type": "InvalidType",
                 "text": "Welcome to the main screen"
             }
@@ -53,11 +63,14 @@ def test_screen_model_invalid_widget_type():
 
 def test_screen_model_missing_widget_type():
     invalid_data = {
-        "size": [400, 300],
+        "width": 400,
+        "height": 300,
         "widgets": [
             {
-                "position": [0, 0],
-                "size": [100, 200],
+                "position_x": 0,
+                "position_y": 0,
+                "size_width": 100,
+                "size_height": 200,
             }
         ]
     }
@@ -68,12 +81,15 @@ def test_screen_model_missing_widget_type():
 
 def test_screen_model_textwidget_missing_text():
     invalid_data = {
-        "size": [400, 300],
+        "width": 400,
+        "height": 300,
         "widgets": [
             {
                 "widget_type": "Text",
-                "position": [0, 0],
-                "size": [100, 200],
+                "position_x": 0,
+                "position_y": 0,
+                "size_width": 100,
+                "size_height": 200,
             }
         ]
     }
@@ -82,10 +98,37 @@ def test_screen_model_textwidget_missing_text():
     assert "field required" in str(exc_info.value).lower()
 
 
+def test_widget_size_none_when_either_dimension_missing():
+    widget = TextWidgetModel(position_x=0, position_y=0, text="x")
+    assert widget.size is None
+    widget.size_width = 100
+    assert widget.size is None
+    widget.size_height = 50
+    assert widget.size == (100, 50)
+
+
+def test_widget_size_setter():
+    widget = TextWidgetModel(position_x=0, position_y=0, text="x")
+    widget.size = (10, 20)
+    assert widget.size_width == 10
+    assert widget.size_height == 20
+    widget.size = None
+    assert widget.size_width is None
+    assert widget.size_height is None
+
+
+def test_widget_font_none_when_either_part_missing():
+    widget = TextWidgetModel(position_x=0, position_y=0, text="x", font_name="Ubuntu-Regular.ttf")
+    assert widget.font is None
+    widget.font_size = 16
+    assert widget.font == ("Ubuntu-Regular.ttf", 16)
+
+
 def test_widget_alignment_pattern():
     base = {
         "widget_type": "Text",
-        "position": [0, 0],
+        "position_x": 0,
+        "position_y": 0,
         "text": "x",
     }
     assert TextWidgetModel(**base, alignment="ct").alignment == "ct"

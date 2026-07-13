@@ -7,9 +7,10 @@ from extensions.epaper.paths import EpaperPaths
 
 
 SCREEN = {
-    "size": [100, 50],
+    "width": 100,
+    "height": 50,
     "widgets": [
-        {"widget_type": "Text", "position": [0, 0], "size": [100, 20], "text": "cache test"}
+        {"widget_type": "Text", "position_x": 0, "position_y": 0, "size_width": 100, "size_height": 20, "text": "cache test"}
     ],
 }
 
