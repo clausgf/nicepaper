@@ -41,6 +41,7 @@ class Config(BaseSettings):
     next_appointment: str = "Nächster Termin"
     current_appointment: str = "Aktueller Termin"
     further_appointments: str = "Weitere Termine"
+    ical_error: str = "Fehler beim Abrufen der Kalenderdaten"
     roomcalendar_date_format_long: str = "EEEE, dd.MM.yyyy"
     roomcalendar_date_format_short: str = "dd.MM.yy"
     roomcalendar_time_format: str = "HH:mm"

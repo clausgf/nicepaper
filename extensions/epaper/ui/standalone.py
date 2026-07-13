@@ -50,7 +50,7 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
 
     @ui.page('/screens')
     def page_screens():
-        with frame('Select a screen to edit or add a new one', 'Screens'):
+        with frame(None, 'Screens'):
             file_list(paths.screen_dir, 'screen',
                       on_select=lambda f: ui.navigate.to(f'/screens/{f}'),
                       on_add=lambda f: ui.navigate.to(f'/screens/{f}'))
@@ -64,7 +64,7 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
 
     @ui.page('/schedules')
     def page_schedules():
-        with frame('Select a schedule to edit or add a new one', 'Schedules'):
+        with frame(None, 'Schedules'):
             file_list(paths.schedule_dir, 'schedule',
                       on_select=lambda f: ui.navigate.to(f'/schedules/{f}'),
                       on_add=lambda f: ui.navigate.to(f'/schedules/{f}'))

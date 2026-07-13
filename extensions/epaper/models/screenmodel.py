@@ -77,13 +77,13 @@ class WidgetModel(BaseModel):
 class TextWidgetModel(WidgetModel):
     widget_type: Literal["Text"] = "Text"
     text: str
-    alignment: Optional[str] = Field(pattern=r'^[lcr][tcb]$', default="lb")
+    alignment: Optional[str] = Field(pattern=r'^[lcr][tcb]$', default="lb", description="Two-letter alignment code: horizontal (l=left, c=center, r=right) and vertical (t=top, c=center, b=bottom).")
 
 
 class DateWidgetModel(WidgetModel):
     widget_type: Literal["Date"] = "Date"
     date_format: _DateFormatField
-    alignment: Optional[str] = Field(pattern=r'^[lcr][tcb]$', default="lb")
+    alignment: Optional[str] = Field(pattern=r'^[lcr][tcb]$', default="lb", description="Two-letter alignment code: horizontal (l=left, c=center, r=right) and vertical (t=top, c=center, b=bottom).")
 
 
 class RoomCalendarWidgetModel(WidgetModel):

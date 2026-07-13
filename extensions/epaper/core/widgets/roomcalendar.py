@@ -59,8 +59,6 @@ class RoomCalendarWidget(Widget):
     async def draw(self, ctx: DrawingContext) -> datetime.datetime:
         await super().draw(ctx)
         now = datetime.datetime.now(ZoneInfo(app_config.timezone))
-        events = await get_from_ical(ctx.paths.ical_dir, ctx.paths.organizer_names_file,
-                                      self.id, self.config.ical_url, extract_organizer_from_summary=True)
         next_change = None
 
         x_inset = 10
@@ -77,7 +75,15 @@ class RoomCalendarWidget(Widget):
         font_room_name = ctx.get_font("Ubuntu-Regular.ttf", 36)
         ctx.draw_text((10,160), size=(w,40), text=self.config.room_name, font=font_room_name)
         font_date = ctx.get_font("Ubuntu-Italic.ttf", 16)
-        ctx.draw_text((10,205), size=(w,40), text=format_datetime(now, format=self.date_format_long, tzinfo=ZoneInfo(app_config.timezone), locale=app_config.locale), font=font_date)
+        ctx.draw_text((10,205), size=(2*w,40), text=format_datetime(now, format=self.date_format_long, tzinfo=ZoneInfo(app_config.timezone), locale=app_config.locale), font=font_date)
+
+        try:
+            events = await get_from_ical(ctx.paths.ical_dir, ctx.paths.organizer_names_file,
+                                        self.id, self.config.ical_url, extract_organizer_from_summary=True)
+        except Exception as e:
+            logger.error(f"Error occurred while fetching ical data for {self.id}: {e}")
+            ctx.draw_text((10, 280), size=(w, 40), text=app_config.ical_error, font=ctx.get_font("Ubuntu-Regular.ttf", 24))
+            return next_change
 
         font_default = ctx.get_font("Ubuntu-Regular.ttf", 24)
         if len(events) == 0:
