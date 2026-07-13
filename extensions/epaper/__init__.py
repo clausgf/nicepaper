@@ -25,7 +25,7 @@ def register(app: FastAPI) -> None:
     from extensions.epaper.api.endpoints import build_extension_router
     from extensions.epaper.config import load_global_config, save_global_config
     from extensions.epaper.paths import EpaperPaths
-    from extensions.epaper.ui.panels import file_list, global_config_card
+    from extensions.epaper.ui.panels import file_list, global_config_card, slide_class
     from extensions.epaper.ui.schedule_editor import schedule_editor
     from extensions.epaper.ui.screen_editor import screen_editor
 
@@ -72,7 +72,8 @@ def register(app: FastAPI) -> None:
     def _epaper_project_page(project_name: str) -> None:
         paths = _paths_for_project(project_name)
         image_base_url = f'/api/ext/epaper/{project_name}/screens'
-        state = {'screen_file': None, 'schedule_file': None}
+        state = {'screen_file': None, 'schedule_file': None,
+                  'screen_direction': 'right', 'schedule_direction': 'right'}
 
         ui.link('← Back to project', project_url(project_name)).classes('text-caption')
         ui.label('E-Paper').classes('text-h5')
@@ -83,27 +84,31 @@ def register(app: FastAPI) -> None:
 
         @ui.refreshable
         def screens_panel():
-            if state['screen_file'] is None:
-                file_list(paths.screen_dir, 'screen',
-                          on_select=lambda f: _select('screen_file', f),
-                          on_add=lambda f: _select('screen_file', f))
-            else:
-                screen_editor(paths, state['screen_file'], image_base_url,
-                              on_back=lambda: _select('screen_file', None),
-                              on_deleted=lambda: _select('screen_file', None))
+            with ui.column().classes(f'w-full {slide_class(state["screen_direction"])}'):
+                if state['screen_file'] is None:
+                    file_list(paths.screen_dir, 'screen',
+                              on_select=lambda f: _select('screen_file', f),
+                              on_add=lambda f: _select('screen_file', f))
+                else:
+                    screen_editor(paths, state['screen_file'], image_base_url,
+                                  on_back=lambda: _select('screen_file', None),
+                                  on_deleted=lambda: _select('screen_file', None))
 
         @ui.refreshable
         def schedules_panel():
-            if state['schedule_file'] is None:
-                file_list(paths.schedule_dir, 'schedule',
-                          on_select=lambda f: _select('schedule_file', f),
-                          on_add=lambda f: _select('schedule_file', f))
-            else:
-                schedule_editor(paths, state['schedule_file'],
-                                 on_back=lambda: _select('schedule_file', None),
-                                 on_deleted=lambda: _select('schedule_file', None))
+            with ui.column().classes(f'w-full {slide_class(state["schedule_direction"])}'):
+                if state['schedule_file'] is None:
+                    file_list(paths.schedule_dir, 'schedule',
+                              on_select=lambda f: _select('schedule_file', f),
+                              on_add=lambda f: _select('schedule_file', f))
+                else:
+                    schedule_editor(paths, state['schedule_file'],
+                                     on_back=lambda: _select('schedule_file', None),
+                                     on_deleted=lambda: _select('schedule_file', None))
 
         def _select(key: str, value) -> None:
+            direction_key = 'screen_direction' if key == 'screen_file' else 'schedule_direction'
+            state[direction_key] = 'right' if value is not None else 'left'
             state[key] = value
             (screens_panel if key == 'screen_file' else schedules_panel).refresh()
 

@@ -20,7 +20,7 @@ from extensions.epaper.models.screenmodel import (
     WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
 )
 from extensions.epaper.paths import EpaperPaths
-from extensions.epaper.ui.panels import _render_row, _rename_file
+from extensions.epaper.ui.panels import _render_row, _rename_file, slide_class
 from extensions.epaper.util import check_filename
 
 WIDGET_MODELS: dict[str, type[WidgetModel]] = {
@@ -128,7 +128,7 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
     widgets_adapter = ListAdapter(WidgetModel, screen.widgets)
     widgets_adapter.on_change(persist_screen)
 
-    state = {'view': 'list', 'key': None}
+    state = {'view': 'list', 'key': None, 'direction': 'right'}
 
     with ui.row().classes('w-full items-center gap-2'):
         ui.button(icon='arrow_back').props('round dense').on_click(on_back)
@@ -153,10 +153,11 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
 
     @ui.refreshable
     def editor_area() -> None:
-        if state['view'] == 'detail' and state['key'] is not None:
-            _widget_detail(state['key'])
-        else:
-            _widget_list()
+        with ui.column().classes(f'w-full {slide_class(state["direction"])}'):
+            if state['view'] == 'detail' and state['key'] is not None:
+                _widget_detail(state['key'])
+            else:
+                _widget_list()
 
     def _widget_list() -> None:
         with ui.card().tight().classes('w-full'):
@@ -245,11 +246,13 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
     def _open_detail(key: str) -> None:
         state['view'] = 'detail'
         state['key'] = key
+        state['direction'] = 'right'
         editor_area.refresh()
 
     def _back_to_list() -> None:
         state['view'] = 'list'
         state['key'] = None
+        state['direction'] = 'left'
         editor_area.refresh()
 
     def _handle_reorder(e: SortableEventArguments) -> None:
@@ -265,6 +268,7 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
         if state['key'] == key:
             state['view'] = 'list'
             state['key'] = None
+            state['direction'] = 'left'
         editor_area.refresh()
         ui.notify('Widget deleted', type='positive')
 
@@ -284,6 +288,7 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
         widgets_adapter.create(new_widget)
         state['view'] = 'detail'
         state['key'] = widgets_adapter.key_from_item(new_widget)
+        state['direction'] = 'right'
         editor_area.refresh()
 
     editor_area()

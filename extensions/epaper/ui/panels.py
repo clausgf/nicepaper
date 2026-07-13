@@ -31,6 +31,29 @@ item_types = {
     "schedule": {'plural': 'schedules'},
 }
 
+# Slide-in-from-left/right for list<->detail switches (screen_editor.py's
+# widget list<->detail, __init__.py's file-list<->editor panels). These
+# switches are all @ui.refreshable functions, which destroy and recreate
+# their elements on every refresh rather than toggling a CSS class -- so a
+# CSS *animation* (not *transition*) plays automatically on every
+# recreation, with no JS/state wiring beyond picking left vs. right by
+# navigation direction. shared=True lets this be registered once here at
+# import time, before any page/client exists.
+_SLIDE_CSS = '''
+    @keyframes slide-in-right { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes slide-in-left  { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .slide-in-right { animation: slide-in-right 0.25s ease-out; }
+    .slide-in-left  { animation: slide-in-left  0.25s ease-out; }
+'''
+ui.add_css(_SLIDE_CSS, shared=True)
+
+
+def slide_class(direction: str) -> str:
+    """CSS class for a slide-in-from-left/right animation, keyed by
+    navigation direction ('right' when drilling into a detail view,
+    'left' when going back to a list)."""
+    return 'slide-in-left' if direction == 'left' else 'slide-in-right'
+
 
 def _render_row(form: ModelForm, *field_names: str, props: str = 'outlined dense') -> None:
     """Render several short fields side by side to save vertical space.
