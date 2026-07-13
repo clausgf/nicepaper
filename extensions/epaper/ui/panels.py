@@ -142,7 +142,6 @@ def global_config_card(persist: Callable[[], None]) -> None:
             ui.label('General').classes('text-subtitle2')
             _render_row(form, 'locale', 'timezone')
             _render_row(form, 'date_format', 'time_format')
-            form.render_field('storage_secret', props='outlined dense').classes('w-full')
 
             ui.label('Font & Colors').classes('text-subtitle2')
             with ui.row().classes('w-full gap-2'):

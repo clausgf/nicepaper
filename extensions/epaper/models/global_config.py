@@ -38,8 +38,6 @@ class GlobalConfig(BaseModel):
     hex strings rendered via niceview's native ui.color_input widget,
     no tuple at all -- nicer than a 3-number-field flatten would have been.
     """
-    storage_secret: str = Field(default="geheim", description="Secret for NiceGUI browser session storage.")
-
     ical_update_interval_s: int = 600
     ical_max_days: int = 30
     ical_error: str = "Fehler beim Abrufen der Kalenderdaten"
