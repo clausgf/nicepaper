@@ -21,7 +21,14 @@ primary signal, color is a bonus on richer palettes.
 
 Y-axis gridlines/labels use "nice" round numbers (Heckbert's classic
 algorithm), not raw data min/max, so labels read as round figures instead
-of odd fractional values.
+of odd fractional values -- and every gridline gets a label, not just the
+top/bottom.
+
+Label font: callers pass their widget's own configured font (fixed size
+from the Appearance card, same convention as the rest of the weather
+widgets) via the `font` parameter; margins are measured from that font's
+actual metrics, not a hardcoded size, so labels never get clipped by a
+too-small margin at a large configured font size.
 """
 import math
 from dataclasses import dataclass
@@ -50,6 +57,14 @@ def _draw_dotted_hline(ctx, x0: float, x1: float, y: float, fill, dash: int = 2,
         seg_end = min(x + dash, x1)
         ctx.draw.line([_abs_pt(ctx, x, y), _abs_pt(ctx, seg_end, y)], fill=fill, width=1)
         x += dash + gap
+
+
+def _draw_dotted_vline(ctx, x: float, y0: float, y1: float, fill, dash: int = 2, gap: int = 3) -> None:
+    y = y0
+    while y < y1:
+        seg_end = min(y + dash, y1)
+        ctx.draw.line([_abs_pt(ctx, x, y), _abs_pt(ctx, x, seg_end)], fill=fill, width=1)
+        y += dash + gap
 
 
 def _draw_polyline(ctx, points: list[tuple[float, float]], fill, width: int, dashed: bool,
@@ -114,19 +129,16 @@ def _format_axis_value(value: float) -> str:
     return f'{value:.1f}'
 
 
-LABEL_FONT = ("Ubuntu-Regular.ttf", 10)
-LABEL_HEIGHT = 14
-AXIS_LABEL_WIDTH = 26
-
-
 def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Sequence[ChartSeries], *,
-               labels: Optional[Sequence[str]] = None) -> None:
+               font=None, labels: Optional[Sequence[str]] = None) -> None:
     """
     Draws all `series` (each 'bar' or 'line', on the 'primary' or
-    'secondary' Y axis) sharing one X axis (data point index). At most one
-    axis label pair (min at the bottom, max at the top, nice round
-    numbers) is drawn per side: primary on the left, secondary on the
-    right if any secondary series is present.
+    'secondary' Y axis) sharing one X axis (data point index). Every
+    horizontal gridline gets a numeric label (primary axis on the left,
+    secondary on the right if any secondary series is present); vertical
+    gridlines are drawn at the same X positions as the (possibly thinned)
+    `labels`. `font` should be the caller's configured font (e.g. a
+    widget's self.font) -- falls back to ctx.font if not given.
     """
     x0, y0 = position
     w, h = size
@@ -134,15 +146,7 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
     if not series or n == 0 or w <= 0 or h <= 0:
         return
 
-    has_secondary = any(s.axis == 'secondary' for s in series)
-    left_margin = AXIS_LABEL_WIDTH
-    right_margin = AXIS_LABEL_WIDTH if has_secondary else 0
-    label_h = LABEL_HEIGHT if labels else 0
-    plot_x0 = x0 + left_margin
-    plot_w = w - left_margin - right_margin
-    plot_h = h - label_h
-    if plot_w <= 0 or plot_h <= 0:
-        return
+    label_font = font or ctx.font
 
     def axis_range(axis: Axis) -> tuple[float, float, float]:
         axis_series = [s for s in series if s.axis == axis]
@@ -157,10 +161,32 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
                 return (0.0, 1.0, 1.0)
         return nice_axis_range(data_min, data_max)
 
+    has_secondary = any(s.axis == 'secondary' for s in series)
     primary_min, primary_max, primary_step = axis_range('primary')
     secondary_min = secondary_max = secondary_step = 0.0
     if has_secondary:
         secondary_min, secondary_max, secondary_step = axis_range('secondary')
+
+    step_count = round((primary_max - primary_min) / primary_step) if primary_step else 0
+    primary_labels = [_format_axis_value(primary_min + i * primary_step) for i in range(step_count + 1)]
+    secondary_labels: list[str] = []
+    for i in range(step_count + 1):
+        frac = i / step_count if step_count else 0.0
+        secondary_labels.append(_format_axis_value(secondary_min + frac * (secondary_max - secondary_min)))
+
+    # margins measured from the actual configured font, not a fixed guess,
+    # so labels never get clipped at a larger configured font size
+    label_gap = 4
+    row_h = ctx.textsize("0", label_font)[1] + 2
+    left_margin = max(ctx.textsize(t, label_font)[0] for t in primary_labels) + label_gap
+    right_margin = (max(ctx.textsize(t, label_font)[0] for t in secondary_labels) + label_gap) if has_secondary else 0
+    label_h = (ctx.textsize("00:00", label_font)[1] + 4) if labels else 0
+
+    plot_x0 = x0 + left_margin
+    plot_w = w - left_margin - right_margin
+    plot_h = h - label_h
+    if plot_w <= 0 or plot_h <= 0:
+        return
 
     def to_y(value: float, axis: Axis) -> float:
         nice_min, nice_max = (primary_min, primary_max) if axis == 'primary' else (secondary_min, secondary_max)
@@ -171,31 +197,33 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
     def slot_center_x(i: int) -> float:
         return plot_x0 + slot_w * (i + 0.5)
 
-    # baseline + gridlines, at the primary axis' nice steps
+    x_indices = range(0, min(n, len(labels)), x_label_step(n, plot_w)) if labels else ()
+
+    # vertical gridlines, aligned with the (thinned) x-axis labels
+    for i in x_indices:
+        _draw_dotted_vline(ctx, slot_center_x(i), y0, y0 + plot_h, fill=ctx.color_primary)
+
+    # baseline + horizontal gridlines, each labeled on both axes in use
     ctx.draw.line([_abs_pt(ctx, plot_x0, y0 + plot_h), _abs_pt(ctx, plot_x0 + plot_w, y0 + plot_h)],
                   fill=ctx.color_primary, width=1)
-    step_count = round((primary_max - primary_min) / primary_step) if primary_step else 0
-    for i in range(1, step_count):
+    for i in range(step_count + 1):
         y = to_y(primary_min + i * primary_step, 'primary')
-        _draw_dotted_hline(ctx, plot_x0, plot_x0 + plot_w, y, fill=ctx.color_primary)
-
-    # axis min/max labels -- anchored so they stay within [y0, y0+plot_h]
-    # (top label's box starts exactly at the chart's own top edge instead
-    # of being vertically centered on it, which would put half the text
-    # above the widget's box -- clipped outright when clipping=True, and
-    # overlapping whatever is drawn above it otherwise)
-    label_font = ctx.get_font(*LABEL_FONT)
-    y_bottom, y_top = to_y(primary_min, 'primary'), to_y(primary_max, 'primary')
-    ctx.draw_text((x0, int(y_bottom - 12)), size=(left_margin - 2, 12), text=_format_axis_value(primary_min),
-                  alignment='rb', font=label_font)
-    ctx.draw_text((x0, int(y_top)), size=(left_margin - 2, 12), text=_format_axis_value(primary_max),
-                  alignment='rt', font=label_font)
-    if has_secondary:
-        right_x = plot_x0 + plot_w + 2
-        ctx.draw_text((int(right_x), int(y_bottom - 12)), size=(right_margin - 2, 12),
-                      text=_format_axis_value(secondary_min), alignment='lb', font=label_font)
-        ctx.draw_text((int(right_x), int(y_top)), size=(right_margin - 2, 12),
-                      text=_format_axis_value(secondary_max), alignment='lt', font=label_font)
+        if 0 < i < step_count:
+            _draw_dotted_hline(ctx, plot_x0, plot_x0 + plot_w, y, fill=ctx.color_primary)
+        # anchor top/bottom rows within [y0, y0+plot_h] instead of
+        # straddling the edge; middle rows can center on their gridline
+        if i == step_count:
+            align_l, align_r, box_y = 'rt', 'lt', y
+        elif i == 0:
+            align_l, align_r, box_y = 'rb', 'lb', y - row_h
+        else:
+            align_l, align_r, box_y = 'rc', 'lc', y - row_h / 2
+        ctx.draw_text((x0, int(box_y)), size=(left_margin - label_gap, row_h), text=primary_labels[i],
+                      alignment=align_l, font=label_font)
+        if has_secondary:
+            right_x = plot_x0 + plot_w + 2
+            ctx.draw_text((int(right_x), int(box_y)), size=(right_margin - label_gap, row_h),
+                          text=secondary_labels[i], alignment=align_r, font=label_font)
 
     accent = app_config.color_accent or ctx.color_primary
     bar_gap = 2
@@ -215,9 +243,7 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
             points = [(slot_center_x(i), to_y(v, s.axis)) for i, v in enumerate(s.values)]
             _draw_polyline(ctx, points, fill=color, width=2 if is_primary else 1, dashed=not is_primary)
 
-    if labels:
-        step = x_label_step(n, plot_w)
-        for i in range(0, min(n, len(labels)), step):
-            px = slot_center_x(i)
-            ctx.draw_text((int(px - 20), int(y0 + plot_h + 2)), size=(40, label_h), text=labels[i],
-                          alignment='ct', font=label_font)
+    for i in x_indices:
+        px = slot_center_x(i)
+        ctx.draw_text((int(px - 20), int(y0 + plot_h + 2)), size=(40, label_h), text=labels[i],
+                      alignment='ct', font=label_font)

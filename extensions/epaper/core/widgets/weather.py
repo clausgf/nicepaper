@@ -166,4 +166,4 @@ class WeatherChartWidget(_WeatherWidgetBase):
                 hourly[_METRIC_FIELD[metric]][start_idx:end_idx], kind=_METRIC_KIND[metric], axis='secondary'))
 
         labels = [times[i][11:16] for i in range(start_idx, end_idx)]
-        charting.draw_chart(ctx, (0, 0), (w, h), series, labels=labels)
+        charting.draw_chart(ctx, (0, 0), (w, h), series, font=self.font, labels=labels)
