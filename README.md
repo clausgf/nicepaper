@@ -28,11 +28,12 @@ the content actually changed.
   can be addressed by a stable name instead of the screen file name, and
   several displays can share one screen.
 - **Management UI**: two top-level tabs, Screens and Schedules. Create
-  and delete files, edit screens with a validated JSON editor and live
-  image previews, edit schedules as a card per weekly rule with
-  checkboxes/multiselects and inline validation. No built-in
-  authentication — put it behind an authenticating reverse proxy if the
-  UI shouldn't be open to anyone who can reach it.
+  and delete files; edit a screen's canvas size/update schedule plus a
+  drag-reorderable widget list (add by type, drill down into a per-type
+  form, live RGB/palette image previews on top) and schedules as a card
+  per weekly rule with checkboxes/multiselects and inline validation. No
+  built-in authentication — put it behind an authenticating reverse
+  proxy if the UI shouldn't be open to anyone who can reach it.
 
 ## Project structure
 
