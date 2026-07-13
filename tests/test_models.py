@@ -127,6 +127,24 @@ def test_widget_font_none_when_either_part_missing():
     assert widget.font == ("Ubuntu-Regular.ttf", 16)
 
 
+def test_widget_size_zero_means_automatic_too():
+    """niceview's ui.number has no clean 'empty' state for Optional[int]:
+    clearing the field in the browser round-trips as 0, not None. 0 must
+    behave exactly like unset, or auto-sizing silently breaks the moment
+    a user touches the field without typing a replacement value."""
+    widget = TextWidgetModel(position_x=0, position_y=0, text="x", size_width=0, size_height=0)
+    assert widget.size is None
+    widget = TextWidgetModel(position_x=0, position_y=0, text="x", size_width=100, size_height=0)
+    assert widget.size is None
+    widget = TextWidgetModel(position_x=0, position_y=0, text="x", size_width=100, size_height=50)
+    assert widget.size == (100, 50)
+
+
+def test_widget_font_size_zero_means_default_too():
+    widget = TextWidgetModel(position_x=0, position_y=0, text="x", font_name="Ubuntu-Regular.ttf", font_size=0)
+    assert widget.font is None
+
+
 def test_widget_alignment_pattern():
     base = {
         "widget_type": "Text",

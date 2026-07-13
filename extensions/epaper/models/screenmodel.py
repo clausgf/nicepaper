@@ -42,13 +42,13 @@ class WidgetModel(BaseModel):
     # properties for the drawing code, not part of the JSON schema.
     position_x: int = Field(description="Horizontal position in pixels from the left edge.")
     position_y: int = Field(description="Vertical position in pixels from the top edge.")
-    size_width: Optional[int] = Field(default=None, description="Leave empty for automatic width.")
-    size_height: Optional[int] = Field(default=None, description="Leave empty for automatic height.")
+    size_width: Optional[int] = Field(default=None, description="0 or empty for automatic width.")
+    size_height: Optional[int] = Field(default=None, description="0 or empty for automatic height.")
     init_background: Optional[bool] = True
     clipping: Optional[bool] = Field(default=False, description="Cut off content that overflows this widget's size instead of letting it bleed into neighboring widgets.")
     show_bounding_box: Optional[bool] = Field(default=False, description="Draw an outline around this widget's box. Useful while laying out a screen.")
     font_name: Optional[str] = Field(default=None, description="Font file name. Leave empty to use the screen's default font.")
-    font_size: Optional[int] = Field(default=None, description="Font size in points. Leave empty to use the screen's default font.")
+    font_size: Optional[int] = Field(default=None, description="Font size in points. 0 or empty to use the screen's default font.")
 
     @property
     def position(self) -> Tuple[int, int]:
@@ -56,7 +56,12 @@ class WidgetModel(BaseModel):
 
     @property
     def size(self) -> Optional[Tuple[int, int]]:
-        if self.size_width is None or self.size_height is None:
+        # niceview's ui.number has no clean "empty" state for an
+        # Optional[int] -- clearing the field in the browser round-trips
+        # as 0, not None -- so 0 has to mean "automatic" too, the same as
+        # actually unset, or auto-sizing would silently break the moment
+        # a user touches the field without typing a new value
+        if not self.size_width or not self.size_height:
             return None
         return (self.size_width, self.size_height)
 
@@ -70,7 +75,8 @@ class WidgetModel(BaseModel):
 
     @property
     def font(self) -> Optional[Tuple[str, int]]:
-        if self.font_name is None or self.font_size is None:
+        # same 0-vs-None quirk as size above, for font_size
+        if not self.font_name or not self.font_size:
             return None
         return (self.font_name, self.font_size)
 
