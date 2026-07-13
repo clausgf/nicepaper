@@ -70,8 +70,8 @@ def register(app: FastAPI) -> None:
                           on_select=lambda f: _select('screen_file', f),
                           on_add=lambda f: _select('screen_file', f))
             else:
-                ui.button('← Back to list', icon='arrow_back', on_click=lambda: _select('screen_file', None)).props('flat')
                 screen_editor(paths, state['screen_file'], image_base_url,
+                              on_back=lambda: _select('screen_file', None),
                               on_deleted=lambda: _select('screen_file', None))
 
         @ui.refreshable
@@ -81,8 +81,9 @@ def register(app: FastAPI) -> None:
                           on_select=lambda f: _select('schedule_file', f),
                           on_add=lambda f: _select('schedule_file', f))
             else:
-                ui.button('← Back to list', icon='arrow_back', on_click=lambda: _select('schedule_file', None)).props('flat')
-                schedule_editor(paths, state['schedule_file'], on_deleted=lambda: _select('schedule_file', None))
+                schedule_editor(paths, state['schedule_file'],
+                                 on_back=lambda: _select('schedule_file', None),
+                                 on_deleted=lambda: _select('schedule_file', None))
 
         def _select(key: str, value) -> None:
             state[key] = value

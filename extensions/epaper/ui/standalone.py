@@ -5,6 +5,7 @@ Page assembly for standalone mode only: header/tabs-nav chrome and the
 and only the content functions in ui/panels.py are reused.
 """
 from contextlib import contextmanager
+from typing import Optional
 from nicegui import ui
 
 from extensions.epaper.paths import EpaperPaths
@@ -16,8 +17,10 @@ TAB_ROUTES = {'Screens': '/screens', 'Schedules': '/schedules'}
 
 
 @contextmanager
-def frame(navigation_title: str, active_tab: str = None):
-    """Page frame to share the same styling and navigation across all pages."""
+def frame(navigation_title: Optional[str] = None, active_tab: str = None):
+    """Page frame to share the same styling and navigation across all pages.
+    navigation_title is omitted for editor pages, which render their own
+    heading (back button, filename, delete) as part of their content."""
     def on_tab_change(e):
         if e.value != active_tab:
             ui.navigate.to(TAB_ROUTES[e.value])
@@ -28,8 +31,9 @@ def frame(navigation_title: str, active_tab: str = None):
             ui.tab('Screens')
             ui.tab('Schedules')
     with ui.column().classes('w-full'):
-        ui.label(navigation_title).classes('text-h5')
-        ui.separator()
+        if navigation_title:
+            ui.label(navigation_title).classes('text-h5')
+            ui.separator()
         yield
 
 
@@ -53,8 +57,9 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
 
     @ui.page('/screens/{filename}')
     def page_screen_edit(filename: str):
-        with frame(f'Edit screen {filename}', 'Screens'):
+        with frame(active_tab='Screens'):
             screen_editor(paths, filename, image_base_url,
+                          on_back=lambda: ui.navigate.to('/screens'),
                           on_deleted=lambda: ui.navigate.to('/screens'))
 
     @ui.page('/schedules')
@@ -66,5 +71,7 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
 
     @ui.page('/schedules/{filename}')
     def page_schedule_edit(filename: str):
-        with frame(f'Edit schedule {filename}', 'Schedules'):
-            schedule_editor(paths, filename, on_deleted=lambda: ui.navigate.to('/schedules'))
+        with frame(active_tab='Schedules'):
+            schedule_editor(paths, filename,
+                             on_back=lambda: ui.navigate.to('/schedules'),
+                             on_deleted=lambda: ui.navigate.to('/schedules'))

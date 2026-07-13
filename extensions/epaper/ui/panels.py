@@ -19,7 +19,6 @@ from nicegui import ui
 from nicegui.events import SortableEventArguments
 from babel.dates import format_datetime, get_timezone
 from niceview.dataadapter import JsonAdapter, JsonListAdapter, ListAdapter
-from niceview.fieldinfo import FieldInfo
 from niceview.form import ModelForm
 from niceview.util import confirm_dialog
 
@@ -75,13 +74,15 @@ def _default_widget(widget_type: str) -> WidgetModel:
     raise ValueError(f'Unknown widget type: {widget_type}')
 
 
-def _render_row(form: ModelForm, *field_names: str) -> None:
+def _render_row(form: ModelForm, *field_names: str, props: str = 'outline dense') -> None:
     """Render several short fields side by side to save vertical space.
     ui.row() wraps by default, so this stays mobile-friendly: fields drop
-    to their own line on narrow viewports instead of overflowing."""
+    to their own line on narrow viewports instead of overflowing. Styling
+    (props) is applied per render_field() call rather than baked into the
+    model, so it's a rendering concern, not a data-model one."""
     with ui.row().classes('w-full gap-2'):
         for name in field_names:
-            form.render_field(name).classes('flex-grow')
+            form.render_field(name, props=props).classes('flex-grow')
 
 
 def screen_image_view(url: str):
@@ -165,7 +166,8 @@ def file_list(dir: Path, item_type: str, on_select: Callable[[str], None], on_ad
             on_add(filename)
 
 
-def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str, on_deleted: Callable[[], None]):
+def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
+                   on_back: Callable[[], None], on_deleted: Callable[[], None]):
     """
     Screen editor content: screen-level settings, a drag-reorderable list
     of widgets that drills down into a per-type detail form, plus live
@@ -203,9 +205,10 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str, on_del
     state = {'view': 'list', 'key': None}
 
     with ui.row().classes('w-full items-center gap-2'):
+        ui.button(icon='arrow_back').props('round dense color=primary').on_click(on_back)
         ui.label(filename).classes('text-h6')
         ui.space()
-        ui.button(icon='delete').props('flat round color=negative').on_click(lambda: delete_file())
+        ui.button(icon='delete').props('flat round dense color=negative').on_click(lambda: delete_file())
 
     ui.separator()
     color_models = [cm.id for cm in app_config.epaper_color_models]
@@ -230,13 +233,13 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str, on_del
             _widget_list()
 
     def _widget_list() -> None:
-        ui.label('Screen settings').classes('text-subtitle1')
-        screen_form = ModelForm.from_item(screen, exclude=['widgets'], on_change=lambda e: persist_screen())
-        with ui.column().classes('w-full gap-2'):
-            _render_row(screen_form, 'width', 'height')
-            screen_form.render_field('update_schedule_id').classes('w-full')
+        with ui.card().classes('w-full'):
+            ui.label('Screen settings').classes('text-subtitle1')
+            screen_form = ModelForm.from_item(screen, exclude=['widgets'], on_change=lambda e: persist_screen())
+            with ui.column().classes('w-full gap-2'):
+                _render_row(screen_form, 'width', 'height')
+                screen_form.render_field('update_schedule_id', props='outline dense').classes('w-full')
 
-        ui.separator()
         with ui.row().classes('w-full items-center justify-between'):
             ui.label('Widgets').classes('text-subtitle1')
             ui.button(icon='add', on_click=lambda: open_add_dialog()).props('size=sm round outline')
@@ -248,15 +251,16 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str, on_del
 
         with ui.column().classes('w-full gap-1') as widget_list_container:
             for key, widget in widgets:
-                with ui.row().classes('w-full items-center border rounded-borders q-pa-sm gap-2'):
-                    ui.icon('drag_indicator').classes('drag-handle cursor-move text-grey-6')
-                    with ui.row().classes('items-center gap-2 flex-grow cursor-pointer').on(
-                            'click', lambda _, k=key: _open_detail(k)):
-                        ui.icon(WIDGET_ICONS[widget.widget_type])
-                        ui.label(_widget_label(widget))
-                    ui.badge(widget.widget_type).props('outline')
-                    ui.button(icon='delete').props('flat dense round color=negative').on_click(
-                        lambda _, k=key: _delete_widget(k))
+                with ui.card().tight().classes('w-full'):
+                    with ui.row().classes('w-full items-center q-pa-sm gap-2'):
+                        ui.icon('drag_indicator').classes('drag-handle cursor-move text-grey-6')
+                        with ui.row().classes('items-center gap-2 flex-grow cursor-pointer').on(
+                                'click', lambda _, k=key: _open_detail(k)):
+                            ui.icon(WIDGET_ICONS[widget.widget_type])
+                            ui.label(_widget_label(widget))
+                        ui.badge(widget.widget_type).props('outline')
+                        ui.button(icon='delete').props('flat dense round color=negative').on_click(
+                            lambda _, k=key: _delete_widget(k))
         widget_list_container.make_sortable(handle='.drag-handle', on_end=_handle_reorder)
 
     def _widget_detail(key: str) -> None:
@@ -269,31 +273,38 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str, on_del
         model_cls = WIDGET_MODELS[widget.widget_type]
 
         with ui.row().classes('w-full items-center gap-2'):
-            ui.button(icon='arrow_back').props('round color=primary').on_click(lambda: _back_to_list())
+            ui.button(icon='arrow_back').props('round dense color=primary').on_click(lambda: _back_to_list())
             ui.label(WIDGET_TITLES[widget.widget_type]).classes('text-h6')
             ui.space()
-            ui.button(icon='delete').props('flat round color=negative').on_click(lambda: _delete_widget(key))
+            ui.button(icon='delete').props('flat round dense color=negative').on_click(lambda: _delete_widget(key))
 
         font_names = sorted(p.name for p in app_config.font_path.glob('*') if p.is_file())
-        form = ModelForm.from_adapter(
-            model_cls, widgets_adapter, key, exclude=['widget_type'], autosave=True,
-            field_infos={'font_name': FieldInfo(select_options=font_names)},
-        )
-        with ui.column().classes('w-full gap-2'):
+        form = ModelForm.from_adapter(model_cls, widgets_adapter, key, exclude=['widget_type'], autosave=True)
+
+        with ui.card().classes('w-full'):
+            ui.label('Layout').classes('text-subtitle2')
             _render_row(form, 'position_x', 'position_y')
             _render_row(form, 'size_width', 'size_height')
-            _render_row(form, 'font_name', 'font_size')
-            _render_row(form, 'init_background', 'clipping')
-            ui.separator()
+
+        with ui.card().classes('w-full'):
+            ui.label('Appearance').classes('text-subtitle2')
+            with ui.row().classes('w-full gap-2'):
+                form.render_field('font_name', widget_type='ui.select', select_options=font_names,
+                                   props='outline dense').classes('flex-grow')
+                form.render_field('font_size', props='outline dense').classes('flex-grow')
+            _render_row(form, 'init_background', 'clipping', props='dense')
+
+        with ui.card().classes('w-full'):
+            ui.label('Content').classes('text-subtitle2')
             if isinstance(widget, TextWidgetModel):
-                form.render_field('text').classes('w-full')
-                form.render_field('alignment').classes('w-32')
+                form.render_field('text', props='outline dense').classes('w-full')
+                form.render_field('alignment', props='outline dense').classes('w-32')
             elif isinstance(widget, DateWidgetModel):
-                form.render_field('date_format').classes('w-full')
-                form.render_field('alignment').classes('w-32')
+                form.render_field('date_format', props='outline dense').classes('w-full')
+                form.render_field('alignment', props='outline dense').classes('w-32')
             elif isinstance(widget, RoomCalendarWidgetModel):
                 _render_row(form, 'room_number', 'room_name')
-                form.render_field('ical_url').classes('w-full')
+                form.render_field('ical_url', props='outline dense').classes('w-full')
                 _render_row(form, 'date_format_long', 'date_format', 'time_format')
             form.render_nonfield_errors()
 
@@ -361,7 +372,7 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str, on_del
             ui.notify(f'Canceled deleting "{filename}".', type='negative')
 
 
-def schedule_editor(paths: EpaperPaths, filename: str, on_deleted: Callable[[], None]):
+def schedule_editor(paths: EpaperPaths, filename: str, on_back: Callable[[], None], on_deleted: Callable[[], None]):
     """
     Edit a schedule as a card per weekly rule (WeeklyScheduleModel), backed
     by a niceview JsonListAdapter over the schedule file. Each card is an
@@ -383,6 +394,14 @@ def schedule_editor(paths: EpaperPaths, filename: str, on_deleted: Callable[[], 
 
     adapter = JsonListAdapter(WeeklyScheduleModel, schedule_path)
 
+    with ui.row().classes('w-full items-center gap-2'):
+        ui.button(icon='arrow_back').props('round dense color=primary').on_click(on_back)
+        ui.label(filename).classes('text-h6')
+        ui.space()
+        ui.button(icon='delete').props('flat round dense color=negative').on_click(lambda: delete_schedule_file())
+
+    ui.separator()
+
     @ui.refreshable
     def rule_cards():
         rules = list(adapter.items())
@@ -397,11 +416,11 @@ def schedule_editor(paths: EpaperPaths, filename: str, on_deleted: Callable[[], 
                         lambda _, k=key: delete_rule(k))
                 # checkbox_group returns a composite CheckboxGroup, not a
                 # ui.element itself -- style its .widget (the row/column) instead
-                form.render_field('by_weekdays', widget_type='checkbox_group', props='inline').widget.classes('w-full')
-                form.render_field('by_months').classes('w-full')
+                form.render_field('by_weekdays', widget_type='checkbox_group', props='inline dense').widget.classes('w-full')
+                form.render_field('by_months', props='outline dense').classes('w-full')
                 # times: List[Annotated[str, pattern]] -> ui.input_chips, a real
                 # ui.element (unlike checkbox_group/editgrid), so .classes() works
-                form.render_field('times').classes('w-full')
+                form.render_field('times', props='outline dense').classes('w-full')
                 form.render_nonfield_errors()
 
     async def delete_rule(key: str):
@@ -416,8 +435,6 @@ def schedule_editor(paths: EpaperPaths, filename: str, on_deleted: Callable[[], 
         adapter.create(WeeklyScheduleModel(times=[]))
         rule_cards.refresh()
 
-    with ui.row().classes('w-full place-content-end'):
-        ui.button('Delete File', on_click=lambda: delete_schedule_file())
     rule_cards()
     ui.button('Add Rule', icon='add', on_click=lambda: add_rule()).props('color=primary')
 

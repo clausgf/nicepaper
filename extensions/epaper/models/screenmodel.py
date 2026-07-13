@@ -1,18 +1,6 @@
 import datetime
 from typing import Annotated, List, Optional, Tuple, Union, Literal
 from pydantic import BaseModel, Field
-from niceview.fieldinfo import FieldInfo
-
-# Baked-in UI styling: niceview reads FieldInfo instances out of Annotated
-# metadata to decide how to render a field. Kept here at the model layer
-# (rather than repeated at every render_field()/render() call site) so
-# every form over these models -- standalone, nice4iot extension, or a
-# future consumer -- gets the same compact styling automatically. Sharing
-# one instance across fields is safe: niceview's field resolver copies it
-# before merging in any overrides, it never mutates the shared instance.
-_DENSE_INPUT = FieldInfo(props='outline dense')
-_DENSE_TOGGLE = FieldInfo(props='dense')
-_DENSE_SELECT = FieldInfo(props='outline dense', widget_type='ui.select')
 
 _DateFormatField = Annotated[
     Optional[str],
@@ -52,14 +40,14 @@ class WidgetModel(BaseModel):
     # a raw string -- wrong type), so position/size/font are flat scalar
     # fields here instead; `position`/`size`/`font` below are computed
     # properties for the drawing code, not part of the JSON schema.
-    position_x: Annotated[int, Field(description="Horizontal position in pixels from the left edge."), _DENSE_INPUT]
-    position_y: Annotated[int, Field(description="Vertical position in pixels from the top edge."), _DENSE_INPUT]
-    size_width: Annotated[Optional[int], Field(default=None, description="Leave empty for automatic width."), _DENSE_INPUT]
-    size_height: Annotated[Optional[int], Field(default=None, description="Leave empty for automatic height."), _DENSE_INPUT]
-    init_background: Annotated[Optional[bool], Field(default=True), _DENSE_TOGGLE]
-    clipping: Annotated[Optional[bool], Field(default=False), _DENSE_TOGGLE]
-    font_name: Annotated[Optional[str], Field(default=None, description="Font file name. Leave empty to use the screen's default font."), _DENSE_SELECT]
-    font_size: Annotated[Optional[int], Field(default=None, description="Font size in points. Leave empty to use the screen's default font."), _DENSE_INPUT]
+    position_x: int = Field(description="Horizontal position in pixels from the left edge.")
+    position_y: int = Field(description="Vertical position in pixels from the top edge.")
+    size_width: Optional[int] = Field(default=None, description="Leave empty for automatic width.")
+    size_height: Optional[int] = Field(default=None, description="Leave empty for automatic height.")
+    init_background: Optional[bool] = True
+    clipping: Optional[bool] = False
+    font_name: Optional[str] = Field(default=None, description="Font file name. Leave empty to use the screen's default font.")
+    font_size: Optional[int] = Field(default=None, description="Font size in points. Leave empty to use the screen's default font.")
 
     @property
     def position(self) -> Tuple[int, int]:
@@ -88,14 +76,14 @@ class WidgetModel(BaseModel):
 
 class TextWidgetModel(WidgetModel):
     widget_type: Literal["Text"] = "Text"
-    text: Annotated[str, Field(), _DENSE_INPUT]
-    alignment: Annotated[Optional[str], Field(pattern=r'^[lcr][tcb]$', default="lb"), _DENSE_INPUT]
+    text: str
+    alignment: Optional[str] = Field(pattern=r'^[lcr][tcb]$', default="lb")
 
 
 class DateWidgetModel(WidgetModel):
     widget_type: Literal["Date"] = "Date"
     date_format: _DateFormatField
-    alignment: Annotated[Optional[str], Field(pattern=r'^[lcr][tcb]$', default="lb"), _DENSE_INPUT]
+    alignment: Optional[str] = Field(pattern=r'^[lcr][tcb]$', default="lb")
 
 
 class RoomCalendarWidgetModel(WidgetModel):
@@ -103,9 +91,9 @@ class RoomCalendarWidgetModel(WidgetModel):
     date_format_long: _DateFormatField
     date_format: _DateFormatField
     time_format: _TimeFormatField
-    room_number: Annotated[str, Field(), _DENSE_INPUT]
-    room_name: Annotated[str, Field(), _DENSE_INPUT]
-    ical_url: Annotated[str, Field(), _DENSE_INPUT]
+    room_number: str
+    room_name: str
+    ical_url: str
 
 # discriminated union: widget_type selects the concrete model and a
 # missing/unknown widget_type is a validation error instead of silently
@@ -118,21 +106,17 @@ AnyWidget = Annotated[
 
 class ScreenModel(BaseModel):
     # Tuple[int, int] -- see the same note on WidgetModel above.
-    width: Annotated[int, Field(description="Canvas width in pixels."), _DENSE_INPUT]
-    height: Annotated[int, Field(description="Canvas height in pixels."), _DENSE_INPUT]
-    update_schedule_id: Annotated[
-        Optional[str],
-        Field(
-            default="default",
-            description=(
-                "Name of a schedule file (without .json) that determines when "
-                "this screen expires and is re-rendered. Leave empty to only "
-                "re-render on request or when a widget provides its own "
-                "expiry (e.g. RoomCalendar's next event)."
-            ),
+    width: int = Field(description="Canvas width in pixels.")
+    height: int = Field(description="Canvas height in pixels.")
+    update_schedule_id: Optional[str] = Field(
+        default="default",
+        description=(
+            "Name of a schedule file (without .json) that determines when "
+            "this screen expires and is re-rendered. Leave empty to only "
+            "re-render on request or when a widget provides its own "
+            "expiry (e.g. RoomCalendar's next event)."
         ),
-        _DENSE_INPUT,
-    ]
+    )
     widgets: List[AnyWidget] = []
 
     @property

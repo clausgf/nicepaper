@@ -11,6 +11,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum {
     HUFFMAN_DE_CHAR,
     HUFFMAN_DE_ESCAPE,
@@ -25,153 +29,17 @@ typedef struct {
     uint8_t length;
 } huffman_de_symbol_t;
 
-static const huffman_de_symbol_t HUFFMAN_DE_TABLE[] = {
-    { HUFFMAN_DE_CHAR, {0x20, 0x00, 0x00, 0x00}, 1, 0x0, 3 }, /* ' ' */
-    { HUFFMAN_DE_CHAR, {0x65, 0x00, 0x00, 0x00}, 1, 0x1, 3 }, /* 'e' */
-    { HUFFMAN_DE_CHAR, {0x6e, 0x00, 0x00, 0x00}, 1, 0x4, 4 }, /* 'n' */
-    { HUFFMAN_DE_CHAR, {0x69, 0x00, 0x00, 0x00}, 1, 0x5, 4 }, /* 'i' */
-    { HUFFMAN_DE_CHAR, {0x73, 0x00, 0x00, 0x00}, 1, 0x6, 4 }, /* 's' */
-    { HUFFMAN_DE_CHAR, {0x72, 0x00, 0x00, 0x00}, 1, 0xe, 5 }, /* 'r' */
-    { HUFFMAN_DE_CHAR, {0x61, 0x00, 0x00, 0x00}, 1, 0xf, 5 }, /* 'a' */
-    { HUFFMAN_DE_CHAR, {0x74, 0x00, 0x00, 0x00}, 1, 0x10, 5 }, /* 't' */
-    { HUFFMAN_DE_CHAR, {0x64, 0x00, 0x00, 0x00}, 1, 0x11, 5 }, /* 'd' */
-    { HUFFMAN_DE_CHAR, {0x68, 0x00, 0x00, 0x00}, 1, 0x12, 5 }, /* 'h' */
-    { HUFFMAN_DE_CHAR, {0x75, 0x00, 0x00, 0x00}, 1, 0x13, 5 }, /* 'u' */
-    { HUFFMAN_DE_CHAR, {0x6c, 0x00, 0x00, 0x00}, 1, 0x28, 6 }, /* 'l' */
-    { HUFFMAN_DE_CHAR, {0x63, 0x00, 0x00, 0x00}, 1, 0x29, 6 }, /* 'c' */
-    { HUFFMAN_DE_CHAR, {0x67, 0x00, 0x00, 0x00}, 1, 0x2a, 6 }, /* 'g' */
-    { HUFFMAN_DE_CHAR, {0x6d, 0x00, 0x00, 0x00}, 1, 0x2b, 6 }, /* 'm' */
-    { HUFFMAN_DE_CHAR, {0x6f, 0x00, 0x00, 0x00}, 1, 0x2c, 6 }, /* 'o' */
-    { HUFFMAN_DE_CHAR, {0x62, 0x00, 0x00, 0x00}, 1, 0x2d, 6 }, /* 'b' */
-    { HUFFMAN_DE_CHAR, {0x77, 0x00, 0x00, 0x00}, 1, 0x2e, 6 }, /* 'w' */
-    { HUFFMAN_DE_CHAR, {0x45, 0x00, 0x00, 0x00}, 1, 0x2f, 6 }, /* 'E' */
-    { HUFFMAN_DE_CHAR, {0x2e, 0x00, 0x00, 0x00}, 1, 0x30, 6 }, /* '.' */
-    { HUFFMAN_DE_CHAR, {0x2c, 0x00, 0x00, 0x00}, 1, 0x31, 6 }, /* ',' */
-    { HUFFMAN_DE_CHAR, {0x66, 0x00, 0x00, 0x00}, 1, 0x64, 7 }, /* 'f' */
-    { HUFFMAN_DE_CHAR, {0x6b, 0x00, 0x00, 0x00}, 1, 0x65, 7 }, /* 'k' */
-    { HUFFMAN_DE_CHAR, {0x7a, 0x00, 0x00, 0x00}, 1, 0x66, 7 }, /* 'z' */
-    { HUFFMAN_DE_CHAR, {0x41, 0x00, 0x00, 0x00}, 1, 0x67, 7 }, /* 'A' */
-    { HUFFMAN_DE_CHAR, {0x44, 0x00, 0x00, 0x00}, 1, 0x68, 7 }, /* 'D' */
-    { HUFFMAN_DE_CHAR, {0x49, 0x00, 0x00, 0x00}, 1, 0x69, 7 }, /* 'I' */
-    { HUFFMAN_DE_CHAR, {0x4e, 0x00, 0x00, 0x00}, 1, 0x6a, 7 }, /* 'N' */
-    { HUFFMAN_DE_CHAR, {0x52, 0x00, 0x00, 0x00}, 1, 0x6b, 7 }, /* 'R' */
-    { HUFFMAN_DE_CHAR, {0x53, 0x00, 0x00, 0x00}, 1, 0x6c, 7 }, /* 'S' */
-    { HUFFMAN_DE_CHAR, {0x54, 0x00, 0x00, 0x00}, 1, 0x6d, 7 }, /* 'T' */
-    { HUFFMAN_DE_CHAR, {0x2d, 0x00, 0x00, 0x00}, 1, 0x6e, 7 }, /* '-' */
-    { HUFFMAN_DE_CHAR, {0x70, 0x00, 0x00, 0x00}, 1, 0xde, 8 }, /* 'p' */
-    { HUFFMAN_DE_CHAR, {0x76, 0x00, 0x00, 0x00}, 1, 0xdf, 8 }, /* 'v' */
-    { HUFFMAN_DE_CHAR, {0xc3, 0xa4, 0x00, 0x00}, 2, 0xe0, 8 }, /* 'ä' */
-    { HUFFMAN_DE_CHAR, {0xc3, 0xbc, 0x00, 0x00}, 2, 0xe1, 8 }, /* 'ü' */
-    { HUFFMAN_DE_CHAR, {0x43, 0x00, 0x00, 0x00}, 1, 0xe2, 8 }, /* 'C' */
-    { HUFFMAN_DE_CHAR, {0x47, 0x00, 0x00, 0x00}, 1, 0xe3, 8 }, /* 'G' */
-    { HUFFMAN_DE_CHAR, {0x48, 0x00, 0x00, 0x00}, 1, 0xe4, 8 }, /* 'H' */
-    { HUFFMAN_DE_CHAR, {0x4c, 0x00, 0x00, 0x00}, 1, 0xe5, 8 }, /* 'L' */
-    { HUFFMAN_DE_CHAR, {0x55, 0x00, 0x00, 0x00}, 1, 0xe6, 8 }, /* 'U' */
-    { HUFFMAN_DE_CHAR, {0x30, 0x00, 0x00, 0x00}, 1, 0xe7, 8 }, /* '0' */
-    { HUFFMAN_DE_CHAR, {0x31, 0x00, 0x00, 0x00}, 1, 0xe8, 8 }, /* '1' */
-    { HUFFMAN_DE_CHAR, {0x32, 0x00, 0x00, 0x00}, 1, 0xe9, 8 }, /* '2' */
-    { HUFFMAN_DE_CHAR, {0x33, 0x00, 0x00, 0x00}, 1, 0xea, 8 }, /* '3' */
-    { HUFFMAN_DE_CHAR, {0x34, 0x00, 0x00, 0x00}, 1, 0xeb, 8 }, /* '4' */
-    { HUFFMAN_DE_CHAR, {0x35, 0x00, 0x00, 0x00}, 1, 0xec, 8 }, /* '5' */
-    { HUFFMAN_DE_CHAR, {0x36, 0x00, 0x00, 0x00}, 1, 0xed, 8 }, /* '6' */
-    { HUFFMAN_DE_CHAR, {0x37, 0x00, 0x00, 0x00}, 1, 0xee, 8 }, /* '7' */
-    { HUFFMAN_DE_CHAR, {0x38, 0x00, 0x00, 0x00}, 1, 0xef, 8 }, /* '8' */
-    { HUFFMAN_DE_CHAR, {0x39, 0x00, 0x00, 0x00}, 1, 0xf0, 8 }, /* '9' */
-    { HUFFMAN_DE_CHAR, {0x3a, 0x00, 0x00, 0x00}, 1, 0xf1, 8 }, /* ':' */
-    { HUFFMAN_DE_CHAR, {0x28, 0x00, 0x00, 0x00}, 1, 0xf2, 8 }, /* '(' */
-    { HUFFMAN_DE_CHAR, {0x29, 0x00, 0x00, 0x00}, 1, 0xf3, 8 }, /* ')' */
-    { HUFFMAN_DE_ESCAPE, {0x00, 0x00, 0x00, 0x00}, 0, 0xf4, 8 },
-    { HUFFMAN_DE_CHAR, {0xc3, 0x9f, 0x00, 0x00}, 2, 0x1ea, 9 }, /* 'ß' */
-    { HUFFMAN_DE_CHAR, {0x6a, 0x00, 0x00, 0x00}, 1, 0x1eb, 9 }, /* 'j' */
-    { HUFFMAN_DE_CHAR, {0xc3, 0xb6, 0x00, 0x00}, 2, 0x1ec, 9 }, /* 'ö' */
-    { HUFFMAN_DE_CHAR, {0x42, 0x00, 0x00, 0x00}, 1, 0x1ed, 9 }, /* 'B' */
-    { HUFFMAN_DE_CHAR, {0x46, 0x00, 0x00, 0x00}, 1, 0x1ee, 9 }, /* 'F' */
-    { HUFFMAN_DE_CHAR, {0x4d, 0x00, 0x00, 0x00}, 1, 0x1ef, 9 }, /* 'M' */
-    { HUFFMAN_DE_CHAR, {0x4f, 0x00, 0x00, 0x00}, 1, 0x1f0, 9 }, /* 'O' */
-    { HUFFMAN_DE_CHAR, {0x57, 0x00, 0x00, 0x00}, 1, 0x1f1, 9 }, /* 'W' */
-    { HUFFMAN_DE_CHAR, {0x3b, 0x00, 0x00, 0x00}, 1, 0x1f2, 9 }, /* ';' */
-    { HUFFMAN_DE_CHAR, {0x2f, 0x00, 0x00, 0x00}, 1, 0x1f3, 9 }, /* '/' */
-    { HUFFMAN_DE_CHAR, {0x27, 0x00, 0x00, 0x00}, 1, 0x1f4, 9 }, /* "'" */
-    { HUFFMAN_DE_CHAR, {0x21, 0x00, 0x00, 0x00}, 1, 0x1f5, 9 }, /* '!' */
-    { HUFFMAN_DE_CHAR, {0x3f, 0x00, 0x00, 0x00}, 1, 0x1f6, 9 }, /* '?' */
-    { HUFFMAN_DE_CHAR, {0x4b, 0x00, 0x00, 0x00}, 1, 0x3ee, 10 }, /* 'K' */
-    { HUFFMAN_DE_CHAR, {0x50, 0x00, 0x00, 0x00}, 1, 0x3ef, 10 }, /* 'P' */
-    { HUFFMAN_DE_CHAR, {0x51, 0x00, 0x00, 0x00}, 1, 0x3f0, 10 }, /* 'Q' */
-    { HUFFMAN_DE_CHAR, {0x56, 0x00, 0x00, 0x00}, 1, 0x3f1, 10 }, /* 'V' */
-    { HUFFMAN_DE_CHAR, {0x58, 0x00, 0x00, 0x00}, 1, 0x3f2, 10 }, /* 'X' */
-    { HUFFMAN_DE_CHAR, {0x59, 0x00, 0x00, 0x00}, 1, 0x3f3, 10 }, /* 'Y' */
-    { HUFFMAN_DE_CHAR, {0x5a, 0x00, 0x00, 0x00}, 1, 0x3f4, 10 }, /* 'Z' */
-    { HUFFMAN_DE_CHAR, {0xc3, 0x84, 0x00, 0x00}, 2, 0x3f5, 10 }, /* 'Ä' */
-    { HUFFMAN_DE_CHAR, {0xc3, 0x96, 0x00, 0x00}, 2, 0x3f6, 10 }, /* 'Ö' */
-    { HUFFMAN_DE_CHAR, {0xc3, 0x9c, 0x00, 0x00}, 2, 0x3f7, 10 }, /* 'Ü' */
-    { HUFFMAN_DE_CHAR, {0x26, 0x00, 0x00, 0x00}, 1, 0x3f8, 10 }, /* '&' */
-    { HUFFMAN_DE_CHAR, {0x2b, 0x00, 0x00, 0x00}, 1, 0x3f9, 10 }, /* '+' */
-    { HUFFMAN_DE_CHAR, {0x22, 0x00, 0x00, 0x00}, 1, 0x3fa, 10 }, /* '"' */
-    { HUFFMAN_DE_CHAR, {0x25, 0x00, 0x00, 0x00}, 1, 0x3fb, 10 }, /* '%' */
-    { HUFFMAN_DE_CHAR, {0xe2, 0x82, 0xac, 0x00}, 3, 0x3fc, 10 }, /* '€' */
-    { HUFFMAN_DE_END, {0x00, 0x00, 0x00, 0x00}, 0, 0x3fd, 10 },
-    { HUFFMAN_DE_CHAR, {0x79, 0x00, 0x00, 0x00}, 1, 0x7fc, 11 }, /* 'y' */
-    { HUFFMAN_DE_CHAR, {0x78, 0x00, 0x00, 0x00}, 1, 0x7fd, 11 }, /* 'x' */
-    { HUFFMAN_DE_CHAR, {0x71, 0x00, 0x00, 0x00}, 1, 0x7fe, 11 }, /* 'q' */
-    { HUFFMAN_DE_CHAR, {0x4a, 0x00, 0x00, 0x00}, 1, 0x7ff, 11 }, /* 'J' */
-};
-#define HUFFMAN_DE_TABLE_SIZE (sizeof(HUFFMAN_DE_TABLE) / sizeof(HUFFMAN_DE_TABLE[0]))
-
-typedef struct {
-    const uint8_t *data;
-    size_t byte_len;
-    size_t bit_pos;
-} huffman_de_reader_t;
-
-static inline int huffman_de_read_bit(huffman_de_reader_t *r) {
-    uint8_t byte = r->data[r->bit_pos / 8];
-    int bit = (byte >> (7 - (r->bit_pos % 8))) & 1;
-    r->bit_pos++;
-    return bit;
-}
+#define HUFFMAN_DE_TABLE_SIZE 88
+extern const huffman_de_symbol_t HUFFMAN_DE_TABLE[HUFFMAN_DE_TABLE_SIZE];
 
 /* Decodes `data` (byte_len bytes) into `out` (out_size bytes,
  * NUL-terminated). Returns the decoded length (excl. NUL), or -1 on
  * a malformed stream or if `out` is too small. */
-static inline int huffman_de_decode(const uint8_t *data, size_t byte_len,
-                                     char *out, size_t out_size) {
-    huffman_de_reader_t r = { data, byte_len, 0 };
-    size_t out_len = 0;
-    uint32_t code = 0;
-    uint8_t length = 0;
-    while (r.bit_pos < byte_len * 8) {
-        code = (code << 1) | (uint32_t)huffman_de_read_bit(&r);
-        length++;
-        const huffman_de_symbol_t *match = NULL;
-        for (size_t i = 0; i < HUFFMAN_DE_TABLE_SIZE; i++) {
-            if (HUFFMAN_DE_TABLE[i].length == length && HUFFMAN_DE_TABLE[i].code == code) {
-                match = &HUFFMAN_DE_TABLE[i];
-                break;
-            }
-        }
-        if (!match) {
-            if (length > 11) return -1;
-            continue;
-        }
-        code = 0;
-        length = 0;
-        if (match->kind == HUFFMAN_DE_END) {
-            if (out_len >= out_size) return -1;
-            out[out_len] = '\0';
-            return (int)out_len;
-        }
-        if (match->kind == HUFFMAN_DE_ESCAPE) {
-            if (r.bit_pos + 8 > byte_len * 8) return -1;
-            uint8_t raw = 0;
-            for (int b = 0; b < 8; b++) raw = (uint8_t)((raw << 1) | (uint8_t)huffman_de_read_bit(&r));
-            if (out_len + 1 >= out_size) return -1;
-            out[out_len++] = (char)raw;
-            continue;
-        }
-        if (out_len + match->utf8_len >= out_size) return -1;
-        for (uint8_t b = 0; b < match->utf8_len; b++) out[out_len++] = (char)match->utf8[b];
-    }
-    return -1; /* ran out of input before an END symbol */
+int huffman_de_decode(const uint8_t *data, size_t byte_len,
+                       char *out, size_t out_size);
+
+#ifdef __cplusplus
 }
+#endif
 
 #endif /* HUFFMAN_DE_H */
