@@ -144,13 +144,19 @@ def dashboard_card(num_screens: int, num_schedules: int, open_url: str) -> None:
         ui.label(f'{num_screens} screen(s), {num_schedules} schedule(s)').classes('text-caption text-grey-7')
 
 
-def global_config_card(persist: Callable[[], None]) -> None:
+def global_config_fields(persist: Callable[[], None]) -> None:
     """
-    One editable card (as nice4iot's register_global_card() and the
-    standalone "Global" tab both expect a single project-independent card)
-    for the shared GlobalConfig singleton, app_config. ModelForm.from_item
-    binds directly to that object -- not a fresh copy from an adapter --
-    so autosave edits mutate app_config's own attributes in place: every
+    The GlobalConfig editing fields, no ui.card()/ui.expansion() of their
+    own -- nice4iot's register_global_card('E-Paper', ...) wraps this in
+    its own uniform config_expansion(title) (see docs/extensions.md in the
+    nice4iot repo: 'general'/global cards must render only their fields,
+    not their own chrome, so third-party cards match nice4iot's built-in
+    ones). global_config_card() below adds a plain ui.card() around this
+    for standalone, which has no such chrome to rely on.
+
+    ModelForm.from_item binds directly to the shared GlobalConfig
+    singleton, app_config -- not a fresh copy from an adapter -- so
+    autosave edits mutate app_config's own attributes in place: every
     module that already did `from extensions.epaper.config import
     app_config` sees the changes without needing to change anything.
     `persist()` is the caller's job (write to the right JSON path for
@@ -158,34 +164,43 @@ def global_config_card(persist: Callable[[], None]) -> None:
     care which.
     """
     font_names = sorted(p.name for p in resource_paths.font_path.glob('*') if p.is_file())
+    form = ModelForm.from_item(app_config, exclude=['epaper_color_models'], on_change=lambda e: persist())
+
+    with ui.column().classes('w-full gap-2'):
+        ui.label('General').classes('text-subtitle2')
+        _render_row(form, 'locale', 'timezone')
+        _render_row(form, 'date_format', 'time_format')
+
+        ui.label('Font & Colors').classes('text-subtitle2')
+        with ui.row().classes('w-full gap-2'):
+            form.render_field('font_name', widget_type='ui.select', select_options=font_names,
+                               props='outlined dense').classes('flex-grow')
+            form.render_field('font_size', props='outlined dense').classes('flex-grow')
+        with ui.row().classes('w-full gap-2'):
+            form.render_field('color_background', widget_type='ui.color_input', props='outlined dense').classes('flex-grow')
+            form.render_field('color_primary', widget_type='ui.color_input', props='outlined dense').classes('flex-grow')
+            form.render_field('color_accent', widget_type='ui.color_input', props='outlined dense').classes('flex-grow')
+
+        ui.label('iCal (Room Calendar)').classes('text-subtitle2')
+        _render_row(form, 'ical_update_interval_s', 'ical_max_days')
+        form.render_field('ical_error', props='outlined dense').classes('w-full')
+        _render_row(form, 'no_appointments', 'next_appointment')
+        _render_row(form, 'current_appointment', 'further_appointments')
+        _render_row(form, 'roomcalendar_date_format_long', 'roomcalendar_date_format_short', 'roomcalendar_time_format')
+
+        ui.label('Weather').classes('text-subtitle2')
+        form.render_field('weather_update_interval_s', props='outlined dense').classes('w-full')
+        form.render_field('weather_error', props='outlined dense').classes('w-full')
+
+        form.render_nonfield_errors()
+
+
+def global_config_card(persist: Callable[[], None]) -> None:
+    """Standalone-only wrapper around global_config_fields(): standalone
+    has no nice4iot chrome to supply a card/heading, so this builds its
+    own -- see global_config_fields()'s docstring for why nice4iot's own
+    register_global_card() usage (extensions/epaper/__init__.py) calls
+    global_config_fields() directly instead of this."""
     with ui.card().classes('w-full'):
         ui.label('E-Paper Global Settings').classes('text-subtitle1')
-        form = ModelForm.from_item(app_config, exclude=['epaper_color_models'], on_change=lambda e: persist())
-
-        with ui.column().classes('w-full gap-2'):
-            ui.label('General').classes('text-subtitle2')
-            _render_row(form, 'locale', 'timezone')
-            _render_row(form, 'date_format', 'time_format')
-
-            ui.label('Font & Colors').classes('text-subtitle2')
-            with ui.row().classes('w-full gap-2'):
-                form.render_field('font_name', widget_type='ui.select', select_options=font_names,
-                                   props='outlined dense').classes('flex-grow')
-                form.render_field('font_size', props='outlined dense').classes('flex-grow')
-            with ui.row().classes('w-full gap-2'):
-                form.render_field('color_background', widget_type='ui.color_input', props='outlined dense').classes('flex-grow')
-                form.render_field('color_primary', widget_type='ui.color_input', props='outlined dense').classes('flex-grow')
-                form.render_field('color_accent', widget_type='ui.color_input', props='outlined dense').classes('flex-grow')
-
-            ui.label('iCal (Room Calendar)').classes('text-subtitle2')
-            _render_row(form, 'ical_update_interval_s', 'ical_max_days')
-            form.render_field('ical_error', props='outlined dense').classes('w-full')
-            _render_row(form, 'no_appointments', 'next_appointment')
-            _render_row(form, 'current_appointment', 'further_appointments')
-            _render_row(form, 'roomcalendar_date_format_long', 'roomcalendar_date_format_short', 'roomcalendar_time_format')
-
-            ui.label('Weather').classes('text-subtitle2')
-            form.render_field('weather_update_interval_s', props='outlined dense').classes('w-full')
-            form.render_field('weather_error', props='outlined dense').classes('w-full')
-
-            form.render_nonfield_errors()
+        global_config_fields(persist)

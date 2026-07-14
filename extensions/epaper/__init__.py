@@ -23,7 +23,7 @@ def register(app: FastAPI) -> None:
     from extensions.epaper.api.endpoints import build_extension_router
     from extensions.epaper.config import load_global_config, save_global_config
     from extensions.epaper.paths import EpaperPaths
-    from extensions.epaper.ui.panels import dashboard_card, global_config_card
+    from extensions.epaper.ui.panels import dashboard_card, global_config_fields
     from extensions.epaper.ui.schedule_editor import schedules_wrapper
     from extensions.epaper.ui.screen_editor import screens_wrapper
 
@@ -40,9 +40,9 @@ def register(app: FastAPI) -> None:
     load_global_config(_global_config_path)
 
     def _global_card() -> None:
-        global_config_card(persist=lambda: save_global_config(_global_config_path))
+        global_config_fields(persist=lambda: save_global_config(_global_config_path))
 
-    register_global_card(_global_card)
+    register_global_card('E-Paper', _global_card)
 
     # --- REST -----------------------------------------------------------
     router = build_extension_router(_paths_for_project)
