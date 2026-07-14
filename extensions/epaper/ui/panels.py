@@ -128,6 +128,22 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
     return wrapper
 
 
+def dashboard_card(num_screens: int, num_schedules: int, open_url: str) -> None:
+    """
+    Compact always-visible summary card for nice4iot's project Dashboard
+    tab (register_project_card('dashboard', ...) requires the card to
+    build its own ui.card()). open_url is where the "open" button
+    navigates -- resolved by the caller (project_url(project_name,
+    tab='Screens')), since URL construction is nice4iot-specific and
+    doesn't belong in this UI-only module.
+    """
+    with ui.card().classes('w-full'):
+        with ui.row().classes('w-full items-center justify-between'):
+            ui.label('E-Paper').classes('text-subtitle1 font-bold')
+            ui.button(icon='open_in_new').props('flat dense round').on_click(lambda: ui.navigate.to(open_url))
+        ui.label(f'{num_screens} screen(s), {num_schedules} schedule(s)').classes('text-caption text-grey-7')
+
+
 def global_config_card(persist: Callable[[], None]) -> None:
     """
     One editable card (as nice4iot's register_global_card() and the

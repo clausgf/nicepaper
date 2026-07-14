@@ -15,17 +15,15 @@ from fastapi import FastAPI
 def register(app: FastAPI) -> None:
     from pathlib import Path
 
-    from nicegui import ui
-
     from app.config import app_config as nice4iot_app_config
-    from app.extensions import mount_extension_router, register_global_card, register_project_card, register_project_page
+    from app.extensions import mount_extension_router, register_global_card, register_project_card, register_project_tab
     from app.paths import extension_project_dir
     from app.routes import project_url
 
     from extensions.epaper.api.endpoints import build_extension_router
     from extensions.epaper.config import load_global_config, save_global_config
     from extensions.epaper.paths import EpaperPaths
-    from extensions.epaper.ui.panels import global_config_card
+    from extensions.epaper.ui.panels import dashboard_card, global_config_card
     from extensions.epaper.ui.schedule_editor import schedules_wrapper
     from extensions.epaper.ui.screen_editor import screens_wrapper
 
@@ -55,37 +53,22 @@ def register(app: FastAPI) -> None:
         paths = _paths_for_project(project_name)
         num_screens = len(list(paths.screen_dir.glob('*.json')))
         num_schedules = len(list(paths.schedule_dir.glob('*.json')))
-        with ui.card().classes('w-full'):
-            with ui.row().classes('w-full items-center justify-between'):
-                ui.label('E-Paper').classes('text-subtitle1 font-bold')
-                ui.button(icon='open_in_new').props('flat dense round').on_click(
-                    lambda: ui.navigate.to(f'{project_url(project_name)}/ext/epaper'))
-            ui.label(f'{num_screens} screen(s), {num_schedules} schedule(s)').classes('text-caption text-grey-7')
+        dashboard_card(num_screens, num_schedules, project_url(project_name, tab='Screens'))
 
     register_project_card('dashboard', _dashboard_card)
 
-    # --- Standalone-within-nice4iot project page --------------------------
-    # A single page (nice4iot's register_project_page allows only one):
-    # Screens/Schedules as client-side tabs, each rendering the same
-    # DirectoryAdapter-backed DrillDownWrapper standalone.py uses (see
-    # screen_editor.screens_wrapper()/schedule_editor.schedules_wrapper()
-    # for the list<->editor chrome, state and slide animation -- nothing
-    # left to own here beyond the tab shell).
-    def _epaper_project_page(project_name: str) -> None:
+    # --- Project tabs --------------------------------------------------
+    # Two tabs on nice4iot's own project page (its tab bar, not ours),
+    # each rendering the same DirectoryAdapter-backed DrillDownWrapper
+    # standalone.py uses -- see screen_editor.screens_wrapper()/
+    # schedule_editor.schedules_wrapper() for the list<->editor chrome,
+    # state and slide animation. Nothing NiceGUI-specific left to own here.
+    def _screens_tab(project_name: str) -> None:
         paths = _paths_for_project(project_name)
-        image_base_url = f'/api/ext/epaper/{project_name}/screens'
+        screens_wrapper(paths, f'/api/ext/epaper/{project_name}/screens').render()
 
-        ui.link('← Back to project', project_url(project_name)).classes('text-caption')
-        ui.label('E-Paper').classes('text-h5')
+    def _schedules_tab(project_name: str) -> None:
+        schedules_wrapper(_paths_for_project(project_name)).render()
 
-        with ui.tabs().classes('w-full') as tabs:
-            screens_tab = ui.tab('Screens')
-            schedules_tab = ui.tab('Schedules')
-
-        with ui.tab_panels(tabs, value=screens_tab).classes('w-full'):
-            with ui.tab_panel(screens_tab):
-                screens_wrapper(paths, image_base_url).render()
-            with ui.tab_panel(schedules_tab):
-                schedules_wrapper(paths).render()
-
-    register_project_page(_epaper_project_page)
+    register_project_tab('Screens', _screens_tab)
+    register_project_tab('Schedules', _schedules_tab)
