@@ -119,7 +119,7 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
 
     wrapper = DrillDownWrapper.from_adapter(
         FileEntry, directory,
-        title=title, title_field='name', subtitle_fields=[],
+        list_title=title, item_title_field='name', item_subtitle_fields=[],
         render_list_item=render_row,
         render_list_container=render_list_container,
         render_detail=render_detail,
