@@ -25,9 +25,9 @@ def register(app: FastAPI) -> None:
     from extensions.epaper.api.endpoints import build_extension_router
     from extensions.epaper.config import load_global_config, save_global_config
     from extensions.epaper.paths import EpaperPaths
-    from extensions.epaper.ui.panels import file_list, global_config_card, slide_class
-    from extensions.epaper.ui.schedule_editor import schedule_editor
-    from extensions.epaper.ui.screen_editor import screen_editor
+    from extensions.epaper.ui.panels import global_config_card
+    from extensions.epaper.ui.schedule_editor import schedules_wrapper
+    from extensions.epaper.ui.screen_editor import screens_wrapper
 
     def _paths_for_project(project_name: str) -> EpaperPaths:
         paths = EpaperPaths(root=extension_project_dir(project_name, 'epaper'))
@@ -66,14 +66,14 @@ def register(app: FastAPI) -> None:
 
     # --- Standalone-within-nice4iot project page --------------------------
     # A single page (nice4iot's register_project_page allows only one):
-    # Screens/Schedules as client-side tabs, list<->editor switching via
-    # in-page @ui.refreshable state rather than sub-routes, since there is
-    # no per-extension routing beyond this one URL.
+    # Screens/Schedules as client-side tabs, each rendering the same
+    # DirectoryAdapter-backed DrillDownWrapper standalone.py uses (see
+    # screen_editor.screens_wrapper()/schedule_editor.schedules_wrapper()
+    # for the list<->editor chrome, state and slide animation -- nothing
+    # left to own here beyond the tab shell).
     def _epaper_project_page(project_name: str) -> None:
         paths = _paths_for_project(project_name)
         image_base_url = f'/api/ext/epaper/{project_name}/screens'
-        state = {'screen_file': None, 'schedule_file': None,
-                  'screen_direction': 'right', 'schedule_direction': 'right'}
 
         ui.link('← Back to project', project_url(project_name)).classes('text-caption')
         ui.label('E-Paper').classes('text-h5')
@@ -82,40 +82,10 @@ def register(app: FastAPI) -> None:
             screens_tab = ui.tab('Screens')
             schedules_tab = ui.tab('Schedules')
 
-        @ui.refreshable
-        def screens_panel():
-            with ui.column().classes(f'w-full {slide_class(state["screen_direction"])}'):
-                if state['screen_file'] is None:
-                    file_list(paths.screen_dir, 'screen',
-                              on_select=lambda f: _select('screen_file', f),
-                              on_add=lambda f: _select('screen_file', f))
-                else:
-                    screen_editor(paths, state['screen_file'], image_base_url,
-                                  on_back=lambda: _select('screen_file', None),
-                                  on_deleted=lambda: _select('screen_file', None))
-
-        @ui.refreshable
-        def schedules_panel():
-            with ui.column().classes(f'w-full {slide_class(state["schedule_direction"])}'):
-                if state['schedule_file'] is None:
-                    file_list(paths.schedule_dir, 'schedule',
-                              on_select=lambda f: _select('schedule_file', f),
-                              on_add=lambda f: _select('schedule_file', f))
-                else:
-                    schedule_editor(paths, state['schedule_file'],
-                                     on_back=lambda: _select('schedule_file', None),
-                                     on_deleted=lambda: _select('schedule_file', None))
-
-        def _select(key: str, value) -> None:
-            direction_key = 'screen_direction' if key == 'screen_file' else 'schedule_direction'
-            state[direction_key] = 'right' if value is not None else 'left'
-            state[key] = value
-            (screens_panel if key == 'screen_file' else schedules_panel).refresh()
-
         with ui.tab_panels(tabs, value=screens_tab).classes('w-full'):
             with ui.tab_panel(screens_tab):
-                screens_panel()
+                screens_wrapper(paths, image_base_url).render()
             with ui.tab_panel(schedules_tab):
-                schedules_panel()
+                schedules_wrapper(paths).render()
 
     register_project_page(_epaper_project_page)

@@ -1,52 +1,42 @@
 """
-Schedule editor content, split out of panels.py alongside screen_editor.py
-(see that module's docstring for why) -- kept separate from it since a
-schedule (List[WeeklyScheduleModel]) has nothing in its editing model in
-common with a screen's widget tree beyond the shared file-list/rename/
-delete plumbing in panels.py.
+Schedule editor: a DirectoryAdapter-backed DrillDownWrapper (schedules_wrapper)
+over paths.schedule_dir, plus the actual schedule content (one card per
+weekly rule) rendered inside its detail view. Split out of panels.py
+alongside screen_editor.py (see that module's docstring for why) -- kept
+separate from it since a schedule (List[WeeklyScheduleModel]) has nothing
+in its editing model in common with a screen's widget tree beyond the
+shared file-list/rename/delete plumbing niceview's DrillDownWrapper now
+owns for both.
 """
-import os
-from typing import Callable
-
 from nicegui import ui
 from niceview.dataadapter import JsonListAdapter
 from niceview.form import ModelForm
+from niceview.modellist import DrillDownWrapper
 from niceview.util import confirm_dialog
 
 from extensions.epaper.models.updateschedulemodel import WeeklyScheduleModel
 from extensions.epaper.paths import EpaperPaths
-from extensions.epaper.ui.panels import _rename_file
+from extensions.epaper.ui.panels import directory_drilldown
 from extensions.epaper.util import check_filename
 
 
-def schedule_editor(paths: EpaperPaths, filename: str, on_back: Callable[[], None], on_deleted: Callable[[], None]):
+def schedule_editor_content(paths: EpaperPaths, filename: str) -> None:
     """
     Edit a schedule as a card per weekly rule (WeeklyScheduleModel), backed
     by a niceview JsonListAdapter over the schedule file. Each card is an
     autosaving ModelForm bound to one list item; fields are placed by hand
     (niceview has no generic "card grid" widget, nor should it: which
     fields go where is inherently an application layout decision, not
-    something a form library can generalize).
+    something a form library can generalize). No file-level chrome
+    (back/rename/delete) of its own -- that's schedules_wrapper()'s job,
+    via DrillDownWrapper's title row.
     """
-    if not filename or not check_filename(filename) or not filename.endswith('.json'):
-        ui.notify(f'Invalid file name: "{filename}".', type='negative')
-        on_deleted()
-        return
-
     schedule_path = paths.schedule_dir / filename
-    if not schedule_path.exists():
-        ui.notify(f'File "{filename}" does not exist.', type='negative')
-        on_deleted()
+    if not check_filename(filename) or not schedule_path.is_file():
+        ui.label(f'Schedule {filename!r} not found.').classes('text-negative')
         return
 
     adapter = JsonListAdapter(WeeklyScheduleModel, schedule_path)
-
-    with ui.row().classes('w-full items-center gap-2'):
-        ui.button(icon='arrow_back').props('round dense color=primary').on_click(on_back)
-        ui.label(os.path.splitext(filename)[0]).classes('text-h6')
-        ui.space()
-        ui.button(icon='edit').props('round dense').on_click(lambda: rename_file())
-        ui.button(icon='delete').props('round dense color=negative').on_click(lambda: delete_schedule_file())
 
     @ui.refreshable
     def rule_cards():
@@ -84,37 +74,19 @@ def schedule_editor(paths: EpaperPaths, filename: str, on_back: Callable[[], Non
     rule_cards()
     ui.button('Add Rule', icon='add', on_click=lambda: add_rule()).props('color=primary')
 
-    with ui.dialog().style('width: 400px') as rename_dialog, ui.card():
-        ui.label('Rename file').classes('text-h6 center')
-        new_name_input = ui.input('New name', value=os.path.splitext(filename)[0]).classes('w-full')
-        with ui.row().classes('w-full place-content-end'):
-            ui.space()
-            ui.button('Cancel', on_click=lambda: rename_dialog.submit(None))
-            ui.button('Rename', on_click=lambda: rename_dialog.submit(new_name_input.value))
 
-    async def rename_file():
-        new_name = await rename_dialog
-        if not new_name:
-            ui.notify('Canceled renaming.', type='negative')
-            return
-        success, message = _rename_file(paths.schedule_dir, schedule_path, new_name)
-        ui.notify(message, type='positive' if success else 'negative')
-        if success:
-            on_deleted()
-
-    with ui.dialog().style('width: 400px') as confirm_delete_file_dialog, ui.card():
-        ui.label('Delete file').classes('text-h6 center')
-        ui.label(f'Are you sure you want to delete "{filename}"?')
-        with ui.row().classes('w-full place-content-end'):
-            ui.space()
-            ui.button('Cancel', on_click=lambda: confirm_delete_file_dialog.submit(False)).props('color=green')
-            ui.button('Confirm', on_click=lambda: confirm_delete_file_dialog.submit(True)).props('color=red')
-
-    async def delete_schedule_file():
-        confirm = await confirm_delete_file_dialog
-        if confirm:
-            os.remove(schedule_path)
-            ui.notify(f'File "{filename}" deleted.', type='positive')
-            on_deleted()
-        else:
-            ui.notify(f'Canceled deleting "{filename}".', type='negative')
+def schedules_wrapper(paths: EpaperPaths) -> DrillDownWrapper:
+    """
+    Directory-backed list<->editor drill-down for schedule files, shared
+    verbatim by standalone.py and __init__.py -- see screens_wrapper()'s
+    docstring in screen_editor.py, same reasoning applies here. All the
+    actual DrillDownWrapper/DirectoryAdapter wiring lives in panels.
+    directory_drilldown(); this just binds it to schedule_dir and
+    schedule_editor_content.
+    """
+    return directory_drilldown(
+        paths.schedule_dir,
+        default_content='[]',  # a schedule file is a plain List[WeeklyScheduleModel]
+        title='Schedules',
+        render_content=lambda filename: schedule_editor_content(paths, filename),
+    )

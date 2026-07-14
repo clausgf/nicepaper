@@ -1,17 +1,25 @@
 """
-Screen editor content: screen-level settings, the widget list/add/reorder/
-delete UI, and the per-widget-type detail form. Split out of panels.py
+Screen editor: a DirectoryAdapter-backed DrillDownWrapper (screens_wrapper)
+over paths.screen_dir, plus the actual screen content (screen-level
+settings, the widget list/add/reorder/delete UI, and the per-widget-type
+detail form) rendered inside its detail view. Split out of panels.py
 (which now holds only the pieces shared across screen/schedule editors and
 the standalone/extension entry points) because this is the one editor that
 keeps growing as new widget types are added.
+
+screens_wrapper() owns the file-level list<->editor chrome (title row,
+Add/Rename/Delete, slide animation) so standalone.py and __init__.py both
+just construct and render() it -- no separate deep-linkable per-file route,
+since niceview's DrillDownWrapper doesn't own routes of its own and
+standalone mode doesn't need one (see standalone.py).
 """
 import os
-from typing import Callable
 
 from nicegui import ui
 from nicegui.events import SortableEventArguments
 from niceview.dataadapter import JsonAdapter, ListAdapter
 from niceview.form import ModelForm
+from niceview.modellist import DrillDownWrapper
 from niceview.util import confirm_dialog
 
 from extensions.epaper.config import app_config, resource_paths
@@ -20,7 +28,7 @@ from extensions.epaper.models.screenmodel import (
     WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
 )
 from extensions.epaper.paths import EpaperPaths
-from extensions.epaper.ui.panels import _render_row, _rename_file, slide_class
+from extensions.epaper.ui.panels import _render_row, directory_drilldown, slide_class
 from extensions.epaper.util import check_filename
 
 WIDGET_MODELS: dict[str, type[WidgetModel]] = {
@@ -92,15 +100,16 @@ def screen_image_view(url: str):
             ui.button(icon='refresh').props('round dense size=sm').on('click', lambda img=img: img.force_reload())
 
 
-def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
-                   on_back: Callable[[], None], on_deleted: Callable[[], None]):
+def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str) -> None:
     """
-    Screen editor content: screen-level settings, a drag-reorderable list
-    of widgets that drills down into a per-type detail form, plus live
+    Screen content: screen-level settings, a drag-reorderable list of
+    widgets that drills down into a per-type detail form, plus live
     RGB/palette image previews (always visible on top, since they reflect
     whichever widget/setting was just edited). `image_base_url` is the
     display API prefix for this screen's images (differs between
-    standalone and the nice4iot extension router).
+    standalone and the nice4iot extension router). No file-level chrome
+    (back/rename/delete) of its own -- that's screens_wrapper()'s job,
+    via DrillDownWrapper's title row.
 
     All edits autosave through `screen_adapter` (a single JsonAdapter for
     the whole screen file, shared by every widget below) -- widgets are a
@@ -109,14 +118,9 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
     ListAdapter wraps the in-memory `screen.widgets` list instead, with
     persistence wired up via on_change().
     """
-    if not filename or not check_filename(filename) or not filename.endswith('.json'):
-        ui.notify(f'Invalid file name: "{filename}".', type='negative')
-        on_deleted()
-        return
     screen_path = paths.screen_dir / filename
-    if not screen_path.exists():
-        ui.notify(f'File "{filename}" does not exist.', type='negative')
-        on_deleted()
+    if not check_filename(filename) or not screen_path.is_file():
+        ui.label(f'Screen {filename!r} not found.').classes('text-negative')
         return
 
     screen_adapter = JsonAdapter(ScreenModel, screen_path)
@@ -129,13 +133,6 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
     widgets_adapter.on_change(persist_screen)
 
     state = {'view': 'list', 'key': None, 'direction': 'right'}
-
-    with ui.row().classes('w-full items-center gap-2'):
-        ui.button(icon='arrow_back').props('round dense').on_click(on_back)
-        ui.label(os.path.splitext(filename)[0]).classes('text-h6')
-        ui.space()
-        ui.button(icon='edit').props('round dense').on_click(lambda: rename_file())
-        ui.button(icon='delete').props('round dense color=negative').on_click(lambda: delete_file())
 
     with ui.card().tight().classes('w-full'):
         with ui.expansion('Image Preview', value=False).classes('w-full q-mb-none').props('dense header-class="text-subtitle1"'):
@@ -293,37 +290,18 @@ def screen_editor(paths: EpaperPaths, filename: str, image_base_url: str,
 
     editor_area()
 
-    with ui.dialog().style('width: 400px') as rename_dialog, ui.card():
-        ui.label('Rename file').classes('text-h6 center')
-        new_name_input = ui.input('New name', value=os.path.splitext(filename)[0]).classes('w-full')
-        with ui.row().classes('w-full place-content-end'):
-            ui.space()
-            ui.button('Cancel', on_click=lambda: rename_dialog.submit(None))
-            ui.button('Rename', on_click=lambda: rename_dialog.submit(new_name_input.value))
 
-    async def rename_file():
-        new_name = await rename_dialog
-        if not new_name:
-            ui.notify('Canceled renaming.', type='negative')
-            return
-        success, message = _rename_file(paths.screen_dir, screen_path, new_name)
-        ui.notify(message, type='positive' if success else 'negative')
-        if success:
-            on_deleted()
-
-    with ui.dialog().style('width: 400px') as confirm_delete_dialog, ui.card():
-        ui.label('Delete file').classes('text-h6 center')
-        ui.label(f'Are you sure you want to delete "{filename}"?')
-        with ui.row().classes('w-full place-content-end'):
-            ui.space()
-            ui.button('Cancel', on_click=lambda: confirm_delete_dialog.submit(False)).props('color=green')
-            ui.button('Confirm', on_click=lambda: confirm_delete_dialog.submit(True)).props('color=red')
-
-    async def delete_file():
-        confirm = await confirm_delete_dialog
-        if confirm:
-            screen_path.unlink()
-            ui.notify(f'File "{filename}" deleted.', type='positive')
-            on_deleted()
-        else:
-            ui.notify(f'Canceled deleting "{filename}".', type='negative')
+def screens_wrapper(paths: EpaperPaths, image_base_url: str) -> DrillDownWrapper:
+    """
+    Directory-backed list<->editor drill-down for screen files, shared
+    verbatim by standalone.py and __init__.py -- deep-linking to a
+    specific screen isn't needed, see standalone.py. All the actual
+    DrillDownWrapper/DirectoryAdapter wiring lives in panels.directory_
+    drilldown(); this just binds it to screen_dir and screen_editor_content.
+    """
+    return directory_drilldown(
+        paths.screen_dir,
+        default_content=lambda: ScreenModel(width=800, height=480).model_dump_json(indent=2),
+        title='Screens',
+        render_content=lambda filename: screen_editor_content(paths, filename, image_base_url),
+    )

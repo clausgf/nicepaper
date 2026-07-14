@@ -1,47 +1,21 @@
-from extensions.epaper.ui.panels import _rename_file
+import datetime
+
+from niceview.dataadapter import FileEntry
+
+from extensions.epaper.ui.panels import _entry_caption
 
 
-def test_rename_file_success(tmp_path):
-    old = tmp_path / "old.json"
-    old.write_text("{}")
-
-    success, message = _rename_file(tmp_path, old, "new")
-
-    assert success
-    assert "new.json" in message
-    assert not old.exists()
-    assert (tmp_path / "new.json").exists()
-    assert (tmp_path / "new.json").read_text() == "{}"
+def _entry(size: int) -> FileEntry:
+    return FileEntry(name="x", mtime=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc), size=size)
 
 
-def test_rename_file_adds_json_suffix_if_missing(tmp_path):
-    old = tmp_path / "old.json"
-    old.write_text("{}")
-
-    success, _message = _rename_file(tmp_path, old, "new")
-
-    assert success
-    assert (tmp_path / "new.json").exists()
+def test_entry_caption_uses_bytes_below_1024():
+    assert "1023 B" in _entry_caption(_entry(1023))
 
 
-def test_rename_file_rejects_invalid_name(tmp_path):
-    old = tmp_path / "old.json"
-    old.write_text("{}")
-
-    success, message = _rename_file(tmp_path, old, "../escape")
-
-    assert not success
-    assert "Invalid" in message
-    assert old.exists()
+def test_entry_caption_uses_kib_below_1_mib():
+    assert "1.0 kiB" in _entry_caption(_entry(1024))
 
 
-def test_rename_file_rejects_existing_target(tmp_path):
-    old = tmp_path / "old.json"
-    old.write_text("{}")
-    (tmp_path / "taken.json").write_text("{}")
-
-    success, message = _rename_file(tmp_path, old, "taken")
-
-    assert not success
-    assert "already exists" in message
-    assert old.exists()
+def test_entry_caption_uses_mib_at_1_mib_and_above():
+    assert "1.0 MiB" in _entry_caption(_entry(1024**2))

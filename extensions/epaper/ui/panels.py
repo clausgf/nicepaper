@@ -1,44 +1,34 @@
 """
 Content-only rendering functions shared across the screen and schedule
 editors (screen_editor.py, schedule_editor.py) and the standalone/nice4iot
-entry points: file listing, renaming, and the global settings card. No
-page/route/chrome ownership, so these work identically whether called from
-a standalone @ui.page route (extensions/epaper/ui/standalone.py) or from
-inside nice4iot's project page / card system (extensions/epaper/__init__.py's
-register(app)).
-
-Navigation out of these functions happens via callbacks (on_select,
-on_add, on_deleted, ...) rather than fixed URLs, since standalone mode
-navigates to real routes while the nice4iot single-page mode switches
-in-page view state instead.
+entry points: the global settings card, the shared directory_drilldown()
+DrillDownWrapper factory, plus small helpers (_render_row, slide_class)
+used by both editors. No page/route/chrome ownership, so these work
+identically whether called from a standalone @ui.page route
+(ui/standalone.py) or from inside nice4iot's project page / card system
+(extensions/epaper/__init__.py's register(app)).
 """
-import datetime
-import os
 from pathlib import Path
-from typing import Callable, Optional
-from zoneinfo import ZoneInfo
+from typing import Callable, Union
 
 from nicegui import ui
 from babel.dates import format_datetime, get_timezone
+from niceview.dataadapter import DirectoryAdapter, FileEntry
 from niceview.form import ModelForm
+from niceview.modellist import DrillDownWrapper
 
 from extensions.epaper.config import app_config, resource_paths
-from extensions.epaper.models.screenmodel import ScreenModel
 from extensions.epaper.util import check_filename
 
-item_types = {
-    "screen": {'plural': 'screens'},
-    "schedule": {'plural': 'schedules'},
-}
-
-# Slide-in-from-left/right for list<->detail switches (screen_editor.py's
-# widget list<->detail, __init__.py's file-list<->editor panels). These
-# switches are all @ui.refreshable functions, which destroy and recreate
-# their elements on every refresh rather than toggling a CSS class -- so a
-# CSS *animation* (not *transition*) plays automatically on every
-# recreation, with no JS/state wiring beyond picking left vs. right by
-# navigation direction. shared=True lets this be registered once here at
-# import time, before any page/client exists.
+# Slide-in-from-left/right for list<->detail switches: screen_editor.py's
+# widget list<->detail, and niceview's own DrillDownWrapper (screens_wrapper/
+# schedules_wrapper) uses an equivalent mechanism internally. These switches
+# are all @ui.refreshable functions, which destroy and recreate their
+# elements on every refresh rather than toggling a CSS class -- so a CSS
+# *animation* (not *transition*) plays automatically on every recreation,
+# with no JS/state wiring beyond picking left vs. right by navigation
+# direction. shared=True lets this be registered once here at import time,
+# before any page/client exists.
 _SLIDE_CSS = '''
     @keyframes slide-in-right { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     @keyframes slide-in-left  { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
@@ -64,23 +54,78 @@ def _render_row(form: ModelForm, *field_names: str, props: str = 'outlined dense
             form.render_field(name, props=props).classes('flex-grow')
 
 
-def _rename_file(dir: Path, old_path: Path, new_name: str) -> tuple[bool, str]:
-    """Validate and perform renaming old_path to new_name within dir.
-    Returns (success, a user-facing notification message). Shared between
-    screen_editor's and schedule_editor's rename dialogs (each has its own
-    local `rename_file()` closure as the button handler -- named
-    differently from this module-level helper on purpose, since a nested
-    `async def rename_file()` referencing a same-named module-level
-    function would instead recurse into itself)."""
-    if not new_name.endswith('.json'):
-        new_name += '.json'
-    if not check_filename(new_name):
-        return False, f'Invalid file name: "{new_name}".'
-    new_path = dir / new_name
-    if new_path.exists():
-        return False, f'File "{new_name}" already exists.'
-    old_path.rename(new_path)
-    return True, f'Renamed to "{new_name}".'
+def _entry_caption(item: FileEntry) -> str:
+    """'<formatted mtime>, <size>' caption for a DirectoryAdapter FileEntry row."""
+    dt_format = app_config.date_format + ' ' + app_config.time_format
+    mtime_str = format_datetime(item.mtime, format=dt_format, tzinfo=get_timezone(app_config.timezone), locale=app_config.locale)
+    if item.size < 1024:
+        size_str = f'{item.size} B'
+    elif item.size < 1024**2:
+        size_str = f'{item.size/1024:.1f} kiB'
+    else:
+        size_str = f'{item.size/1024**2:.1f} MiB'
+    return f'{mtime_str}, {size_str}'
+
+
+def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[], str]],
+                         title: str, render_content: Callable[[str], None]) -> DrillDownWrapper:
+    """
+    Shared DrillDownWrapper wiring for a directory of JSON files, used
+    identically by screen_editor.screens_wrapper() and
+    schedule_editor.schedules_wrapper(): the "no custom dialogs" Add/Rename
+    style from niceview's DirectoryAdapter example (examples/13_directory_
+    drilldown.py) -- Add creates an "untitled-NN" file and opens it
+    directly; Rename is an inline "Name" field in the detail view, wired to
+    DirectoryAdapter.rename() on blur -- plus this project's bordered-list
+    row styling (icon + filename + mtime/size caption).
+
+    render_content(filename) renders the actual per-file editor body (e.g.
+    screen_editor_content(paths, filename, image_base_url) with paths/
+    image_base_url already bound by the caller); this function only owns
+    the file-level list<->editor chrome around it.
+    """
+    directory = DirectoryAdapter(dir_path, default_content=default_content)
+
+    def render_list_container(render_rows) -> None:
+        with ui.list().style('width: 100%').props('bordered separator'):
+            render_rows()
+
+    def render_row(key: str, item: FileEntry, select) -> None:
+        with ui.item(on_click=lambda: select()):
+            with ui.item_section().props('avatar'):
+                ui.icon('description')
+            with ui.item_section():
+                ui.item_label(item.name)
+                ui.item_label(_entry_caption(item)).props('caption').classes('italic')
+
+    def render_detail(adapter: DirectoryAdapter, key: str, set_key) -> None:
+        def do_rename() -> None:
+            new_name = name_input.value
+            if not check_filename(f'{new_name}.json'):
+                ui.notify(f'Invalid file name: "{new_name}".', type='negative')
+                return
+            try:
+                set_key(adapter.rename(key, new_name))
+            except ValueError as e:
+                ui.notify(str(e), type='negative')
+
+        name_input = ui.input('Name', value=key).classes('w-full').props('outlined dense')
+        name_input.on('blur', do_rename)
+        render_content(f'{key}.json')
+
+    def handle_add() -> None:
+        entry = directory.create()
+        wrapper.open(entry.name)
+
+    wrapper = DrillDownWrapper.from_adapter(
+        FileEntry, directory,
+        title=title, title_field='name', subtitle_fields=[],
+        render_list_item=render_row,
+        render_list_container=render_list_container,
+        render_detail=render_detail,
+        on_add=handle_add,
+    )
+    return wrapper
 
 
 def global_config_card(persist: Callable[[], None]) -> None:
@@ -128,77 +173,3 @@ def global_config_card(persist: Callable[[], None]) -> None:
             form.render_field('weather_error', props='outlined dense').classes('w-full')
 
             form.render_nonfield_errors()
-
-
-@ui.refreshable
-def file_list(dir: Path, item_type: str, on_select: Callable[[str], None], on_add: Optional[Callable[[str], None]] = None):
-    """
-    List the JSON files in `dir` with an "add" button. on_select(filename)
-    is called when a file is clicked; on_add(filename) after a new file is
-    created (typically to navigate/switch to editing it). Pass on_add=None
-    to hide the add button (e.g. a read-only context).
-    """
-    with ui.row().classes('w-full items-center justify-between'):
-        plural = item_types[item_type]['plural']
-        ui.label(f'{plural.capitalize()}').classes('text-h6')
-        if on_add is not None:
-            ui.button(icon='add', on_click=lambda: add_file()).props('round size=sm')
-
-    file_list_names = sorted(os.listdir(dir))
-    with ui.list().style('width: 100%').props('bordered separator'):
-        for filename in file_list_names:
-            with ui.item(on_click=lambda f=filename: on_select(f)):
-                with ui.item_section().props('avatar'):
-                    ui.icon('description')
-                with ui.item_section():
-                    ui.item_label(os.path.splitext(filename)[0])
-
-                    fn = os.path.join(dir, filename)
-                    mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fn), tz=ZoneInfo("UTC"))
-                    dt_format = app_config.date_format + ' ' + app_config.time_format
-                    mtime_str = format_datetime(mtime, format=dt_format, tzinfo=get_timezone(app_config.timezone), locale=app_config.locale)
-
-                    size = os.path.getsize(fn)
-                    if size < 1024:
-                        size_str = f'{size} B'
-                    elif size < 1024**2:
-                        size_str = f'{size/1024:.1f} kiB'
-                    else:
-                        size_str = f'{size/1024**2:.1f} MiB'
-
-                    ui.item_label(mtime_str + ', ' + size_str).props('caption').classes('italic')
-
-    if on_add is not None:
-        with ui.dialog().style('width: 1800px') as add_file_dialog, ui.card():
-            ui.label(f'Add new {item_type}').classes('text-h6 center')
-            new_filename = ui.input("Enter the name of the new file").props('placeholder=filename.json').classes('w-full')
-            with ui.row().classes('w-full place-content-end'):
-                ui.space()
-                ui.button('Cancel', on_click=lambda: add_file_dialog.submit(None))
-                ui.button('Add', on_click=lambda: add_file_dialog.submit(new_filename.value))
-
-        async def add_file():
-            filename = await add_file_dialog
-            if filename and not filename.endswith('.json'):
-                filename += '.json'
-            if not filename or not check_filename(filename):
-                ui.notify('Canceled adding new file.', type='negative')
-                return
-            if os.path.exists(os.path.join(dir, filename)):
-                ui.notify(f'File "{filename}" already exists.', type='negative')
-                return
-
-            if item_type == 'screen':
-                content = ScreenModel(width=800, height=480).model_dump_json(indent=2)
-            elif item_type == 'schedule':
-                content = '[]'  # a schedule file is a plain List[WeeklyScheduleModel]
-            else:
-                ui.notify(f'Unknown item type "{item_type}".', type='negative')
-                return
-
-            with open(os.path.join(dir, filename), 'w') as f:
-                f.write(content)
-
-            file_list.refresh(dir, item_type, on_select, on_add)
-            ui.notify(f'File "{filename}" added.', type='positive')
-            on_add(filename)
