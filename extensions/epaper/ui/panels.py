@@ -1,23 +1,25 @@
 """
 Content-only rendering functions shared across the screen and schedule
 editors (screen_editor.py, schedule_editor.py) and the standalone/nice4iot
-entry points: the global settings card, the shared directory_drilldown()
-DrillDownWrapper factory, plus small helpers (_render_row, slide_class)
-used by both editors. No page/route/chrome ownership, so these work
-identically whether called from a standalone @ui.page route
-(ui/standalone.py) or from inside nice4iot's project page / card system
-(extensions/epaper/__init__.py's register(app)).
+entry points: the global settings card, the per-device settings card, the
+shared directory_drilldown() DrillDownWrapper factory, plus small helpers
+(_render_row, slide_class) used by both editors. No page/route/chrome
+ownership, so these work identically whether called from a standalone
+@ui.page route (ui/standalone.py) or from inside nice4iot's project/device
+page / card system (extensions/epaper/__init__.py's register(app)).
 """
 from pathlib import Path
 from typing import Callable, Union
 
-from nicegui import ui
+from nicegui import context, ui
 from babel.dates import format_datetime, get_timezone
 from niceview.dataadapter import DirectoryAdapter, FileEntry
 from niceview.form import ModelForm
 from niceview.modellist import DrillDownWrapper
 
 from extensions.epaper.config import app_config, resource_paths
+from extensions.epaper.core.screen import get_aliases, set_alias
+from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.util import check_filename
 
 # Slide-in-from-left/right for list<->detail switches: screen_editor.py's
@@ -142,6 +144,50 @@ def dashboard_card(num_screens: int, num_schedules: int, open_url: str) -> None:
             ui.label('E-Paper').classes('text-subtitle1 font-bold')
             ui.button(icon='open_in_new').props('flat dense round').on_click(lambda: ui.navigate.to(open_url))
         ui.label(f'{num_screens} screen(s), {num_schedules} schedule(s)').classes('text-caption text-grey-7')
+
+
+async def device_config_card(paths: EpaperPaths, device_name: str, image_base_url: str) -> None:
+    """
+    'general' device settings card content (extensions.epaper.__init__'s
+    register_device_card('general', ..., title='E-Paper') -- no
+    ui.card()/ui.expansion() of its own, same nice4iot chrome contract as
+    global_config_fields()).
+
+    Lets the admin optionally assign one of the project's screens to this
+    device. The assignment is stored as an ordinary alias (paths.alias_file,
+    see core/screen.get_aliases()/set_alias()) keyed by the device's own
+    name -- so the device-specific image URL shown below is just the
+    normal screen image endpoint addressed by device name instead of
+    screen id: the device only ever needs to know its own name, never any
+    screen id, and every existing query parameter/header (color_model,
+    If-None-Match, ...) keeps working unchanged since it's the same route.
+    """
+    screen_names = sorted(p.stem for p in paths.screen_dir.glob('*.json'))
+    aliases = await get_aliases(paths)
+    current_screen = aliases.get(device_name)
+
+    base_url = str(context.client.request.base_url).rstrip('/')
+    image_url = f'{base_url}{image_base_url}/{device_name}/image.png'
+
+    async def on_change(e) -> None:
+        await set_alias(paths, device_name, e.value)
+        ui.notify('Saved', type='positive')
+
+    ui.label('Optionally assign a screen to this device to give it its own image URL below.').classes('text-caption')
+    if current_screen and current_screen not in screen_names:
+        ui.label(f'Assigned screen "{current_screen}" no longer exists.').classes('text-caption text-negative')
+
+    ui.select(
+        screen_names,
+        value=current_screen if current_screen in screen_names else None,
+        label='Screen',
+        clearable=True,
+        on_change=on_change,
+    ).classes('w-full').props('outlined dense')
+
+    with ui.row().classes('w-full items-center gap-2 q-mt-sm'):
+        ui.input(label='Image URL', value=image_url).props('outlined dense readonly').classes('flex-grow')
+        ui.button(icon='content_copy').props('flat dense round').on_click(lambda: ui.clipboard.write(image_url))
 
 
 def global_config_fields(persist: Callable[[], None]) -> None:

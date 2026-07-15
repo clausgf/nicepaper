@@ -166,21 +166,42 @@ def _schedule_changed(paths: EpaperPaths, screen: Screen) -> bool:
     return schedule_mtime != screen.update_schedule.config_mtime
 
 
+async def get_aliases(paths: EpaperPaths) -> dict[str, str]:
+    """
+    All entries in the alias file (name -> screen id), or {} if the file
+    doesn't exist or can't be parsed. Shared by _resolve_alias() below and
+    the device-config UI card (ui/panels.py's device_config_card), which
+    lets a nice4iot device be assigned a screen by writing an alias keyed
+    by the device's own name.
+    """
+    if not paths.alias_file.exists():
+        return {}
+    try:
+        async with aiofiles.open(paths.alias_file, 'r') as f:
+            return json.loads(await f.read())
+    except (OSError, ValueError) as e:
+        logger.warning(f"Error reading alias file {paths.alias_file}: {e}")
+        return {}
+
+
+async def set_alias(paths: EpaperPaths, name: str, screen_id: Optional[str]) -> None:
+    """Set (screen_id given) or remove (screen_id=None) a single alias entry."""
+    aliases = await get_aliases(paths)
+    if screen_id is None:
+        aliases.pop(name, None)
+    else:
+        aliases[name] = screen_id
+    async with aiofiles.open(paths.alias_file, 'w') as f:
+        await f.write(json.dumps(aliases, indent=2))
+
+
 async def _resolve_alias(paths: EpaperPaths, id: str) -> str:
     """
     Resolve a display alias to its target screen id, e.g. so a display
     can be addressed as "hallway" instead of the screen file name. Falls
-    back to the given id unchanged if there is no alias file or no
-    matching entry.
+    back to the given id unchanged if there is no matching entry.
     """
-    if not paths.alias_file.exists():
-        return id
-    try:
-        async with aiofiles.open(paths.alias_file, 'r') as f:
-            aliases = json.loads(await f.read())
-    except (OSError, ValueError) as e:
-        logger.warning(f"Error reading alias file {paths.alias_file}: {e}")
-        return id
+    aliases = await get_aliases(paths)
     return aliases.get(id, id)
 
 

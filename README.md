@@ -164,12 +164,21 @@ This repository serves two purposes from the same code:
     - REST: `/api/ext/epaper/<project>/screens/<id>/image.png`, gated
     by nice4iot's per-project extension activation (General tab →
     Extensions card) before the handler runs.
-  - UI: a dashboard card (screen/schedule counts, link to the full UI)
-    and one dedicated project page (`/<project>/ext/epaper`) with the
-    same Screens/Schedules editing as standalone, as an in-page view
-    switch rather than separate routes (nice4iot allows only one
-    registered page per extension). No built-in login here either —
-    nice4iot's own auth and per-project activation gate access.
+  - UI: a project Dashboard card (screen/schedule counts, link into the
+    Screens tab) plus Screens/Schedules tabs registered via
+    `register_project_tab` on nice4iot's own project page — no separate
+    routes of our own. No built-in login here either — nice4iot's own
+    auth and per-project activation gate access.
+  - Each nice4iot **device**'s General tab gets an "E-Paper" card
+    (`register_device_card('general', ...)`) to optionally assign one of
+    the project's screens to that device. Assigning a screen adds an
+    entry to `<project>/.epaper/aliases.json` keyed by the device's own
+    name (the same alias mechanism described under
+    [Display aliases](#features) above), and the card then shows the
+    resulting device-specific image URL — so the device firmware only
+    ever needs to know its own name, never the screen id, and every
+    existing query parameter/header (`color_model`, `If-None-Match`, ...)
+    keeps working unchanged since it's the same image endpoint.
 
   `extensions/epaper/__init__.py` defers every nice4iot-specific import
   (`app.extensions`, `app.paths`, `app.routes`) into `register()`'s

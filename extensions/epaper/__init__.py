@@ -16,14 +16,17 @@ def register(app: FastAPI) -> None:
     from pathlib import Path
 
     from app.config import app_config as nice4iot_app_config
-    from app.extensions import mount_extension_router, register_global_card, register_project_card, register_project_tab
+    from app.extensions import (
+        mount_extension_router, register_device_card, register_global_card,
+        register_project_card, register_project_tab,
+    )
     from app.paths import extension_project_dir
     from app.routes import project_url
 
     from extensions.epaper.api.endpoints import build_extension_router
     from extensions.epaper.config import load_global_config, save_global_config
     from extensions.epaper.paths import EpaperPaths
-    from extensions.epaper.ui.panels import dashboard_card, global_config_fields
+    from extensions.epaper.ui.panels import dashboard_card, device_config_card, global_config_fields
     from extensions.epaper.ui.schedule_editor import schedules_wrapper
     from extensions.epaper.ui.screen_editor import screens_wrapper
 
@@ -56,6 +59,17 @@ def register(app: FastAPI) -> None:
         dashboard_card(num_screens, num_schedules, project_url(project_name, tab='Screens'))
 
     register_project_card('dashboard', _dashboard_card)
+
+    # --- Device settings card -------------------------------------------
+    # Lets a device be assigned a screen and shows the resulting
+    # device-specific image URL (an alias, keyed by device name, resolved
+    # by the same screens/{id}/image.png route _screens_tab already uses --
+    # see device_config_card()'s docstring in ui/panels.py).
+    def _device_card(project_name: str, device_name: str):
+        paths = _paths_for_project(project_name)
+        return device_config_card(paths, device_name, f'/api/ext/epaper/{project_name}/screens')
+
+    register_device_card('general', _device_card, title='E-Paper')
 
     # --- Project tabs --------------------------------------------------
     # Two tabs on nice4iot's own project page (its tab bar, not ours),
