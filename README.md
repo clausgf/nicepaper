@@ -84,15 +84,13 @@ epaper-nice
 │   └── weather/                  # Open-Meteo forecast cache
 ├── examples                    # example configuration files to copy into data/
 ├── firmware/huffman_de.h       # generated C codebook, see Low-bandwidth rendering
-├── Dockerfile / docker-compose.yml
 └── pyproject.toml / uv.lock
 ```
 
 Everything under `extensions/epaper/` is reusable between standalone and
-extension mode; `main.py`, `data/`, `examples/`, `tests/`,
-`Dockerfile`/`docker-compose.yml` only matter for standalone deployment
-(and aren't part of the wheel — see
-[`pyproject.toml`](pyproject.toml)'s `packages = ["extensions/epaper"]`).
+extension mode; `main.py`, `data/`, `examples/` and `tests/` only matter
+for standalone (development/debugging) use and aren't part of the wheel
+(see [`pyproject.toml`](pyproject.toml)'s `only-include = ["extensions"]`).
 
 ## Installation
 
@@ -141,22 +139,30 @@ uv run uvicorn main:app --reload
 `<id>` is the name of a JSON file in `data/screens` without the
 extension, or an alias from `data/aliases.json`.
 
-Alternatively use Docker: adjust `PUID`/`PGID` in `docker-compose.yml`
-and run `docker compose up --build`.
+This standalone server is for development and debugging only. For a real
+deployment epaper-nice runs as a
+[nice4iot](https://github.com/clausgf/nice4iot) extension (Docker/Compose,
+reverse proxy, ...) — see
+[Standalone vs. nice4iot extension](#standalone-vs-nice4iot-extension) below.
 
 ## Standalone vs. nice4iot extension
 
 This repository serves two purposes from the same code:
 
 - **Standalone** (the above): one fixed data root (`data/`), its own
-  login-free NiceGUI pages (`/ui/screens`, `/ui/schedules`, ...), own
-  Docker deployment. Entry point: `main.py`.
+  login-free NiceGUI pages (`/ui/screens`, `/ui/schedules`, ...). For
+  development and debugging only, not a deployment target. Entry point:
+  `main.py`.
 - **nice4iot extension** (`extensions.epaper`): installed as a normal
   `uv`/pip dependency of a [nice4iot](https://github.com/clausgf/nice4iot)
   deployment (`uv add git+https://.../epaper-nice.git`, matching how
   epaper-nice itself depends on `niceview`). nice4iot discovers and
   calls `extensions/epaper/__init__.py`'s `register(app)` at startup
   (see nice4iot's `docs/extensions.md`); no separate configuration step.
+  Deploying nice4iot with this extension enabled — the Docker/Compose
+  image, reverse-proxy wiring, etc. — is owned by
+  [nice4iot](https://github.com/clausgf/nice4iot) itself (build it with
+  the `epaper` extra: `uv sync --extra epaper`), not by this repository.
   In this mode:
   - Each nice4iot **project** gets its own screens/schedules, stored at
     `<project>/.epaper/` (via `extension_project_dir`), not the shared

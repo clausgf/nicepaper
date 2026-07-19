@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "epaper-nice"
-version = "0.1.0"
+version = "0.9.0"
 description = "Renders screens (e.g. door signs with room calendars) as PNG images for e-paper displays; FastAPI backend with a NiceGUI management UI, installable as a nice4iot extension (extensions.epaper) or run standalone"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -28,6 +28,7 @@ dependencies = [
 dev = [
     "pytest",
     "httpx",
+    "ruff>=0.6",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -66,10 +67,25 @@ only-include = ["extensions"]
 package = false
 
 [tool.uv.sources]
-# pre-1.0, no PyPI release; uv.lock pins the exact commit (same pattern
-# as nice4iot). Re-run 'uv lock --upgrade-package niceview' to pick up
-# upstream changes.
+# no PyPI release yet. Track niceview's git the same way nice4iot does, so
+# epaper-nice's own dev/CI env resolves the same niceview nice4iot pulls in
+# the real (extension) deployment -- note this source only governs *this*
+# repo's standalone/dev/CI: uv does not inherit a dependency's
+# [tool.uv.sources], so when nice4iot consumes epaper-nice, nice4iot's own
+# niceview source/lock wins. uv.lock pins the exact commit for reproducible
+# CI here; re-run 'uv lock --upgrade-package niceview' to move it forward.
 niceview = { git = "https://github.com/clausgf/niceview.git" }
+
+[tool.ruff]
+line-length = 140
+target-version = "py312"
+
+[tool.ruff.lint]
+# Conservative set, matching niceview's: pyflakes (real bugs -- unused
+# imports, undefined names, f-strings without placeholders) plus syntax
+# errors. Style rules are intentionally left off to avoid churn on the
+# existing, deliberately-formatted code.
+select = ["E9", "F"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,5 +1,3 @@
-from typing import Optional, Tuple, List, Literal
-from pydantic import BaseModel
 
 from extensions.epaper.core.drawingcontext import DrawingContext
 from extensions.epaper.models.screenmodel import WidgetModel

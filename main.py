@@ -51,7 +51,6 @@ app = FastAPI(
         "avoid unnecessary downloads. Screens and update schedules are "
         "managed as JSON files via the NiceGUI frontend at `/ui`."
     ),
-    version="0.1.0",
 )
 
 app.include_router(build_standalone_router(STANDALONE_PATHS), prefix="/api")

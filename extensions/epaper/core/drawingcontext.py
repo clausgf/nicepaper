@@ -1,7 +1,7 @@
 import os
 import math
 from typing import Tuple
-from PIL import Image, ImageFont, ImageDraw, ImageColor
+from PIL import Image, ImageFont, ImageDraw
 
 from extensions.epaper.util import logger
 from extensions.epaper.config import resource_paths
