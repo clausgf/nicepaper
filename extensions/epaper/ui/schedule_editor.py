@@ -9,9 +9,7 @@ shared file-list/rename/delete plumbing niceview's DrillDownWrapper now
 owns for both.
 """
 from nicegui import ui
-from niceview.dataadapter import JsonListAdapter
-from niceview.form import ModelForm
-from niceview.modellist import DrillDownWrapper
+from niceview import DrillDownWrapper, JsonListAdapter, ModelForm
 from niceview.util import confirm_dialog
 
 from extensions.epaper.models.updateschedulemodel import WeeklyScheduleModel

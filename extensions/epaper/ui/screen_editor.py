@@ -17,9 +17,7 @@ import os
 
 from nicegui import ui
 from nicegui.events import SortableEventArguments
-from niceview.dataadapter import JsonAdapter, ListAdapter
-from niceview.form import ModelForm
-from niceview.modellist import DrillDownWrapper
+from niceview import DrillDownWrapper, JsonAdapter, ListAdapter, ModelForm
 from niceview.util import confirm_dialog
 
 from extensions.epaper.config import app_config, resource_paths
@@ -214,7 +212,7 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
             ui.label('Appearance').classes('text-subtitle2')
             _render_row(form, 'init_background', 'clipping', 'show_bounding_box', props='dense')
             with ui.row().classes('w-full gap-2'):
-                form.render_field('font_name', widget_type='ui.select', select_options=font_names,
+                form.render_field('font_name', widget_type='ui.select', options=font_names,
                                 props='outlined dense').classes('flex-grow')
                 form.render_field('font_size', props='outlined dense').classes('flex-grow')
 

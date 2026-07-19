@@ -13,9 +13,7 @@ from typing import Callable, Union
 
 from nicegui import context, ui
 from babel.dates import format_datetime, get_timezone
-from niceview.dataadapter import DirectoryAdapter, FileEntry
-from niceview.form import ModelForm
-from niceview.modellist import DrillDownWrapper
+from niceview import DirectoryAdapter, DrillDownWrapper, FileEntry, ModelForm
 
 from extensions.epaper.config import app_config, resource_paths
 from extensions.epaper.core.screen import get_aliases, set_alias
@@ -219,7 +217,7 @@ def global_config_fields(persist: Callable[[], None]) -> None:
 
         ui.label('Font & Colors').classes('text-subtitle2')
         with ui.row().classes('w-full gap-2'):
-            form.render_field('font_name', widget_type='ui.select', select_options=font_names,
+            form.render_field('font_name', widget_type='ui.select', options=font_names,
                                props='outlined dense').classes('flex-grow')
             form.render_field('font_size', props='outlined dense').classes('flex-grow')
         with ui.row().classes('w-full gap-2'):
