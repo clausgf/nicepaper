@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Public-repository metadata: `LICENSE` (AGPL-3.0-or-later), `CONTRIBUTING.md`,
+  `SECURITY.md`, a GitHub Actions CI workflow (ruff + pytest), and `license` /
+  `license-files` / `authors` / `classifiers` fields in `pyproject.toml`.
+
 ### Changed (breaking)
 
 - **Renamed the project from `epaper-nice` to `nicepaper`** and moved the

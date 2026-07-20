@@ -8,6 +8,18 @@ version = "0.9.0"
 description = "Renders screens (e.g. door signs with room calendars) as PNG images for e-paper displays; FastAPI backend with a NiceGUI management UI, installable as a nice4iot extension (extensions.epaper) or run standalone"
 readme = "README.md"
 requires-python = ">=3.12"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [
+    { name = "clausgf" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: FastAPI",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+]
 dependencies = [
     "fastapi",
     "nicegui",
