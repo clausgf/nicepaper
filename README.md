@@ -1,10 +1,3 @@
-> [!IMPORTANT]
-> **This repository has moved to
-> [github.com/clausgf/nicepaper](https://github.com/clausgf/nicepaper)
-> and was renamed from `epaper-nice` to `nicepaper`.**
-> This GitLab copy is no longer maintained — please update your remotes
-> and any `uv`/pip dependency URLs to the new location.
-
 # Nicepaper
 
 A web application that renders screens (e.g. door signs with room
