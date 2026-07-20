@@ -6,7 +6,7 @@ extensions.epaper.* code the nice4iot extension uses (see
 extensions/epaper/__init__.py's register(app) for the extension-mode
 counterpart of this wiring). Not part of the installable extension
 package (see pyproject.toml's only-include=["extensions"]) -- this
-file only matters for running epaper-nice by itself.
+file only matters for running nicepaper by itself.
 """
 from pathlib import Path
 from fastapi import FastAPI
@@ -42,7 +42,7 @@ load_global_config(STANDALONE_PATHS.root / "global_config.json")
 # proxy and the e-paper displays are not browsers, so nothing needs
 # cross-origin access.
 app = FastAPI(
-    title="Epaper Doorsign Manager",
+    title="Nicepaper",
     description=(
         "Renders screens (e.g. door signs with room calendars) as PNG images "
         "for e-paper displays.\n\n"

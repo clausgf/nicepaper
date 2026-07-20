@@ -231,57 +231,6 @@ wheels = [
 ]
 
 [[package]]
-name = "epaper-nice"
-version = "0.9.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "aiofiles" },
-    { name = "aiohttp" },
-    { name = "babel" },
-    { name = "fastapi" },
-    { name = "icalendar" },
-    { name = "nicegui" },
-    { name = "niceview" },
-    { name = "pillow" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "python-dateutil" },
-    { name = "recurring-ical-events" },
-    { name = "uvicorn" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "httpx" },
-    { name = "pytest" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiofiles" },
-    { name = "aiohttp" },
-    { name = "babel" },
-    { name = "fastapi" },
-    { name = "icalendar" },
-    { name = "nicegui" },
-    { name = "niceview", git = "https://github.com/clausgf/niceview.git" },
-    { name = "pillow" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "python-dateutil" },
-    { name = "recurring-ical-events" },
-    { name = "uvicorn" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "httpx" },
-    { name = "pytest" },
-    { name = "ruff", specifier = ">=0.6" },
-]
-
-[[package]]
 name = "fastapi"
 version = "0.139.2"
 source = { registry = "https://pypi.org/simple" }
@@ -819,6 +768,57 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/2a/8a/e477a9d7693b19b6941903b26c3e1525634f077102b3c82599466ca6a643/nicegui-3.14.0.tar.gz", hash = "sha256:d581537545aad191757b668f95612f7362ca50fcfe30e82bd9ca424337c7006e", size = 19621934, upload-time = "2026-06-30T14:40:37.937Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/55/65/2675ae3b9e69d51afbb103a053ce656d555b188b4509add5386b4ad4e5de/nicegui-3.14.0-py3-none-any.whl", hash = "sha256:05b1e453350930b253268edee093bf79cd7b9fe2ffab96043f9234722736652d", size = 20204536, upload-time = "2026-06-30T14:40:33.606Z" },
+]
+
+[[package]]
+name = "nicepaper"
+version = "0.9.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "aiofiles" },
+    { name = "aiohttp" },
+    { name = "babel" },
+    { name = "fastapi" },
+    { name = "icalendar" },
+    { name = "nicegui" },
+    { name = "niceview" },
+    { name = "pillow" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "python-dateutil" },
+    { name = "recurring-ical-events" },
+    { name = "uvicorn" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiofiles" },
+    { name = "aiohttp" },
+    { name = "babel" },
+    { name = "fastapi" },
+    { name = "icalendar" },
+    { name = "nicegui" },
+    { name = "niceview", git = "https://github.com/clausgf/niceview.git" },
+    { name = "pillow" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "python-dateutil" },
+    { name = "recurring-ical-events" },
+    { name = "uvicorn" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "ruff", specifier = ">=0.6" },
 ]
 
 [[package]]

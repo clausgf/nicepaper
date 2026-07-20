@@ -240,7 +240,7 @@ _GENERATED_NOTICE = (
     " * hand, regenerate instead. Fixed German-text Huffman codebook, see\n"
     " * that module's docstring for the wire format this decodes.\n"
     " *\n"
-    " * Decode-only: encoding happens server-side (epaper-nice); firmware\n"
+    " * Decode-only: encoding happens server-side (nicepaper); firmware\n"
     " * only needs to turn received bytes back into a string. */"
 )
 

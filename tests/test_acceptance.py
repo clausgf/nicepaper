@@ -106,4 +106,4 @@ def test_ui_and_api_docs_reachable(client):
     assert r.status_code == 200
     r = client.get("/openapi.json")
     assert r.status_code == 200
-    assert r.json()["info"]["title"] == "Epaper Doorsign Manager"
+    assert r.json()["info"]["title"] == "Nicepaper"

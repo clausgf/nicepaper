@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "epaper-nice"
+name = "nicepaper"
 version = "0.9.0"
 description = "Renders screens (e.g. door signs with room calendars) as PNG images for e-paper displays; FastAPI backend with a NiceGUI management UI, installable as a nice4iot extension (extensions.epaper) or run standalone"
 readme = "README.md"
@@ -57,21 +57,21 @@ dev = [
 only-include = ["extensions"]
 
 [tool.uv]
-# don't build/install epaper-nice's own wheel into its own .venv --
+# don't build/install nicepaper's own wheel into its own .venv --
 # standalone/dev just runs from source (uv run uvicorn main:app), and
 # the Docker image locks+installs *dependencies* before the source is
 # even copied in (see Dockerfile). This is purely local to this repo's
-# own venv: when another project (e.g. nice4iot) adds epaper-nice as a
+# own venv: when another project (e.g. nice4iot) adds nicepaper as a
 # dependency, its own uv build uses [build-system]/[tool.hatch...]
 # above regardless of this flag.
 package = false
 
 [tool.uv.sources]
 # no PyPI release yet. Track niceview's git the same way nice4iot does, so
-# epaper-nice's own dev/CI env resolves the same niceview nice4iot pulls in
+# nicepaper's own dev/CI env resolves the same niceview nice4iot pulls in
 # the real (extension) deployment -- note this source only governs *this*
 # repo's standalone/dev/CI: uv does not inherit a dependency's
-# [tool.uv.sources], so when nice4iot consumes epaper-nice, nice4iot's own
+# [tool.uv.sources], so when nice4iot consumes nicepaper, nice4iot's own
 # niceview source/lock wins. uv.lock pins the exact commit for reproducible
 # CI here; re-run 'uv lock --upgrade-package niceview' to move it forward.
 niceview = { git = "https://github.com/clausgf/niceview.git" }

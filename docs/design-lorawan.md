@@ -8,7 +8,7 @@ generator" below).
 
 ## Motivation
 
-epaper-nice currently renders screens server-side to PNG and serves them
+nicepaper currently renders screens server-side to PNG and serves them
 over HTTP (`/api/screen/{id}/image.png`). That model assumes a display
 with enough network budget to fetch a raster image on every refresh.
 
@@ -123,7 +123,7 @@ small:
 ## Time sync
 
 A separate LoRaWAN channel handles time sync, needed anyway for general
-device/system management (independent of epaper-nice). The device uses
+device/system management (independent of nicepaper). The device uses
 that channel's clock for its local "now", so `now` does not need to be
 part of the calendar payload at all.
 
@@ -232,4 +232,4 @@ Huffman codebook and event-diffing logic in one place.
   updatable remotely, or if a reflash is always acceptable for this
   device class.
 - Bridge deployment: separate process/container, or a small addition
-  to how epaper-nice itself is deployed.
+  to how nicepaper itself is deployed.

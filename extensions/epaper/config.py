@@ -18,7 +18,7 @@ __all__ = ["ColorModel", "GlobalConfig", "app_config", "resource_paths", "load_g
 
 def _resource_dir(name: str) -> str:
     # bundled inside the extensions.epaper package (see pyproject.toml package-data),
-    # so this resolves correctly whether epaper-nice runs standalone (cwd = repo root)
+    # so this resolves correctly whether nicepaper runs standalone (cwd = repo root)
     # or is installed as a dependency inside another process (e.g. nice4iot)
     return str(importlib.resources.files(__package__) / "resources" / name)
 

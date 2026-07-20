@@ -1,4 +1,11 @@
-# Epaper Doorsign Manager
+> [!IMPORTANT]
+> **This repository has moved to
+> [github.com/clausgf/nicepaper](https://github.com/clausgf/nicepaper)
+> and was renamed from `epaper-nice` to `nicepaper`.**
+> This GitLab copy is no longer maintained — please update your remotes
+> and any `uv`/pip dependency URLs to the new location.
+
+# Nicepaper
 
 A web application that renders screens (e.g. door signs with room
 calendars) as PNG images for e-paper displays. It is built with FastAPI
@@ -53,7 +60,7 @@ the content actually changed.
 ## Project structure
 
 ```
-epaper-nice
+nicepaper
 ├── main.py                     # standalone entry point (uvicorn main:app);
 │                                # NOT part of the installable extension package
 ├── extensions/epaper           # the installable package (extensions.epaper)
@@ -140,7 +147,7 @@ uv run uvicorn main:app --reload
 extension, or an alias from `data/aliases.json`.
 
 This standalone server is for development and debugging only. For a real
-deployment epaper-nice runs as a
+deployment nicepaper runs as a
 [nice4iot](https://github.com/clausgf/nice4iot) extension (Docker/Compose,
 reverse proxy, ...) — see
 [Standalone vs. nice4iot extension](#standalone-vs-nice4iot-extension) below.
@@ -155,8 +162,8 @@ This repository serves two purposes from the same code:
   `main.py`.
 - **nice4iot extension** (`extensions.epaper`): installed as a normal
   `uv`/pip dependency of a [nice4iot](https://github.com/clausgf/nice4iot)
-  deployment (`uv add git+https://.../epaper-nice.git`, matching how
-  epaper-nice itself depends on `niceview`). nice4iot discovers and
+  deployment (`uv add git+https://github.com/clausgf/nicepaper.git`,
+  matching how nicepaper itself depends on `niceview`). nice4iot discovers and
   calls `extensions/epaper/__init__.py`'s `register(app)` at startup
   (see nice4iot's `docs/extensions.md`); no separate configuration step.
   Deploying nice4iot with this extension enabled — the Docker/Compose

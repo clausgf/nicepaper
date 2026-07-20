@@ -34,7 +34,7 @@ def frame(active_tab: str):
             ui.navigate.to(TAB_ROUTES[e.value])
 
     with ui.header(elevated=True).style('background-color: #3874c8').classes('items-center justify-between'):
-        ui.label('Epaper Doorsign Manager').classes('font-bold')
+        ui.label('Nicepaper').classes('font-bold')
         with ui.tabs(value=active_tab, on_change=on_tab_change).props('dense indicator-color=white').classes('text-white'):
             ui.tab('Global')
             ui.tab('Screens')
