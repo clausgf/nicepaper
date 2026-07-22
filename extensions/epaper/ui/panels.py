@@ -233,7 +233,11 @@ def global_config_fields(persist: Callable[[], None]) -> None:
         _render_row(form, 'roomcalendar_date_format_long', 'roomcalendar_date_format_short', 'roomcalendar_time_format')
 
         ui.label('Weather').classes('text-subtitle2')
-        form.render_field('weather_update_interval_s', props='outlined dense').classes('w-full')
+        with ui.row().classes('w-full gap-2'):
+            form.render_field('weather_update_interval_s', props='outlined dense').classes('flex-grow')
+            form.render_field('wind_speed_unit', widget_type='ui.select',
+                               options=['kmh', 'ms', 'mph', 'kn'],
+                               props='outlined dense').classes('flex-grow')
         form.render_field('weather_error', props='outlined dense').classes('w-full')
 
         form.render_nonfield_errors()

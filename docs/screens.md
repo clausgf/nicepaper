@@ -20,6 +20,9 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   list of further ones. `room_number`/`room_name` label the screen.
 - **`WeatherNow`** / **`WeatherForecast`** / **`WeatherChart`** — current
   conditions, an hourly forecast strip, and one configurable bar/line chart.
+  `WeatherNow` shows temperature, the condition, and wind (speed, direction as
+  an 8-point compass, and gusts). Its text language follows `LOCALE` and the
+  wind-speed unit follows `WIND_SPEED_UNIT` (see [Configuration](configuration.md)).
   In `WeatherChart`, `primary_metric` is always shown and `secondary_metric`
   is optional on its own right Y axis (e.g. temperature + precipitation
   combined). All three are backed by [Open-Meteo](https://open-meteo.com)

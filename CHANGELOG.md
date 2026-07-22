@@ -4,6 +4,14 @@
 
 ### Added
 
+- `WeatherNow` now shows wind direction (localized 8-point compass) and gusts
+  alongside the wind speed, and its description/wind text is localized: the
+  language follows the existing `locale` setting (`de`/`en`, English fallback),
+  covering the WMO descriptions, the `Wind`/`Gusts` labels and the compass
+  points.
+- New `wind_speed_unit` global-config field (`kmh`, `ms`, `mph`, `kn`) selecting
+  the unit `WeatherNow` renders wind speed in. Open-Meteo is always fetched in
+  km/h and converted locally, so changing the unit needs no refetch.
 - Public-repository metadata: `LICENSE` (AGPL-3.0-or-later), `CONTRIBUTING.md`,
   `SECURITY.md`, a GitHub Actions CI workflow (ruff + pytest), and `license` /
   `license-files` / `authors` / `classifiers` fields in `pyproject.toml`.

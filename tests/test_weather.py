@@ -4,27 +4,77 @@ import json
 from zoneinfo import ZoneInfo
 
 from extensions.epaper.config import app_config
-from extensions.epaper.core.datasources.weather import WMO_CODES, get_weather, weather_icon_and_description
+import pytest
+
+from extensions.epaper.core.datasources.weather import (
+    WMO_DESCRIPTIONS, WMO_ICONS, format_wind_speed, get_weather,
+    weather_icon_and_description, wind_direction_label, wind_labels,
+)
 
 
-def test_wmo_codes_have_day_and_night_icons():
-    for code, (day_icon, night_icon, description) in WMO_CODES.items():
+def test_wmo_icons_have_day_and_night_variants():
+    for code, (day_icon, night_icon) in WMO_ICONS.items():
         assert day_icon, f"missing day icon for code {code}"
         assert night_icon, f"missing night icon for code {code}"
-        assert description
 
 
-def test_weather_icon_and_description_resolves_day_and_night():
+def test_wmo_descriptions_cover_same_codes_in_every_language():
+    codes = set(WMO_ICONS)
+    for lang, table in WMO_DESCRIPTIONS.items():
+        assert set(table) == codes, f"language {lang} does not cover all WMO codes"
+        assert all(text for text in table.values())
+
+
+def test_weather_icon_and_description_resolves_day_and_night(monkeypatch):
+    monkeypatch.setattr(app_config, "locale", "de_DE.utf8")
     day_icon, description = weather_icon_and_description(0, True)
     night_icon, _ = weather_icon_and_description(0, False)
     assert day_icon != night_icon
     assert description == "Klarer Himmel"
 
 
-def test_weather_icon_and_description_unknown_code_falls_back():
+def test_weather_description_follows_locale(monkeypatch):
+    monkeypatch.setattr(app_config, "locale", "en_US.utf8")
+    _, description = weather_icon_and_description(0, True)
+    assert description == "Clear sky"
+    assert wind_labels()["gusts"] == "Gusts"
+    assert wind_direction_label(90) == "E"
+
+
+def test_weather_description_unknown_locale_falls_back_to_english(monkeypatch):
+    monkeypatch.setattr(app_config, "locale", "xx_XX")
+    _, description = weather_icon_and_description(0, True)
+    assert description == "Clear sky"
+
+
+def test_weather_icon_and_description_unknown_code_falls_back(monkeypatch):
+    monkeypatch.setattr(app_config, "locale", "de_DE.utf8")
     icon, description = weather_icon_and_description(-1, True)
     assert icon
     assert description == "Unbekannt"
+
+
+@pytest.mark.parametrize("unit,kmh,expected", [
+    ("kmh", 36.0, ("36", "km/h")),
+    ("ms", 36.0, ("10", "m/s")),
+    ("mph", 16.09344, ("10", "mph")),
+    ("kn", 18.52, ("10", "kn")),
+])
+def test_format_wind_speed_converts_and_labels(monkeypatch, unit, kmh, expected):
+    monkeypatch.setattr(app_config, "wind_speed_unit", unit)
+    assert format_wind_speed(kmh) == expected
+
+
+def test_wind_direction_label_maps_bearings_to_compass(monkeypatch):
+    monkeypatch.setattr(app_config, "locale", "de_DE.utf8")
+    assert wind_direction_label(0) == "N"
+    assert wind_direction_label(90) == "O"
+    assert wind_direction_label(180) == "S"
+    assert wind_direction_label(270) == "W"
+    assert wind_direction_label(45) == "NO"
+    # rounds to the nearest 45° sector and wraps past 360°
+    assert wind_direction_label(20) == "N"
+    assert wind_direction_label(340) == "N"
 
 
 def test_get_weather_uses_cache_without_network_call(tmp_path):

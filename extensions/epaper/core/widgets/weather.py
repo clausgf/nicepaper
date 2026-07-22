@@ -2,7 +2,9 @@ from typing import Optional, Union
 
 from extensions.epaper.config import app_config
 from extensions.epaper.core import charting
-from extensions.epaper.core.datasources.weather import get_weather, weather_icon_and_description
+from extensions.epaper.core.datasources.weather import (
+    format_wind_speed, get_weather, weather_icon_and_description, wind_direction_label, wind_labels,
+)
 from extensions.epaper.models.screenmodel import (
     WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
 )
@@ -63,15 +65,28 @@ class WeatherNowWidget(_WeatherWidgetBase):
 
         ctx.draw_text((0, 0), size=(icon_size, h), text=icon, alignment='cc', font=icon_font)
 
-        info_x = icon_size
-        info_w = max(0, w - icon_size)
+        # nudge the text block clear of the icon's right edge
+        info_x = icon_size + 2
+        info_w = max(0, w - info_x)
         temp_text = f"{current['temperature_2m']:.0f}°C"
         ctx.draw_text((info_x, 0), size=(info_w, h // 2), text=temp_text, alignment='lc', font=temp_font)
-        ctx.draw_text((info_x, h // 2), size=(info_w, h // 4), text=description,
-                      alignment='lt', font=self.font, ellipsis='...')
-        wind_text = f"Wind {current['wind_speed_10m']:.0f} km/h"
-        ctx.draw_text((info_x, h - h // 4), size=(info_w, h // 4), text=wind_text,
-                      alignment='lb', font=self.font, ellipsis='...')
+
+        # stack description + wind lines below the temperature with a line
+        # height derived from the font size, so the spacing stays constant
+        # instead of being spread across whatever the box height happens to be
+        labels = wind_labels()
+        speed, unit = format_wind_speed(current["wind_speed_10m"])
+        wind_text = f"{labels['wind']} {speed} {unit} {wind_direction_label(current['wind_direction_10m'])}"
+        gusts = current.get("wind_gusts_10m")
+        if gusts is not None:
+            gust_speed, _ = format_wind_speed(gusts)
+            wind_text += f", {labels['gusts']} {gust_speed}"
+        line_h = round(self.font.size * 1.3)
+        y = h // 2
+        for line in (description, wind_text):
+            ctx.draw_text((info_x, y), size=(info_w, line_h), text=line,
+                          alignment='lt', font=self.font, ellipsis='...')
+            y += line_h
 
 
 class WeatherForecastWidget(_WeatherWidgetBase):

@@ -19,11 +19,17 @@ screen.
 
 - `STORAGE_SECRET` — secret for NiceGUI browser session storage.
 - `LOCALE`, `TIMEZONE`, `DATE_FORMAT`, `TIME_FORMAT` — defaults used where a
-  screen/widget doesn't set its own.
+  screen/widget doesn't set its own. `LOCALE` additionally selects the language
+  of the `WeatherNow` texts (its first two letters, e.g. `de_DE.utf8` → German,
+  otherwise English): the weather descriptions, the `Wind`/`Gusts` labels and
+  the compass points.
 - `ICAL_UPDATE_INTERVAL_S`, `ICAL_MAX_DAYS` — iCal feed polling/lookahead for
   the `RoomCalendar` widget.
 - `WEATHER_UPDATE_INTERVAL_S` — Open-Meteo polling interval for the `Weather*`
   widgets.
+- `WIND_SPEED_UNIT` — unit `WeatherNow` shows wind speed/gusts in: `kmh`
+  (default), `ms`, `mph` or `kn` (knots). Open-Meteo is always fetched in km/h
+  and converted locally, so changing this takes effect without a refetch.
 - `COLOR_ACCENT` — RGB color the chart widgets use for their primary data
   series (defaults to red, the only accent the `bwr` color model has).
 

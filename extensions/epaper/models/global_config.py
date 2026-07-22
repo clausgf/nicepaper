@@ -51,6 +51,15 @@ class GlobalConfig(BaseModel):
 
     weather_update_interval_s: int = 900
     weather_error: str = "Fehler beim Abrufen der Wetterdaten"
+    wind_speed_unit: str = Field(
+        default="kmh",
+        description=(
+            "Unit the WeatherNow widget shows wind speed in: kmh, ms, mph or "
+            "kn (knots). Open-Meteo is always fetched in km/h and converted "
+            "locally, so changing this needs no refetch. Weather description "
+            "language follows the 'locale' field (de/en)."
+        ),
+    )
 
     locale: str = 'de_DE.utf8'
     timezone: str = 'Europe/Berlin'
