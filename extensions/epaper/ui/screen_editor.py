@@ -14,6 +14,7 @@ since niceview's DrillDownWrapper doesn't own routes of its own and
 standalone mode doesn't need one (see standalone.py).
 """
 import os
+from typing import Optional
 
 from nicegui import ui
 from nicegui.events import SortableEventArguments
@@ -65,10 +66,35 @@ def _widget_label(widget: WidgetModel) -> str:
         return widget.room_name or widget.room_number or '(room calendar)'
     if isinstance(widget, WeatherChartWidgetModel):
         metrics = widget.primary_metric + (f' + {widget.secondary_metric}' if widget.secondary_metric else '')
-        return metrics
+        return f'{widget.latitude:.2f}, {widget.longitude:.2f} · {metrics}'
     if isinstance(widget, (WeatherNowWidgetModel, WeatherForecastWidgetModel)):
         return f'{widget.latitude:.2f}, {widget.longitude:.2f}'
     return widget.widget_type
+
+
+def _schedule_ids(paths: EpaperPaths) -> list[str]:
+    """Existing schedule ids (schedule file names without .json)."""
+    return sorted(p.stem for p in paths.schedule_dir.glob('*.json'))
+
+
+def _missing_schedule_message(paths: EpaperPaths, update_schedule_id: Optional[str]) -> Optional[str]:
+    """A warning message if update_schedule_id points at a schedule file that
+    doesn't exist, else None. An empty id means 'no schedule' (intentional,
+    not a warning), matching get_schedule_by_id()."""
+    if update_schedule_id and not (paths.schedule_dir / f'{update_schedule_id}.json').is_file():
+        return f'Update schedule "{update_schedule_id}" not found — this screen won\'t be re-rendered on a schedule.'
+    return None
+
+
+def _screen_row_warning(paths: EpaperPaths, screen_key: str) -> Optional[str]:
+    """Warning for a screen list row: flags a dangling update_schedule_id.
+    Reads the screen file the same way it's loaded for rendering, so the
+    effective update_schedule_id default ('default') is applied too."""
+    try:
+        screen = JsonAdapter(ScreenModel, paths.screen_dir / f'{screen_key}.json').read()
+    except Exception:
+        return None  # an unreadable/invalid screen file is a different concern
+    return _missing_schedule_message(paths, screen.update_schedule_id)
 
 
 def _default_widget(widget_type: str) -> WidgetModel:
@@ -158,9 +184,27 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
         with ui.card().tight().classes('w-full'):
             with ui.expansion('Screen Settings', value=False).classes('w-full q-mb-none').props('dense header-class="text-subtitle1"'):
                 screen_form = ModelForm.from_item(screen, exclude=['widgets'], on_change=lambda e: persist_screen())
+                schedule_ids = _schedule_ids(paths)
+                # keep a dangling current value selectable so it isn't silently
+                # dropped by the select (and stays visible + flagged)
+                schedule_options = schedule_ids + (
+                    [screen.update_schedule_id]
+                    if screen.update_schedule_id and screen.update_schedule_id not in schedule_ids else [])
+
+                @ui.refreshable
+                def schedule_warning() -> None:
+                    message = _missing_schedule_message(paths, screen.update_schedule_id)
+                    if message:
+                        ui.label(message).classes('text-caption text-negative')
+
                 with ui.column().classes('w-full gap-2'):
                     _render_row(screen_form, 'width', 'height')
-                    _render_row(screen_form, 'update_schedule_id')
+                    with ui.row().classes('w-full gap-2'):
+                        screen_form.render_field(
+                            'update_schedule_id', widget_type='ui.select', options=schedule_options,
+                            props='outlined dense clearable').classes('flex-grow').on(
+                            'update:model-value', lambda: schedule_warning.refresh())
+                    schedule_warning()
 
         with ui.card().classes('w-full'):
             with ui.row().classes('w-full items-center justify-between'):
@@ -180,8 +224,8 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
                             with ui.row().classes('items-center gap-2 flex-grow cursor-pointer').on(
                                     'click', lambda _, k=key: _open_detail(k)):
                                 ui.icon(WIDGET_ICONS[widget.widget_type])
-                                ui.label(_widget_label(widget))
-                            ui.badge(widget.widget_type).props('outline')
+                                ui.badge(widget.widget_type).props('outline')
+                                ui.label(_widget_label(widget)).classes('text-grey-8')
                             ui.button(icon='delete').props('flat dense color=negative').on_click(
                                 lambda _, k=key: _delete_widget(k))
             widget_list_container.make_sortable(handle='.drag-handle', on_end=_handle_reorder)
@@ -302,4 +346,5 @@ def screens_wrapper(paths: EpaperPaths, image_base_url: str) -> DrillDownWrapper
         default_content=lambda: ScreenModel(width=800, height=480).model_dump_json(indent=2),
         title='Screens',
         render_content=lambda filename: screen_editor_content(paths, filename, image_base_url),
+        row_warning=lambda key: _screen_row_warning(paths, key),
     )

@@ -25,7 +25,8 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   wind-speed unit follows `WIND_SPEED_UNIT` (see [Configuration](configuration.md)).
   In `WeatherChart`, `primary_metric` is always shown and `secondary_metric`
   is optional on its own right Y axis (e.g. temperature + precipitation
-  combined). All three are backed by [Open-Meteo](https://open-meteo.com)
+  combined). Available metrics are `temperature`, `precipitation`, `humidity`,
+  `pressure` and `wind` (the wind series honours `WIND_SPEED_UNIT`). All three are backed by [Open-Meteo](https://open-meteo.com)
   (no API key needed; the DWD ICON model for German/European locations) and
   are placed by `latitude`/`longitude`. Icons reuse the bundled
   `fa-solid-900.ttf` (no extra font/image assets). Charts are hand-drawn with
@@ -64,6 +65,14 @@ re-rendered. Screens reference one by `update_schedule_id` (default:
 `"default"`, so most setups need a `default.json`). The management UI edits a
 schedule as one card per weekly rule with weekday checkboxes, a month
 multiselect, and time chips.
+
+Leaving `update_schedule_id` empty means the screen has no schedule and is only
+re-rendered on request or when a widget provides its own expiry (e.g. a
+`RoomCalendar`'s next event). A *non-empty* `update_schedule_id` that points at
+a missing schedule file is a dangling reference: the screen still renders but
+isn't re-rendered on a schedule. This is flagged in the management UI (an inline
+warning in the screen editor and a warning icon in the screen list) and logged
+at `warning` level, rather than failing silently.
 
 ## Examples
 

@@ -75,3 +75,20 @@ def test_get_schedule_by_id_returns_none_for_missing_file(tmp_path):
     paths = EpaperPaths(root=tmp_path)
     paths.ensure_dirs()
     assert asyncio.run(get_schedule_by_id(paths, "does-not-exist")) is None
+
+
+def test_get_schedule_by_id_warns_on_dangling_reference(tmp_path, caplog):
+    paths = EpaperPaths(root=tmp_path)
+    paths.ensure_dirs()
+    with caplog.at_level("WARNING"):
+        assert asyncio.run(get_schedule_by_id(paths, "does-not-exist")) is None
+    assert any("does-not-exist" in r.message and r.levelname == "WARNING" for r in caplog.records)
+
+
+def test_get_schedule_by_id_empty_id_is_silent(tmp_path, caplog):
+    paths = EpaperPaths(root=tmp_path)
+    paths.ensure_dirs()
+    with caplog.at_level("WARNING"):
+        assert asyncio.run(get_schedule_by_id(paths, "")) is None
+        assert asyncio.run(get_schedule_by_id(paths, None)) is None
+    assert not caplog.records  # empty/None id means 'no schedule', not an error

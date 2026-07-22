@@ -2,8 +2,14 @@
 
 ## Unreleased
 
+## 0.10.0 — 2026-07-22
+
 ### Added
 
+- `WeatherChart` gains a `wind` metric (hourly wind speed), selectable as the
+  primary or secondary series like the existing temperature/precipitation/
+  humidity/pressure metrics. The series is converted to the configured
+  `wind_speed_unit`.
 - `WeatherNow` now shows wind direction (localized 8-point compass) and gusts
   alongside the wind speed, and its description/wind text is localized: the
   language follows the existing `locale` setting (`de`/`en`, English fallback),
@@ -15,6 +21,21 @@
 - Public-repository metadata: `LICENSE` (AGPL-3.0-or-later), `CONTRIBUTING.md`,
   `SECURITY.md`, a GitHub Actions CI workflow (ruff + pytest), and `license` /
   `license-files` / `authors` / `classifiers` fields in `pyproject.toml`.
+
+### Changed
+
+- A screen whose `update_schedule_id` points at a missing schedule file is now
+  surfaced instead of failing silently: the screen editor shows the field as a
+  dropdown of existing schedules with an inline warning for a dangling
+  reference, the screen list marks such screens with a warning icon, and
+  `get_schedule_by_id()` logs the dangling reference at `warning` level. An
+  empty `update_schedule_id` (intentionally no schedule) stays silent.
+- Widget editor: a half-set widget size (only width *or* only height) is now a
+  validation error instead of being silently ignored — width and height only
+  take effect together; leave both empty for automatic sizing.
+- Widget list rows now show the type badge up front (after the icon), followed
+  by the detail (coordinates for the weather widgets, plus the metric(s) for
+  `WeatherChart`), with the delete button right-aligned.
 
 ### Changed (breaking)
 

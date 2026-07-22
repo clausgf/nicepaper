@@ -1,6 +1,6 @@
 import datetime
 from typing import Annotated, List, Optional, Tuple, Union, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 _DateFormatField = Annotated[
     Optional[str],
@@ -42,13 +42,27 @@ class WidgetModel(BaseModel):
     # properties for the drawing code, not part of the JSON schema.
     position_x: int = Field(description="Horizontal position in pixels from the left edge.")
     position_y: int = Field(description="Vertical position in pixels from the top edge.")
-    size_width: Optional[int] = Field(default=None, description="0 or empty for automatic width.")
-    size_height: Optional[int] = Field(default=None, description="0 or empty for automatic height.")
+    size_width: Optional[int] = Field(default=None, description="Widget width in pixels. Width and height only take effect together; leave both empty (or 0) for automatic sizing.")
+    size_height: Optional[int] = Field(default=None, description="Widget height in pixels. Width and height only take effect together; leave both empty (or 0) for automatic sizing.")
     init_background: Optional[bool] = True
     clipping: Optional[bool] = Field(default=False, description="Cut off content that overflows this widget's size instead of letting it bleed into neighboring widgets.")
     show_bounding_box: Optional[bool] = Field(default=False, description="Draw an outline around this widget's box. Useful while laying out a screen.")
     font_name: Optional[str] = Field(default=None, description="Font file name. Leave empty to use the screen's default font.")
     font_size: Optional[int] = Field(default=None, description="Font size in points. 0 or empty to use the screen's default font.")
+
+    @model_validator(mode='after')
+    def _check_size_pair(self) -> 'WidgetModel':
+        # size is all-or-nothing (see the size property): a widget is either
+        # fully auto-sized (both empty/0) or has a fixed box (both set). A
+        # half-filled size used to be silently dropped -- setting only the
+        # width had no effect at all -- so reject it here instead, surfacing
+        # a visible error in the editor rather than a mystery. bool() treats
+        # both None and the 0 that a cleared ui.number round-trips as as
+        # "empty", matching the size property below.
+        if bool(self.size_width) != bool(self.size_height):
+            raise ValueError(
+                "Set width and height together, or leave both empty for automatic sizing.")
+        return self
 
     @property
     def position(self) -> Tuple[int, int]:
@@ -118,7 +132,7 @@ class WeatherForecastWidgetModel(WeatherWidgetModel):
     forecast_hours: int = Field(default=24, description="How many hours ahead the forecast strip covers.")
 
 
-WeatherMetric = Literal["temperature", "precipitation", "humidity", "pressure"]
+WeatherMetric = Literal["temperature", "precipitation", "humidity", "pressure", "wind"]
 
 
 class WeatherChartWidgetModel(WeatherWidgetModel):

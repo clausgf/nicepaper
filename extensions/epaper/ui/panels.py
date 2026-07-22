@@ -9,7 +9,7 @@ ownership, so these work identically whether called from a standalone
 page / card system (extensions/epaper/__init__.py's register(app)).
 """
 from pathlib import Path
-from typing import Callable, Union
+from typing import Callable, Optional, Union
 
 from nicegui import context, ui
 from babel.dates import format_datetime, get_timezone
@@ -68,7 +68,8 @@ def _entry_caption(item: FileEntry) -> str:
 
 
 def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[], str]],
-                         title: str, render_content: Callable[[str], None]) -> DrillDownWrapper:
+                         title: str, render_content: Callable[[str], None],
+                         row_warning: Optional[Callable[[str], Optional[str]]] = None) -> DrillDownWrapper:
     """
     Shared DrillDownWrapper wiring for a directory of JSON files, used
     identically by screen_editor.screens_wrapper() and
@@ -83,6 +84,13 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
     screen_editor_content(paths, filename, image_base_url) with paths/
     image_base_url already bound by the caller); this function only owns
     the file-level list<->editor chrome around it.
+
+    row_warning(key) is an optional, purely presentational hook: given a
+    file's key (name without .json) it returns a message to show as a
+    warning icon + tooltip on that list row, or None for no warning. Used by
+    the screens list to flag a screen whose update_schedule_id points at a
+    missing schedule file; this function stays generic and knows nothing
+    about screen semantics.
     """
     directory = DirectoryAdapter(dir_path, default_content=default_content)
 
@@ -97,6 +105,10 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
             with ui.item_section():
                 ui.item_label(item.name)
                 ui.item_label(_entry_caption(item)).props('caption').classes('italic')
+            warning = row_warning(key) if row_warning else None
+            if warning:
+                with ui.item_section().props('side'):
+                    ui.icon('warning', color='warning').tooltip(warning)
 
     def render_detail(adapter: DirectoryAdapter, key: str, set_key) -> None:
         def do_rename() -> None:

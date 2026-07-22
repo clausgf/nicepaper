@@ -7,7 +7,7 @@ from extensions.epaper.config import app_config
 import pytest
 
 from extensions.epaper.core.datasources.weather import (
-    WMO_DESCRIPTIONS, WMO_ICONS, format_wind_speed, get_weather,
+    WMO_DESCRIPTIONS, WMO_ICONS, convert_wind_speed, format_wind_speed, get_weather,
     weather_icon_and_description, wind_direction_label, wind_labels,
 )
 
@@ -63,6 +63,22 @@ def test_weather_icon_and_description_unknown_code_falls_back(monkeypatch):
 def test_format_wind_speed_converts_and_labels(monkeypatch, unit, kmh, expected):
     monkeypatch.setattr(app_config, "wind_speed_unit", unit)
     assert format_wind_speed(kmh) == expected
+
+
+def test_chart_metric_maps_cover_every_weather_metric():
+    from typing import get_args
+    from extensions.epaper.core.widgets.weather import _METRIC_FIELD, _METRIC_KIND
+    from extensions.epaper.models.screenmodel import WeatherMetric
+    metrics = set(get_args(WeatherMetric))
+    assert set(_METRIC_FIELD) == metrics
+    assert set(_METRIC_KIND) == metrics
+
+
+def test_convert_wind_speed_uses_configured_unit(monkeypatch):
+    monkeypatch.setattr(app_config, "wind_speed_unit", "kn")
+    assert round(convert_wind_speed(18.52), 2) == 10.0
+    monkeypatch.setattr(app_config, "wind_speed_unit", "kmh")
+    assert convert_wind_speed(36.0) == 36.0
 
 
 def test_wind_direction_label_maps_bearings_to_compass(monkeypatch):

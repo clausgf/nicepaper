@@ -45,6 +45,23 @@ def test_screen_model_missing_size():
         ScreenModel(widgets=[])
 
 
+def test_widget_size_both_set_or_both_empty_is_valid():
+    fixed = TextWidgetModel(position_x=0, position_y=0, size_width=100, size_height=200, text="x")
+    assert fixed.size == (100, 200)
+    auto = TextWidgetModel(position_x=0, position_y=0, text="x")
+    assert auto.size is None
+    # a cleared ui.number round-trips as 0, which counts as automatic too
+    zeroed = TextWidgetModel(position_x=0, position_y=0, size_width=0, size_height=0, text="x")
+    assert zeroed.size is None
+
+
+@pytest.mark.parametrize("width,height", [(200, None), (None, 300), (200, 0), (0, 300)])
+def test_widget_half_set_size_is_rejected(width, height):
+    with pytest.raises(ValidationError, match="together"):
+        TextWidgetModel(position_x=0, position_y=0,
+                        size_width=width, size_height=height, text="x")
+
+
 def test_screen_model_invalid_widget_type():
     invalid_data = {
         "width": 400,
@@ -131,10 +148,10 @@ def test_widget_size_zero_means_automatic_too():
     """niceview's ui.number has no clean 'empty' state for Optional[int]:
     clearing the field in the browser round-trips as 0, not None. 0 must
     behave exactly like unset, or auto-sizing silently breaks the moment
-    a user touches the field without typing a replacement value."""
+    a user touches the field without typing a replacement value. (A
+    half-set size -- only one of width/height -- is a validation error, see
+    test_widget_half_set_size_is_rejected.)"""
     widget = TextWidgetModel(position_x=0, position_y=0, text="x", size_width=0, size_height=0)
-    assert widget.size is None
-    widget = TextWidgetModel(position_x=0, position_y=0, text="x", size_width=100, size_height=0)
     assert widget.size is None
     widget = TextWidgetModel(position_x=0, position_y=0, text="x", size_width=100, size_height=50)
     assert widget.size == (100, 50)
@@ -187,6 +204,12 @@ def test_weather_chart_widget_combined_metrics():
                                       primary_metric="precipitation", secondary_metric="temperature")
     assert widget.primary_metric == "precipitation"
     assert widget.secondary_metric == "temperature"
+
+
+def test_weather_chart_widget_accepts_wind_metric():
+    widget = WeatherChartWidgetModel(position_x=0, position_y=0, latitude=52.52, longitude=13.405,
+                                      primary_metric="wind", secondary_metric="temperature")
+    assert widget.primary_metric == "wind"
 
 
 @pytest.mark.parametrize("widget_type,model_cls,extra", [

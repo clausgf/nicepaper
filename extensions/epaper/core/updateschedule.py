@@ -46,17 +46,32 @@ class UpdateSchedule:
 
 async def get_schedule_by_id(paths: EpaperPaths, schedule_id: str) -> UpdateSchedule:
     """
-    Get a schedule instance by its id. The schedule file is a plain JSON
-    list of weekly schedule rules (List[WeeklyScheduleModel]).
+    Get a schedule instance by its id, or None. The schedule file is a plain
+    JSON list of weekly schedule rules (List[WeeklyScheduleModel]).
+
+    An empty/None schedule_id means the screen intentionally has no update
+    schedule (see ScreenModel.update_schedule_id) -- that is not an error and
+    is returned silently. A non-empty id whose file is missing or invalid is a
+    dangling reference: the screen still renders but won't be re-rendered on a
+    schedule, so it is logged as a warning (see also the editor, which flags
+    such references inline and in the screen list).
     """
+    if not schedule_id:
+        return None
+
     schedule_model_file = paths.schedule_dir / f"{schedule_id}.json"
+    if not schedule_model_file.is_file():
+        logger.warning(
+            f"Update schedule '{schedule_id}' is referenced but {schedule_model_file} is missing; "
+            f"the screen will not be re-rendered on a schedule.")
+        return None
     try:
         async with aiofiles.open(schedule_model_file, 'r') as f:
             j = json.loads(await f.read())
         schedules = _schedules_adapter.validate_python(j)
         config_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(schedule_model_file), tz=ZoneInfo("UTC"))
     except Exception as e:
-        logger.info(f"Error reading schedule model file {schedule_model_file}: {e}")
+        logger.warning(f"Update schedule '{schedule_id}' file {schedule_model_file} is invalid: {e}")
         return None
 
     return UpdateSchedule(schedule_id, schedules, config_mtime)

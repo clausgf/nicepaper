@@ -149,11 +149,24 @@ WIND_SPEED_UNITS: dict[str, tuple[str, float]] = {
 }
 
 
+def convert_wind_speed(kmh: float) -> float:
+    """Convert a km/h wind speed to GlobalConfig.wind_speed_unit's numeric
+    value (unknown units fall back to km/h). Used both for the WeatherNow
+    label and the WeatherChart 'wind' series."""
+    _, divisor = WIND_SPEED_UNITS.get(app_config.wind_speed_unit, WIND_SPEED_UNITS["kmh"])
+    return kmh / divisor
+
+
+def wind_speed_unit_suffix() -> str:
+    """Display suffix (e.g. 'km/h', 'kn') for the configured wind speed unit."""
+    suffix, _ = WIND_SPEED_UNITS.get(app_config.wind_speed_unit, WIND_SPEED_UNITS["kmh"])
+    return suffix
+
+
 def format_wind_speed(kmh: float) -> tuple[str, str]:
     """(rounded value string, unit suffix) for a km/h wind speed, converted to
     GlobalConfig.wind_speed_unit. Unknown units fall back to km/h."""
-    suffix, divisor = WIND_SPEED_UNITS.get(app_config.wind_speed_unit, WIND_SPEED_UNITS["kmh"])
-    return f"{kmh / divisor:.0f}", suffix
+    return f"{convert_wind_speed(kmh):.0f}", wind_speed_unit_suffix()
 
 
 _session: aiohttp.ClientSession | None = None
@@ -199,7 +212,7 @@ async def get_weather(weather_dir: Path, latitude: float, longitude: float) -> d
         "latitude": latitude,
         "longitude": longitude,
         "current": "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,is_day,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure",
-        "hourly": "temperature_2m,precipitation,relative_humidity_2m,surface_pressure,weather_code,is_day",
+        "hourly": "temperature_2m,precipitation,relative_humidity_2m,surface_pressure,wind_speed_10m,weather_code,is_day",
         "forecast_days": 2,
         "timezone": app_config.timezone,
     }

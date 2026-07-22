@@ -3,7 +3,8 @@ from typing import Optional, Union
 from extensions.epaper.config import app_config
 from extensions.epaper.core import charting
 from extensions.epaper.core.datasources.weather import (
-    format_wind_speed, get_weather, weather_icon_and_description, wind_direction_label, wind_labels,
+    convert_wind_speed, format_wind_speed, get_weather, weather_icon_and_description,
+    wind_direction_label, wind_labels,
 )
 from extensions.epaper.models.screenmodel import (
     WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
@@ -141,13 +142,26 @@ _METRIC_FIELD = {
     "precipitation": "precipitation",
     "humidity": "relative_humidity_2m",
     "pressure": "surface_pressure",
+    "wind": "wind_speed_10m",
 }
 _METRIC_KIND: dict[str, charting.Kind] = {
     "temperature": "line",
     "precipitation": "bar",  # mostly-zero, bursty -- reads better as bars
     "humidity": "line",
     "pressure": "line",
+    "wind": "line",
 }
+
+
+def _metric_series(hourly: dict, metric: str, start_idx: int, end_idx: int,
+                   axis: charting.Axis) -> charting.ChartSeries:
+    """One ChartSeries for a metric over [start_idx, end_idx). Open-Meteo
+    delivers wind in km/h, so the 'wind' series is converted to the configured
+    wind_speed_unit here (the other metrics have no unit choice)."""
+    values = hourly[_METRIC_FIELD[metric]][start_idx:end_idx]
+    if metric == "wind":
+        values = [None if v is None else convert_wind_speed(v) for v in values]
+    return charting.ChartSeries(values, kind=_METRIC_KIND[metric], axis=axis)
 
 
 class WeatherChartWidget(_WeatherWidgetBase):
@@ -172,13 +186,10 @@ class WeatherChartWidget(_WeatherWidgetBase):
         start_idx = next((i for i, t in enumerate(times) if t >= now_iso), 0)
         end_idx = min(start_idx + self.config.forecast_hours, len(times))
 
-        metric = self.config.primary_metric
-        series = [charting.ChartSeries(
-            hourly[_METRIC_FIELD[metric]][start_idx:end_idx], kind=_METRIC_KIND[metric], axis='primary')]
+        series = [_metric_series(hourly, self.config.primary_metric, start_idx, end_idx, 'primary')]
         if self.config.secondary_metric:
-            metric = self.config.secondary_metric
-            series.append(charting.ChartSeries(
-                hourly[_METRIC_FIELD[metric]][start_idx:end_idx], kind=_METRIC_KIND[metric], axis='secondary'))
+            series.append(
+                _metric_series(hourly, self.config.secondary_metric, start_idx, end_idx, 'secondary'))
 
         labels = [times[i][11:16] for i in range(start_idx, end_idx)]
         charting.draw_chart(ctx, (0, 0), (w, h), series, font=self.font, labels=labels)
