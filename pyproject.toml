@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nicepaper"
-version = "0.10.0"
+version = "0.11.0"
 description = "Renders screens (e.g. door signs with room calendars) as PNG images for e-paper displays; FastAPI backend with a NiceGUI management UI, installable as a nice4iot extension (extensions.epaper) or run standalone"
 readme = "README.md"
 requires-python = ">=3.12"

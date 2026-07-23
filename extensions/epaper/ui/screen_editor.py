@@ -256,9 +256,11 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
             ui.label('Appearance').classes('text-subtitle2')
             _render_row(form, 'init_background', 'clipping', 'show_bounding_box', props='dense')
             with ui.row().classes('w-full gap-2'):
+                # both clearable so each aspect can be reverted to the screen
+                # default independently (empty name/size falls back on its own)
                 form.render_field('font_name', widget_type='ui.select', options=font_names,
-                                props='outlined dense').classes('flex-grow')
-                form.render_field('font_size', props='outlined dense').classes('flex-grow')
+                                props='outlined dense clearable').classes('flex-grow')
+                form.render_field('font_size', props='outlined dense clearable').classes('flex-grow')
 
             ui.label('Content').classes('text-subtitle2')
             if isinstance(widget, TextWidgetModel):

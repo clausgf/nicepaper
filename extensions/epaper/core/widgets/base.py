@@ -39,7 +39,7 @@ class Widget:
                 ctx.draw.rectangle([p0, p1], fill=ctx.color_background)
             if self.config.show_bounding_box:
                 ctx.draw.rectangle([p0, p1], outline=ctx.color_primary)
-        if self.config.font:
-            self.font = ctx.get_font(self.config.font[0], self.config.font[1])
-        else:
-            self.font = ctx.font
+        # each font aspect falls back to the context's default independently,
+        # so overriding just the name or just the size takes effect
+        font_name, font_size = self.config.resolved_font(*ctx.font_model)
+        self.font = ctx.get_font(font_name, font_size)

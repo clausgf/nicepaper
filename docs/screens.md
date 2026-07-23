@@ -26,7 +26,10 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   In `WeatherChart`, `primary_metric` is always shown and `secondary_metric`
   is optional on its own right Y axis (e.g. temperature + precipitation
   combined). Available metrics are `temperature`, `precipitation`, `humidity`,
-  `pressure` and `wind` (the wind series honours `WIND_SPEED_UNIT`). All three are backed by [Open-Meteo](https://open-meteo.com)
+  `pressure` and `wind` (the wind series honours `WIND_SPEED_UNIT`). Each axis
+  is titled with its metric name and unit above the plot (primary left,
+  secondary right) — e.g. `Temperatur (°C)`, `Wind (km/h)` — in the `LOCALE`
+  language. All three are backed by [Open-Meteo](https://open-meteo.com)
   (no API key needed; the DWD ICON model for German/European locations) and
   are placed by `latitude`/`longitude`. Icons reuse the bundled
   `fa-solid-900.ttf` (no extra font/image assets). Charts are hand-drawn with

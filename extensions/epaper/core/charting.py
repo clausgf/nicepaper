@@ -130,7 +130,8 @@ def _format_axis_value(value: float) -> str:
 
 
 def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Sequence[ChartSeries], *,
-               font=None, labels: Optional[Sequence[str]] = None) -> None:
+               font=None, labels: Optional[Sequence[str]] = None,
+               primary_title: Optional[str] = None, secondary_title: Optional[str] = None) -> None:
     """
     Draws all `series` (each 'bar' or 'line', on the 'primary' or
     'secondary' Y axis) sharing one X axis (data point index). Every
@@ -139,6 +140,11 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
     gridlines are drawn at the same X positions as the (possibly thinned)
     `labels`. `font` should be the caller's configured font (e.g. a
     widget's self.font) -- falls back to ctx.font if not given.
+
+    `primary_title`/`secondary_title` label the two Y axes above the plot,
+    left- and right-aligned respectively. They consume a strip at the top
+    (so the plot gets a little shorter, not narrower), keeping the numeric
+    axis labels on the sides where they are.
     """
     x0, y0 = position
     w, h = size
@@ -181,17 +187,20 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
     left_margin = max(ctx.textsize(t, label_font)[0] for t in primary_labels) + label_gap
     right_margin = (max(ctx.textsize(t, label_font)[0] for t in secondary_labels) + label_gap) if has_secondary else 0
     label_h = (ctx.textsize("00:00", label_font)[1] + 4) if labels else 0
+    # a strip above the plot for the axis titles (leaves plot width alone)
+    title_h = (ctx.textsize("Ag", label_font)[1] + 4) if (primary_title or secondary_title) else 0
 
     plot_x0 = x0 + left_margin
     plot_w = w - left_margin - right_margin
-    plot_h = h - label_h
+    plot_y0 = y0 + title_h
+    plot_h = h - label_h - title_h
     if plot_w <= 0 or plot_h <= 0:
         return
 
     def to_y(value: float, axis: Axis) -> float:
         nice_min, nice_max = (primary_min, primary_max) if axis == 'primary' else (secondary_min, secondary_max)
         span = max(nice_max - nice_min, 1e-6)
-        return y0 + plot_h - (value - nice_min) / span * plot_h
+        return plot_y0 + plot_h - (value - nice_min) / span * plot_h
 
     slot_w = plot_w / n
     def slot_center_x(i: int) -> float:
@@ -201,10 +210,10 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
 
     # vertical gridlines, aligned with the (thinned) x-axis labels
     for i in x_indices:
-        _draw_dotted_vline(ctx, slot_center_x(i), y0, y0 + plot_h, fill=ctx.color_primary)
+        _draw_dotted_vline(ctx, slot_center_x(i), plot_y0, plot_y0 + plot_h, fill=ctx.color_primary)
 
     # baseline + horizontal gridlines, each labeled on both axes in use
-    ctx.draw.line([_abs_pt(ctx, plot_x0, y0 + plot_h), _abs_pt(ctx, plot_x0 + plot_w, y0 + plot_h)],
+    ctx.draw.line([_abs_pt(ctx, plot_x0, plot_y0 + plot_h), _abs_pt(ctx, plot_x0 + plot_w, plot_y0 + plot_h)],
                   fill=ctx.color_primary, width=1)
     for i in range(step_count + 1):
         y = to_y(primary_min + i * primary_step, 'primary')
@@ -245,5 +254,17 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
 
     for i in x_indices:
         px = slot_center_x(i)
-        ctx.draw_text((int(px - 20), int(y0 + plot_h + 2)), size=(40, label_h), text=labels[i],
+        ctx.draw_text((int(px - 20), int(plot_y0 + plot_h + 2)), size=(40, label_h), text=labels[i],
                       alignment='ct', font=label_font)
+
+    # axis titles in the reserved top strip: primary left-aligned (accent,
+    # matching its series), secondary right-aligned. Each gets half the
+    # width with an ellipsis so long titles can't overlap in the middle.
+    if title_h:
+        half = w // 2
+        if primary_title:
+            ctx.draw_text((x0, y0), size=(half, title_h), text=primary_title,
+                          alignment='lt', font=label_font, color=accent, ellipsis='...')
+        if secondary_title:
+            ctx.draw_text((x0 + w - half, y0), size=(half, title_h), text=secondary_title,
+                          alignment='rt', font=label_font, ellipsis='...')

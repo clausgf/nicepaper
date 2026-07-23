@@ -95,3 +95,26 @@ def test_every_horizontal_gridline_gets_a_label_not_just_min_max():
     middle_rows_dark = any(image.getpixel((x, y)) != (255, 255, 255)
                             for x in range(0, 25) for y in range(90, 110))
     assert middle_rows_dark
+
+
+def test_axis_titles_draw_in_the_top_strip():
+    values = [5, 10, 15, 20]
+    # region past the left numeric margin and above the (pushed-down) plot:
+    # blank without a title, inked by a left-aligned primary_title
+    region = [(x, y) for x in range(40, 120) for y in range(0, 14)]
+    blank = _render([ChartSeries(values, kind="line", axis="primary")], size=(300, 150))
+    titled = _render([ChartSeries(values, kind="line", axis="primary")], size=(300, 150),
+                     primary_title="Temperature")
+    assert all(blank.getpixel(p) == (255, 255, 255) for p in region)
+    assert any(titled.getpixel(p) != (255, 255, 255) for p in region)
+
+
+def test_secondary_title_is_right_aligned():
+    values = [5, 10, 15, 20]
+    image = _render([ChartSeries(values, kind="line", axis="primary"),
+                     ChartSeries([1, 2, 3, 4], kind="line", axis="secondary")],
+                    size=(300, 150), primary_title="Temp", secondary_title="Rain")
+    # secondary title sits in the right half's top strip
+    right_top_dark = any(image.getpixel((x, y)) != (255, 255, 255)
+                          for x in range(230, 300) for y in range(0, 14))
+    assert right_top_dark

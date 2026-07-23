@@ -137,6 +137,36 @@ def wind_labels() -> dict[str, str]:
     return _WIND_LABELS[weather_language()]
 
 
+# Localized WeatherChart axis titles, keyed by the WeatherMetric value.
+_METRIC_TITLES = {
+    "de": {"temperature": "Temperatur", "precipitation": "Niederschlag",
+           "humidity": "Luftfeuchte", "pressure": "Luftdruck", "wind": "Wind"},
+    "en": {"temperature": "Temperature", "precipitation": "Precipitation",
+           "humidity": "Humidity", "pressure": "Pressure", "wind": "Wind"},
+}
+# Units are language-independent; wind's unit is dynamic (see metric_unit).
+_METRIC_UNITS = {
+    "temperature": "°C", "precipitation": "mm", "humidity": "%", "pressure": "hPa",
+}
+
+
+def metric_unit(metric: str) -> str | None:
+    """Display unit for a WeatherChart metric, or None. Wind follows the
+    configured wind_speed_unit; the others are fixed."""
+    if metric == "wind":
+        return wind_speed_unit_suffix()
+    return _METRIC_UNITS.get(metric)
+
+
+def metric_title(metric: str) -> str:
+    """Localized axis title for a WeatherChart metric, with its unit in
+    parentheses (e.g. 'Temperatur (°C)'). Falls back to the raw key for an
+    unknown metric."""
+    name = _METRIC_TITLES[weather_language()].get(metric, metric)
+    unit = metric_unit(metric)
+    return f'{name} ({unit})' if unit else name
+
+
 # Open-Meteo always delivers wind speed in km/h (we don't send a
 # wind_speed_unit param), so a single cached response can be reformatted into
 # whatever unit GlobalConfig.wind_speed_unit selects without refetching. Each

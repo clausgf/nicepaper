@@ -67,11 +67,32 @@ def test_format_wind_speed_converts_and_labels(monkeypatch, unit, kmh, expected)
 
 def test_chart_metric_maps_cover_every_weather_metric():
     from typing import get_args
+    from extensions.epaper.core.datasources.weather import _METRIC_TITLES
     from extensions.epaper.core.widgets.weather import _METRIC_FIELD, _METRIC_KIND
     from extensions.epaper.models.screenmodel import WeatherMetric
     metrics = set(get_args(WeatherMetric))
     assert set(_METRIC_FIELD) == metrics
     assert set(_METRIC_KIND) == metrics
+    for lang, titles in _METRIC_TITLES.items():
+        assert set(titles) == metrics, f"metric titles for {lang} miss a metric"
+
+
+def test_metric_title_follows_locale_and_includes_unit(monkeypatch):
+    from extensions.epaper.core.datasources.weather import metric_title
+    monkeypatch.setattr(app_config, "locale", "de_DE.utf8")
+    assert metric_title("temperature") == "Temperatur (°C)"
+    assert metric_title("precipitation") == "Niederschlag (mm)"
+    monkeypatch.setattr(app_config, "locale", "en_US.utf8")
+    assert metric_title("temperature") == "Temperature (°C)"
+
+
+def test_metric_title_wind_unit_follows_wind_speed_unit(monkeypatch):
+    from extensions.epaper.core.datasources.weather import metric_title
+    monkeypatch.setattr(app_config, "locale", "en_US.utf8")
+    monkeypatch.setattr(app_config, "wind_speed_unit", "kn")
+    assert metric_title("wind") == "Wind (kn)"
+    monkeypatch.setattr(app_config, "wind_speed_unit", "kmh")
+    assert metric_title("wind") == "Wind (km/h)"
 
 
 def test_convert_wind_speed_uses_configured_unit(monkeypatch):

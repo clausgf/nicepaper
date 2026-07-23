@@ -3,7 +3,7 @@ from typing import Optional, Union
 from extensions.epaper.config import app_config
 from extensions.epaper.core import charting
 from extensions.epaper.core.datasources.weather import (
-    convert_wind_speed, format_wind_speed, get_weather, weather_icon_and_description,
+    convert_wind_speed, format_wind_speed, get_weather, metric_title, weather_icon_and_description,
     wind_direction_label, wind_labels,
 )
 from extensions.epaper.models.screenmodel import (
@@ -192,4 +192,7 @@ class WeatherChartWidget(_WeatherWidgetBase):
                 _metric_series(hourly, self.config.secondary_metric, start_idx, end_idx, 'secondary'))
 
         labels = [times[i][11:16] for i in range(start_idx, end_idx)]
-        charting.draw_chart(ctx, (0, 0), (w, h), series, font=self.font, labels=labels)
+        charting.draw_chart(
+            ctx, (0, 0), (w, h), series, font=self.font, labels=labels,
+            primary_title=metric_title(self.config.primary_metric),
+            secondary_title=metric_title(self.config.secondary_metric) if self.config.secondary_metric else None)

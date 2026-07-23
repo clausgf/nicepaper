@@ -137,13 +137,6 @@ def test_widget_size_setter():
     assert widget.size_height is None
 
 
-def test_widget_font_none_when_either_part_missing():
-    widget = TextWidgetModel(position_x=0, position_y=0, text="x", font_name="Ubuntu-Regular.ttf")
-    assert widget.font is None
-    widget.font_size = 16
-    assert widget.font == ("Ubuntu-Regular.ttf", 16)
-
-
 def test_widget_size_zero_means_automatic_too():
     """niceview's ui.number has no clean 'empty' state for Optional[int]:
     clearing the field in the browser round-trips as 0, not None. 0 must
@@ -157,9 +150,20 @@ def test_widget_size_zero_means_automatic_too():
     assert widget.size == (100, 50)
 
 
-def test_widget_font_size_zero_means_default_too():
-    widget = TextWidgetModel(position_x=0, position_y=0, text="x", font_name="Ubuntu-Regular.ttf", font_size=0)
-    assert widget.font is None
+def test_widget_resolved_font_falls_back_per_aspect():
+    default = ("Ubuntu-Regular.ttf", 16)
+    # only the name overridden -> keeps the default size
+    only_name = TextWidgetModel(position_x=0, position_y=0, text="x", font_name="Ubuntu-Bold.ttf")
+    assert only_name.resolved_font(*default) == ("Ubuntu-Bold.ttf", 16)
+    # only the size overridden -> keeps the default name
+    only_size = TextWidgetModel(position_x=0, position_y=0, text="x", font_size=30)
+    assert only_size.resolved_font(*default) == ("Ubuntu-Regular.ttf", 30)
+    # neither set (None or the 0 a cleared ui.number sends) -> both defaults
+    neither = TextWidgetModel(position_x=0, position_y=0, text="x", font_name=None, font_size=0)
+    assert neither.resolved_font(*default) == default
+    # both set -> both overridden
+    both = TextWidgetModel(position_x=0, position_y=0, text="x", font_name="Ubuntu-Bold.ttf", font_size=30)
+    assert both.resolved_font(*default) == ("Ubuntu-Bold.ttf", 30)
 
 
 def test_widget_alignment_pattern():

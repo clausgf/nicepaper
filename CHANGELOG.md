@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.11.0 — 2026-07-23
+
+### Fixed
+
+- Widget Appearance: overriding only the font name *or* only the font size now
+  takes effect. Previously a font was all-or-nothing — a half-set font was
+  silently dropped and the widget fell back to the full default font. Each
+  aspect now falls back to the screen default independently, and both fields in
+  the editor are clearable so either can be reverted on its own.
+
+### Added
+
+- `WeatherChart` now labels its Y axes above the plot with the metric name and
+  unit — e.g. `Temperatur (°C)`, `Wind (km/h)` (primary left-aligned in the
+  accent colour, secondary right-aligned), in the `locale` language. Wind's unit
+  follows `wind_speed_unit`. The titles take a strip at the top, so the plot
+  keeps its width.
+
 ## 0.10.0 — 2026-07-22
 
 ### Added

@@ -47,8 +47,8 @@ class WidgetModel(BaseModel):
     init_background: Optional[bool] = True
     clipping: Optional[bool] = Field(default=False, description="Cut off content that overflows this widget's size instead of letting it bleed into neighboring widgets.")
     show_bounding_box: Optional[bool] = Field(default=False, description="Draw an outline around this widget's box. Useful while laying out a screen.")
-    font_name: Optional[str] = Field(default=None, description="Font file name. Leave empty to use the screen's default font.")
-    font_size: Optional[int] = Field(default=None, description="Font size in points. 0 or empty to use the screen's default font.")
+    font_name: Optional[str] = Field(default=None, description="Font file name. Leave empty to use the screen's default font name (independent of font size).")
+    font_size: Optional[int] = Field(default=None, description="Font size in points. 0 or empty to use the screen's default font size (independent of font name).")
 
     @model_validator(mode='after')
     def _check_size_pair(self) -> 'WidgetModel':
@@ -87,12 +87,12 @@ class WidgetModel(BaseModel):
         else:
             self.size_width, self.size_height = value
 
-    @property
-    def font(self) -> Optional[Tuple[str, int]]:
-        # same 0-vs-None quirk as size above, for font_size
-        if not self.font_name or not self.font_size:
-            return None
-        return (self.font_name, self.font_size)
+    def resolved_font(self, default_name: str, default_size: int) -> Tuple[str, int]:
+        """This widget's (font name, size), each aspect falling back to the
+        screen default independently: an empty font_name/font_size (or the 0 a
+        cleared ui.number round-trips as) takes the default, so a widget can
+        override just the name, just the size, or both."""
+        return (self.font_name or default_name, self.font_size or default_size)
 
 
 class TextWidgetModel(WidgetModel):
