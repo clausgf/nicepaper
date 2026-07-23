@@ -252,6 +252,9 @@ def global_config_fields(persist: Callable[[], None]) -> None:
                                props='outlined dense').classes('flex-grow')
         form.render_field('weather_error', props='outlined dense').classes('w-full')
 
+        ui.label('Image').classes('text-subtitle2')
+        form.render_field('image_error', props='outlined dense').classes('w-full')
+
         form.render_nonfield_errors()
 
 

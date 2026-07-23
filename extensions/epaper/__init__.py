@@ -31,7 +31,10 @@ def register(app: FastAPI) -> None:
     from extensions.epaper.ui.screen_editor import screens_wrapper
 
     def _paths_for_project(project_name: str) -> EpaperPaths:
-        paths = EpaperPaths(root=extension_project_dir(project_name, 'epaper'))
+        root = extension_project_dir(project_name, 'epaper')
+        # the project directory itself (root's parent) holds the user's image
+        # files, managed via nice4iot's 'Project Files' -- see EpaperPaths
+        paths = EpaperPaths(root=root, project_root=root.parent)
         paths.ensure_dirs()
         return paths
 

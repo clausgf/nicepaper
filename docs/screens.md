@@ -18,6 +18,18 @@ A screen's `widgets` list is made of typed widgets, each positioned with
 - **`RoomCalendar`** — fetches an iCal feed (`ical_url`) with recurring-event
   expansion, caches it, and shows the current and next appointments plus a
   list of further ones. `room_number`/`room_name` label the screen.
+- **`Image`** — renders an image loaded from a `url` or from a `file` in the
+  project directory (`source_type` selects which). By default the image is
+  loaded once and cached; set `reload_each_time` to re-fetch on every render
+  (the editor also has a *Reload now* button). Size behaves specially: setting
+  only `size_width` **or** `size_height` scales the image to that dimension
+  keeping the aspect ratio, setting both scales to exactly that size, and
+  leaving both empty uses the natural size. If the image can't be loaded within
+  a fixed timeout, the configurable `image_error` message
+  (see [Configuration](configuration.md)) is drawn instead. The widget has no
+  font of its own. The selectable files live in the project directory — in the
+  nice4iot extension that is the project directory where *Project Files* are
+  managed, standalone it is the `data/` directory.
 - **`WeatherNow`** / **`WeatherForecast`** / **`WeatherChart`** — current
   conditions, an hourly forecast strip, and one configurable bar/line chart.
   `WeatherNow` shows temperature, the condition, and wind (speed, direction as

@@ -61,6 +61,8 @@ class GlobalConfig(BaseModel):
         ),
     )
 
+    image_error: str = "Fehler beim Laden des Bildes"
+
     locale: str = 'de_DE.utf8'
     timezone: str = 'Europe/Berlin'
     date_format: str = 'dd.MM.yy'

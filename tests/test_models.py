@@ -3,6 +3,7 @@ from pydantic import ValidationError
 from extensions.epaper.models.screenmodel import (
     ScreenModel, TextWidgetModel, RoomCalendarWidgetModel,
     WeatherNowWidgetModel, WeatherForecastWidgetModel, WeatherChartWidgetModel,
+    ImageWidgetModel,
 )
 
 
@@ -214,6 +215,38 @@ def test_weather_chart_widget_accepts_wind_metric():
     widget = WeatherChartWidgetModel(position_x=0, position_y=0, latitude=52.52, longitude=13.405,
                                       primary_metric="wind", secondary_metric="temperature")
     assert widget.primary_metric == "wind"
+
+
+def test_image_widget_defaults():
+    w = ImageWidgetModel(position_x=0, position_y=0)
+    assert w.source_type == "url"
+    assert w.url is None and w.file is None
+    assert w.reload_each_time is False
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"size_width": 100},                  # only width -> keep aspect ratio
+    {"size_height": 50},                  # only height -> keep aspect ratio
+    {"size_width": 100, "size_height": 50},  # both -> exact
+    {},                                   # neither -> natural size
+])
+def test_image_widget_allows_partial_size(kwargs):
+    # unlike other widgets, the Image widget opts out of the size-pair check
+    w = ImageWidgetModel(position_x=0, position_y=0, **kwargs)
+    assert w.size_width == kwargs.get("size_width")
+    assert w.size_height == kwargs.get("size_height")
+
+
+def test_image_widget_round_trips_through_union():
+    screen = ScreenModel(width=400, height=300, widgets=[
+        {"widget_type": "Image", "position_x": 0, "position_y": 0,
+         "source_type": "file", "file": "logo.png", "size_width": 120},
+    ])
+    assert isinstance(screen.widgets[0], ImageWidgetModel)
+    reloaded = ScreenModel.model_validate_json(screen.model_dump_json())
+    assert isinstance(reloaded.widgets[0], ImageWidgetModel)
+    assert reloaded.widgets[0].file == "logo.png"
+    assert reloaded.widgets[0].size_height is None
 
 
 @pytest.mark.parametrize("widget_type,model_cls,extra", [

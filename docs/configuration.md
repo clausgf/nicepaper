@@ -42,6 +42,8 @@ same settings with humanized labels):
   the `RoomCalendar` widget.
 - `weather_update_interval_s` — Open-Meteo polling interval for the `Weather*`
   widgets.
+- `image_error` — message the `Image` widget renders when its image can't be
+  loaded within the fetch timeout.
 - `color_background`, `color_primary`, `color_accent` — screen background,
   default text/drawing color, and the color the chart widgets use for their
   primary series (accent defaults to red, the only accent the `bwr` color model

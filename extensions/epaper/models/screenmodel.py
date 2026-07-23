@@ -1,5 +1,5 @@
 import datetime
-from typing import Annotated, List, Optional, Tuple, Union, Literal
+from typing import Annotated, ClassVar, List, Optional, Tuple, Union, Literal
 from pydantic import BaseModel, Field, model_validator
 
 _DateFormatField = Annotated[
@@ -33,7 +33,7 @@ class ImageMetadata(BaseModel):
 
 
 class WidgetModel(BaseModel):
-    widget_type: Literal["Text", "Date", "RoomCalendar", "WeatherNow", "WeatherForecast", "WeatherChart"]
+    widget_type: Literal["Text", "Date", "RoomCalendar", "WeatherNow", "WeatherForecast", "WeatherChart", "Image"]
 
     # Tuple[int, int] fields (position/size) aren't renderable by niceview
     # (an unrecognised field type falls back to a plain ui.input bound to
@@ -50,16 +50,21 @@ class WidgetModel(BaseModel):
     font_name: Optional[str] = Field(default=None, description="Font file name. Leave empty to use the screen's default font name (independent of font size).")
     font_size: Optional[int] = Field(default=None, description="Font size in points. 0 or empty to use the screen's default font size (independent of font name).")
 
+    # widgets that give a lone width/height a meaning (Image: scale to that
+    # dimension, keep aspect ratio) set this True to opt out of the
+    # size-pair validation below
+    _allows_partial_size: ClassVar[bool] = False
+
     @model_validator(mode='after')
     def _check_size_pair(self) -> 'WidgetModel':
-        # size is all-or-nothing (see the size property): a widget is either
-        # fully auto-sized (both empty/0) or has a fixed box (both set). A
-        # half-filled size used to be silently dropped -- setting only the
-        # width had no effect at all -- so reject it here instead, surfacing
-        # a visible error in the editor rather than a mystery. bool() treats
-        # both None and the 0 that a cleared ui.number round-trips as as
+        # size is all-or-nothing for most widgets (see the size property): a
+        # widget is either fully auto-sized (both empty/0) or has a fixed box
+        # (both set). A half-filled size used to be silently dropped -- setting
+        # only the width had no effect at all -- so reject it here instead,
+        # surfacing a visible error in the editor rather than a mystery. bool()
+        # treats both None and the 0 that a cleared ui.number round-trips as as
         # "empty", matching the size property below.
-        if bool(self.size_width) != bool(self.size_height):
+        if not self._allows_partial_size and bool(self.size_width) != bool(self.size_height):
             raise ValueError(
                 "Set width and height together, or leave both empty for automatic sizing.")
         return self
@@ -148,6 +153,28 @@ class WeatherChartWidgetModel(WeatherWidgetModel):
     secondary_metric: Optional[WeatherMetric] = Field(default=None, description="Shown alongside primary_metric if set; dashed, right Y axis.")
     forecast_hours: int = Field(default=24, description="How many hours ahead the chart covers.")
 
+ImageSourceType = Literal["url", "file"]
+
+
+class ImageWidgetModel(WidgetModel):
+    """Renders an image loaded from a URL or a file in the project directory.
+
+    Unlike other widgets, a lone width/height is meaningful (scale to that
+    dimension, keep aspect ratio), so it opts out of the size-pair validation;
+    setting both scales to exactly that size. Has no font of its own -- the
+    error message (on load failure) uses the screen default font."""
+    widget_type: Literal["Image"] = "Image"
+    # override the base descriptions: a lone width/height is valid here
+    size_width: Optional[int] = Field(default=None, description="Image width in pixels. A single dimension (width or height) scales keeping the aspect ratio; both set scales to exactly that size; empty = natural size.")
+    size_height: Optional[int] = Field(default=None, description="Image height in pixels. A single dimension (width or height) scales keeping the aspect ratio; both set scales to exactly that size; empty = natural size.")
+    source_type: ImageSourceType = Field(default="url", description="Where the image comes from: a URL, or a file in the project directory.")
+    url: Optional[str] = Field(default=None, description="Image URL (used when source_type is 'url').")
+    file: Optional[str] = Field(default=None, description="Image file in the project directory (used when source_type is 'file'). Add files there via nice4iot's 'Project Files', or by copying them into the project directory directly.")
+    reload_each_time: bool = Field(default=False, description="Reload the image on every render instead of loading it once and caching it.")
+
+    _allows_partial_size: ClassVar[bool] = True
+
+
 # discriminated union: widget_type selects the concrete model and a
 # missing/unknown widget_type is a validation error instead of silently
 # matching the first union member
@@ -155,6 +182,7 @@ AnyWidget = Annotated[
     Union[
         DateWidgetModel, TextWidgetModel, RoomCalendarWidgetModel,
         WeatherNowWidgetModel, WeatherForecastWidgetModel, WeatherChartWidgetModel,
+        ImageWidgetModel,
     ],
     Field(discriminator="widget_type"),
 ]

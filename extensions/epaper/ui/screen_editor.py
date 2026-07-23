@@ -22,8 +22,9 @@ from niceview import DrillDownWrapper, JsonAdapter, ListAdapter, ModelForm
 from niceview.util import confirm_dialog
 
 from extensions.epaper.config import app_config, resource_paths
+from extensions.epaper.core.datasources.image import clear_cache as clear_image_cache
 from extensions.epaper.models.screenmodel import (
-    DateWidgetModel, RoomCalendarWidgetModel, ScreenModel, TextWidgetModel, WidgetModel,
+    DateWidgetModel, ImageWidgetModel, RoomCalendarWidgetModel, ScreenModel, TextWidgetModel, WidgetModel,
     WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
 )
 from extensions.epaper.paths import EpaperPaths
@@ -37,6 +38,7 @@ WIDGET_MODELS: dict[str, type[WidgetModel]] = {
     'WeatherNow': WeatherNowWidgetModel,
     'WeatherForecast': WeatherForecastWidgetModel,
     'WeatherChart': WeatherChartWidgetModel,
+    'Image': ImageWidgetModel,
 }
 WIDGET_ICONS: dict[str, str] = {
     'Text': 'text_fields',
@@ -45,6 +47,7 @@ WIDGET_ICONS: dict[str, str] = {
     'WeatherNow': 'wb_sunny',
     'WeatherForecast': 'view_column',
     'WeatherChart': 'show_chart',
+    'Image': 'image',
 }
 WIDGET_TITLES: dict[str, str] = {
     'Text': 'Text Widget',
@@ -53,7 +56,11 @@ WIDGET_TITLES: dict[str, str] = {
     'WeatherNow': 'Weather (Now) Widget',
     'WeatherForecast': 'Weather (Forecast) Widget',
     'WeatherChart': 'Weather (Chart) Widget',
+    'Image': 'Image Widget',
 }
+
+# image files selectable by the Image widget (Pillow-readable raster formats)
+IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')
 
 
 def _widget_label(widget: WidgetModel) -> str:
@@ -69,7 +76,15 @@ def _widget_label(widget: WidgetModel) -> str:
         return f'{widget.latitude:.2f}, {widget.longitude:.2f} · {metrics}'
     if isinstance(widget, (WeatherNowWidgetModel, WeatherForecastWidgetModel)):
         return f'{widget.latitude:.2f}, {widget.longitude:.2f}'
+    if isinstance(widget, ImageWidgetModel):
+        return (widget.url if widget.source_type == 'url' else widget.file) or '(no image)'
     return widget.widget_type
+
+
+def _asset_image_files(paths: EpaperPaths) -> list[str]:
+    """Image file names available in the project directory."""
+    return sorted(p.name for p in paths.asset_dir.glob('*')
+                  if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
 
 
 def _schedule_ids(paths: EpaperPaths) -> list[str]:
@@ -107,6 +122,8 @@ def _default_widget(widget_type: str) -> WidgetModel:
         return DateWidgetModel(position_x=0, position_y=0)
     if widget_type == 'RoomCalendar':
         return RoomCalendarWidgetModel(position_x=0, position_y=0, room_number='', room_name='', ical_url='')
+    if widget_type == 'Image':
+        return ImageWidgetModel(position_x=0, position_y=0)
     if widget_type in WIDGET_MODELS and issubclass(WIDGET_MODELS[widget_type], (
             WeatherNowWidgetModel, WeatherForecastWidgetModel, WeatherChartWidgetModel)):
         return WIDGET_MODELS[widget_type](position_x=0, position_y=0, latitude=0.0, longitude=0.0)
@@ -255,12 +272,14 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
 
             ui.label('Appearance').classes('text-subtitle2')
             _render_row(form, 'init_background', 'clipping', 'show_bounding_box', props='dense')
-            with ui.row().classes('w-full gap-2'):
-                # both clearable so each aspect can be reverted to the screen
-                # default independently (empty name/size falls back on its own)
-                form.render_field('font_name', widget_type='ui.select', options=font_names,
-                                props='outlined dense clearable').classes('flex-grow')
-                form.render_field('font_size', props='outlined dense clearable').classes('flex-grow')
+            # the Image widget has no text of its own, so no font to configure
+            if not isinstance(widget, ImageWidgetModel):
+                with ui.row().classes('w-full gap-2'):
+                    # both clearable so each aspect can be reverted to the screen
+                    # default independently (empty name/size falls back on its own)
+                    form.render_field('font_name', widget_type='ui.select', options=font_names,
+                                    props='outlined dense clearable').classes('flex-grow')
+                    form.render_field('font_size', props='outlined dense clearable').classes('flex-grow')
 
             ui.label('Content').classes('text-subtitle2')
             if isinstance(widget, TextWidgetModel):
@@ -282,6 +301,35 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
                 _render_row(form, 'latitude', 'longitude')
                 _render_row(form, 'primary_metric', 'secondary_metric')
                 _render_row(form, 'forecast_hours')
+            elif isinstance(widget, ImageWidgetModel):
+                image_files = _asset_image_files(paths)
+
+                @ui.refreshable
+                def image_source_field() -> None:
+                    if widget.source_type == 'file':
+                        # keep a now-missing file selectable/visible, like schedules
+                        options = image_files + ([widget.file] if widget.file and widget.file not in image_files else [])
+                        form.render_field('file', widget_type='ui.select', options=options,
+                                          props='outlined dense clearable').classes('w-full')
+                    else:
+                        form.render_field('url', props='outlined dense').classes('w-full')
+
+                with ui.row().classes('w-full items-center gap-3'):
+                    ui.label('Source').classes('text-caption')
+                    form.render_field('source_type', widget_type='ui.toggle',
+                                      options=['url', 'file']).on(
+                        'update:model-value', lambda: image_source_field.refresh())
+                image_source_field()
+
+                def _reload_image() -> None:
+                    clear_image_cache(paths, widget)
+                    persist_screen()  # rewrite the screen file -> re-render picks up the refetch
+                    ui.notify('Image reloaded', type='positive')
+
+                with ui.row().classes('w-full items-center gap-2'):
+                    form.render_field('reload_each_time', label='Reload on every rendering', props='dense')
+                    ui.space()
+                    ui.button('Reload now', icon='refresh', on_click=_reload_image).props('flat dense')
             form.render_nonfield_errors()
 
     def _open_detail(key: str) -> None:

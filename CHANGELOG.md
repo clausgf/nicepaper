@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.12.0 — 2026-07-23
+
+### Added
+
+- New `Image` widget: renders an image from a URL or a file in the project
+  directory (`source_type`). Loaded once and cached by default, or re-fetched
+  every render (`reload_each_time`); the editor has a *Reload now* button.
+  Setting only width or only height scales keeping the aspect ratio, both scales
+  to exactly that size, neither uses the natural size. On a load failure (fixed
+  10 s timeout) it draws the configurable `image_error` message
+  (global config, sensible default). No per-widget font.
+
 ## 0.11.0 — 2026-07-23
 
 ### Fixed
