@@ -8,14 +8,17 @@ ownership, so these work identically whether called from a standalone
 @ui.page route (ui/standalone.py) or from inside nice4iot's project/device
 page / card system (extensions/epaper/__init__.py's register(app)).
 """
+import datetime
 from pathlib import Path
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Sequence, Union
+from zoneinfo import ZoneInfo
 
 from nicegui import context, ui
 from babel.dates import format_datetime, get_timezone
 from niceview import DirectoryAdapter, DrillDownWrapper, FileEntry, ModelForm
 
 from extensions.epaper.config import app_config, resource_paths
+from extensions.epaper.core.datasources.weather import WeatherStatus
 from extensions.epaper.core.screen import get_aliases, set_alias
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.util import check_filename
@@ -140,7 +143,45 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
     return wrapper
 
 
-def dashboard_card(num_screens: int, num_schedules: int, open_url: str) -> None:
+def _humanize_age(dt: Optional[datetime.datetime], now: datetime.datetime) -> str:
+    """'just now' / 'N min ago' / 'N h ago' / 'N d ago' for a past datetime."""
+    if dt is None:
+        return 'never'
+    minutes = max(0, int((now - dt).total_seconds() // 60))
+    if minutes < 1:
+        return 'just now'
+    if minutes < 60:
+        return f'{minutes} min ago'
+    if minutes < 60 * 24:
+        return f'{minutes // 60} h ago'
+    return f'{minutes // (60 * 24)} d ago'
+
+
+def _weather_status_row(status: WeatherStatus, now: datetime.datetime) -> None:
+    """One dashboard health line for a weather location: colour + icon by
+    severity, with a tooltip carrying the last error and retry time."""
+    coord = f'{status.latitude:.2f},{status.longitude:.2f}'
+    if not status.failing:
+        icon, color, text, tip = 'cloud_done', 'positive', f'Weather {coord}: updated {_humanize_age(status.last_update, now)}', None
+    else:
+        retry = ''
+        if status.retry_after and status.retry_after > now:
+            mins = max(1, int((status.retry_after - now).total_seconds() // 60))
+            retry = f', retry in {mins} min'
+        tip = f'{status.fail_count} failed attempt(s){retry}' + (f'\nLast error: {status.error}' if status.error else '')
+        if status.data is not None:
+            icon, color, text = 'cloud_off', 'warning', f'Weather {coord}: stale, last OK {_humanize_age(status.last_update, now)}'
+        else:
+            icon, color, text = 'cloud_off', 'negative', f'Weather {coord}: unavailable'
+    with ui.row().classes('items-center gap-1 no-wrap'):
+        ui.icon(icon, color=color).props('size=xs')
+        label = ui.label(text).classes('text-caption')
+        if tip:
+            label.tooltip(tip)
+
+
+def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
+                   weather_statuses: Sequence[WeatherStatus] = ()) -> None:
     """
     Compact always-visible summary card for nice4iot's project Dashboard
     tab (register_project_card('dashboard', ...) requires the card to
@@ -148,12 +189,19 @@ def dashboard_card(num_screens: int, num_schedules: int, open_url: str) -> None:
     navigates -- resolved by the caller (project_url(project_name,
     tab='Screens')), since URL construction is nice4iot-specific and
     doesn't belong in this UI-only module.
+
+    weather_statuses (read from the weather cache by the caller) render one
+    health line per location, so a weather outage is visible here without
+    opening a screen.
     """
+    now = datetime.datetime.now(ZoneInfo(app_config.timezone))
     with ui.card().classes('w-full'):
         with ui.row().classes('w-full items-center justify-between'):
             ui.label('E-Paper').classes('text-subtitle1 font-bold')
             ui.button(icon='open_in_new').props('flat dense round').on_click(lambda: ui.navigate.to(open_url))
         ui.label(f'{num_screens} screen(s), {num_schedules} schedule(s)').classes('text-caption text-grey-7')
+        for status in weather_statuses:
+            _weather_status_row(status, now)
 
 
 async def device_config_card(paths: EpaperPaths, device_name: str, image_base_url: str) -> None:

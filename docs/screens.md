@@ -47,7 +47,10 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   `fa-solid-900.ttf` (no extra font/image assets). Charts are hand-drawn with
   Pillow, not a plotting library, so they render crisply on bilevel/limited
   palettes instead of dithering, with gridlines/axis labels rounded to nice
-  human-friendly numbers — see `extensions/epaper/core/charting.py`.
+  human-friendly numbers — see `extensions/epaper/core/charting.py`. During an
+  Open-Meteo outage the fetch backs off and the last-known data keeps showing
+  (`WeatherNow` with an "as of HH:MM" marker); the outage is also surfaced on
+  the nice4iot Dashboard — see [Configuration](configuration.md).
 
 ### Clipping and debug outline
 

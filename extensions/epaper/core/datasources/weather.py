@@ -1,7 +1,9 @@
 import datetime
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 from zoneinfo import ZoneInfo
 import aiofiles
 import aiohttp
@@ -213,29 +215,101 @@ def _get_session() -> aiohttp.ClientSession:
     return _session
 
 
-async def get_weather(weather_dir: Path, latitude: float, longitude: float) -> dict:
-    """
-    Fetch (or return cached) Open-Meteo forecast data for a location.
-    Cached per rounded coordinates so multiple weather widgets at the same
-    location (e.g. a "now" and a "forecast" widget) share one cached
-    response instead of each fetching their own. Returns the raw Open-Meteo
-    JSON response (dict with "current" and "hourly" keys); widgets read the
-    fields they need directly, no intermediate model -- same approach as
-    get_from_ical()'s plain event dicts.
-    """
-    cache_filename = os.path.join(weather_dir, f"{latitude:.4f}_{longitude:.4f}.json")
+@dataclass
+class WeatherStatus:
+    """Outcome of a weather lookup for one location, for both the widgets
+    (data + staleness) and the dashboard health view (failing/error/retry)."""
+    latitude: float
+    longitude: float
+    data: Optional[dict]                             # forecast (fresh or last-known); None if never fetched
+    last_update: Optional[datetime.datetime]         # last successful fetch
+    fresh: bool                                      # last_update within the update interval
+    failing: bool                                    # last attempt failed / currently backing off
+    fail_count: int                                  # consecutive failures
+    retry_after: Optional[datetime.datetime]         # earliest next network attempt
+    error: Optional[str]                             # last error message (dashboard tooltip)
 
-    data = None
-    if os.path.exists(cache_filename):
-        async with aiofiles.open(cache_filename, "r") as cache_file:
-            data = json.loads(await cache_file.read())
-    if data is not None and 'last_update' in data and 'data' in data:
-        last_update = datetime.datetime.fromisoformat(data['last_update'])
-        now = datetime.datetime.now(ZoneInfo(app_config.timezone))
-        timedelta = now - last_update
-        if timedelta.total_seconds() < app_config.weather_update_interval_s:
-            logger.info(f"Weather {latitude},{longitude} skipping update, last update was {timedelta.total_seconds()} seconds ago")
-            return data['data']
+
+def _cache_filename(weather_dir: Path, latitude: float, longitude: float) -> str:
+    return os.path.join(weather_dir, f"{latitude:.4f}_{longitude:.4f}.json")
+
+
+def _read_cache(cache_filename: str) -> dict:
+    try:
+        with open(cache_filename, "r") as f:
+            cache = json.load(f)
+        return cache if isinstance(cache, dict) else {}
+    except Exception:
+        return {}
+
+
+def _parse_dt(value: Optional[str]) -> Optional[datetime.datetime]:
+    return datetime.datetime.fromisoformat(value) if value else None
+
+
+def _status_from_cache(latitude: float, longitude: float, cache: dict,
+                       now: datetime.datetime) -> WeatherStatus:
+    last_update = _parse_dt(cache.get('last_update'))
+    fresh = (last_update is not None
+             and (now - last_update).total_seconds() < app_config.weather_update_interval_s)
+    fail_count = int(cache.get('fail_count', 0))
+    return WeatherStatus(
+        latitude=latitude, longitude=longitude, data=cache.get('data'),
+        last_update=last_update, fresh=fresh, failing=fail_count > 0, fail_count=fail_count,
+        retry_after=_parse_dt(cache.get('retry_after')), error=cache.get('error'),
+    )
+
+
+def _backoff_seconds(fail_count: int) -> float:
+    """Exponential backoff (base doubling per consecutive failure), capped."""
+    base = max(1, app_config.weather_retry_min_s)
+    return float(min(base * (2 ** max(0, fail_count - 1)), app_config.weather_retry_max_s))
+
+
+def read_weather_status(weather_dir: Path, latitude: float, longitude: float) -> WeatherStatus:
+    """Read the cached weather status for a location WITHOUT fetching -- for the
+    dashboard health view."""
+    now = datetime.datetime.now(ZoneInfo(app_config.timezone))
+    return _status_from_cache(latitude, longitude, _read_cache(_cache_filename(weather_dir, latitude, longitude)), now)
+
+
+def read_all_weather_statuses(weather_dir: Path) -> list[WeatherStatus]:
+    """Read the status of every cached weather location (no fetch), for the
+    dashboard. Coordinates are recovered from the cache file names."""
+    now = datetime.datetime.now(ZoneInfo(app_config.timezone))
+    statuses = []
+    for path in sorted(Path(weather_dir).glob("*.json")):
+        try:
+            latitude, longitude = (float(p) for p in path.stem.split("_"))
+        except ValueError:
+            continue
+        statuses.append(_status_from_cache(latitude, longitude, _read_cache(str(path)), now))
+    return statuses
+
+
+async def get_weather(weather_dir: Path, latitude: float, longitude: float) -> WeatherStatus:
+    """
+    Fetch (or return cached) Open-Meteo forecast data for a location, as a
+    WeatherStatus. Cached per rounded coordinates so multiple weather widgets
+    at the same location share one cached response.
+
+    Never raises: on a fetch failure it records the failure (fail_count,
+    exponential backoff via retry_after, last error) in the same cache file
+    and returns the last-known data with failing=True (graceful degradation).
+    While backing off, no network request is made -- which also collapses the
+    burst of one request per weather widget on a screen into a single attempt.
+    """
+    cache_filename = _cache_filename(weather_dir, latitude, longitude)
+    now = datetime.datetime.now(ZoneInfo(app_config.timezone))
+    cache = _read_cache(cache_filename)
+    status = _status_from_cache(latitude, longitude, cache, now)
+
+    if status.fresh:
+        logger.info(f"Weather {latitude},{longitude} skipping update, cached data is fresh")
+        return status
+    if status.retry_after is not None and now < status.retry_after:
+        logger.info(f"Weather {latitude},{longitude} backing off until {status.retry_after.isoformat()}")
+        return status
 
     logger.info(f"Weather {latitude},{longitude} updating from {_BASE_URL}")
     params = {
@@ -246,15 +320,20 @@ async def get_weather(weather_dir: Path, latitude: float, longitude: float) -> d
         "forecast_days": 2,
         "timezone": app_config.timezone,
     }
-    async with _get_session().get(_BASE_URL, params=params) as response:
-        forecast = await response.json()
+    try:
+        async with _get_session().get(_BASE_URL, params=params) as response:
+            forecast = await response.json()
+    except Exception as e:
+        fail_count = status.fail_count + 1
+        retry_after = now + datetime.timedelta(seconds=_backoff_seconds(fail_count))
+        logger.error(f"Error occurred while fetching weather data for {latitude},{longitude}: {e}; "
+                     f"retrying after {retry_after.isoformat()} (attempt {fail_count})")
+        cache.update(fail_count=fail_count, retry_after=retry_after.isoformat(), error=str(e))
+        async with aiofiles.open(cache_filename, "w") as cache_file:
+            await cache_file.write(json.dumps(cache))
+        return _status_from_cache(latitude, longitude, cache, now)
 
-    now = datetime.datetime.now(ZoneInfo(app_config.timezone))
-    data = {
-        'last_update': now.isoformat(),
-        'data': forecast,
-    }
+    cache = {'last_update': now.isoformat(), 'data': forecast}  # success clears fail/backoff state
     async with aiofiles.open(cache_filename, "w") as cache_file:
-        await cache_file.write(json.dumps(data))
-
-    return forecast
+        await cache_file.write(json.dumps(cache))
+    return _status_from_cache(latitude, longitude, cache, now)

@@ -8,7 +8,7 @@ import pytest
 
 from extensions.epaper.core.datasources.weather import (
     WMO_DESCRIPTIONS, WMO_ICONS, convert_wind_speed, format_wind_speed, get_weather,
-    weather_icon_and_description, wind_direction_label, wind_labels,
+    read_all_weather_statuses, weather_icon_and_description, wind_direction_label, wind_labels,
 )
 
 
@@ -124,4 +124,71 @@ def test_get_weather_uses_cache_without_network_call(tmp_path):
     }))
 
     result = asyncio.run(get_weather(tmp_path, 52.52, 13.405))
-    assert result == cached_payload
+    assert result.data == cached_payload
+    assert result.fresh is True and result.failing is False
+
+
+def _write_cache(tmp_path, name, **fields):
+    (tmp_path / name).write_text(json.dumps(fields))
+
+
+def test_get_weather_backs_off_and_degrades_gracefully(tmp_path, monkeypatch):
+    # a stale success plus a fetch that will fail: no network within backoff,
+    # last-known data still served (graceful), failure state recorded
+    monkeypatch.setattr(app_config, "weather_retry_min_s", 60)
+    monkeypatch.setattr(app_config, "weather_retry_max_s", 1800)
+    old = datetime.datetime.now(ZoneInfo(app_config.timezone)) - datetime.timedelta(hours=2)
+    payload = {"current": {"temperature_2m": 9.0}, "hourly": {}}
+    _write_cache(tmp_path, "52.5200_13.4050.json", last_update=old.isoformat(), data=payload)
+
+    async def boom(*a, **k):
+        raise RuntimeError("503 Service Unavailable")
+    # force the fetch path (cache is stale) to fail
+    monkeypatch.setattr("extensions.epaper.core.datasources.weather._get_session",
+                        lambda: _FakeSession(boom))
+
+    first = asyncio.run(get_weather(tmp_path, 52.52, 13.405))
+    assert first.data == payload            # graceful: last-known data still returned
+    assert first.failing and first.fail_count == 1
+    assert first.retry_after is not None
+
+    # a second call is inside the backoff window -> must NOT hit the network
+    monkeypatch.setattr("extensions.epaper.core.datasources.weather._get_session",
+                        _fail_if_called)
+    second = asyncio.run(get_weather(tmp_path, 52.52, 13.405))
+    assert second.data == payload and second.failing
+
+
+def test_read_all_weather_statuses(tmp_path):
+    now = datetime.datetime.now(ZoneInfo(app_config.timezone))
+    _write_cache(tmp_path, "52.5200_13.4050.json", last_update=now.isoformat(), data={"x": 1})
+    _write_cache(tmp_path, "48.1000_11.6000.json",
+                 last_update=(now - datetime.timedelta(hours=3)).isoformat(),
+                 data={"x": 2}, fail_count=2, error="503")
+    statuses = {(s.latitude, s.longitude): s for s in read_all_weather_statuses(tmp_path)}
+    assert statuses[(52.52, 13.405)].fresh is True
+    stale = statuses[(48.1, 11.6)]
+    assert stale.failing and stale.fail_count == 2 and stale.error == "503"
+
+
+class _FakeResponse:
+    def __init__(self, fn):
+        self._fn = fn
+    async def __aenter__(self):
+        await self._fn()
+        return self
+    async def __aexit__(self, *a):
+        return False
+    async def json(self):
+        return {}
+
+
+class _FakeSession:
+    def __init__(self, fn):
+        self._fn = fn
+    def get(self, *a, **k):
+        return _FakeResponse(self._fn)
+
+
+def _fail_if_called():
+    raise AssertionError("network must not be used while backing off")

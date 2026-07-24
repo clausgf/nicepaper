@@ -40,17 +40,17 @@ class GlobalConfig(BaseModel):
     """
     ical_update_interval_s: int = 600
     ical_max_days: int = 30
-    ical_error: str = "Fehler beim Abrufen der Kalenderdaten"
-    no_appointments: str = "Keine Termine"
-    next_appointment: str = "Nächster Termin"
-    current_appointment: str = "Aktueller Termin"
-    further_appointments: str = "Weitere Termine"
+    ical_error: str = "Error fetching calendar data"
+    no_appointments: str = "No appointments"
+    next_appointment: str = "Next appointment"
+    current_appointment: str = "Current appointment"
+    further_appointments: str = "Further appointments"
     roomcalendar_date_format_long: str = "EEEE, dd.MM.yyyy"
     roomcalendar_date_format_short: str = "dd.MM.yy"
     roomcalendar_time_format: str = "HH:mm"
 
     weather_update_interval_s: int = 900
-    weather_error: str = "Fehler beim Abrufen der Wetterdaten"
+    weather_error: str = "Error fetching weather data"
     wind_speed_unit: str = Field(
         default="kmh",
         description=(
@@ -60,8 +60,11 @@ class GlobalConfig(BaseModel):
             "language follows the 'locale' field (de/en)."
         ),
     )
+    weather_retry_min_s: int = Field(default=60, description="Backoff after a failed weather fetch starts at this many seconds and doubles per consecutive failure.")
+    weather_retry_max_s: int = Field(default=1800, description="Upper cap for the weather-fetch backoff, in seconds.")
+    weather_stale_notice: str = Field(default="as of {time}", description="WeatherNow marker shown when serving cached data during an outage; '{time}' is the last successful update. Empty to hide.")
 
-    image_error: str = "Fehler beim Laden des Bildes"
+    image_error: str = "Error loading image"
 
     locale: str = 'de_DE.utf8'
     timezone: str = 'Europe/Berlin'

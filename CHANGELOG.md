@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+## 0.13.0 — 2026-07-24
+
+### Added
+
+- Weather fetches now back off on failure (exponential, `weather_retry_min_s` …
+  `weather_retry_max_s`) instead of retrying on every render, and serve the
+  last-known data during an outage (graceful degradation) with an "as of HH:MM"
+  marker on `WeatherNow` (`weather_stale_notice`). The nice4iot project
+  Dashboard's E-Paper card shows a per-location weather health line (fresh /
+  stale / unavailable) with the last error and next retry in a tooltip.
+
+### Changed
+
+- Default message and label strings are now English (`weather_error`,
+  `ical_error`, `image_error`, the room-calendar labels). Existing
+  `global_config.json` files keep their configured values; only the built-in
+  defaults changed. Set them in the global settings card for another language.
+- Updated all locked dependencies (niceview 0.9.0 → 0.9.1, plus nicegui,
+  fastapi, aiohttp, icalendar, ruff, …).
+
+### Fixed
+
+- Clearing a widget number field (e.g. `size_height`) after typing no longer
+  leaves a stuck "Set width and height together …" validation error — fixed
+  upstream in niceview 0.9.1 (a cleared `ui.number` now round-trips to empty
+  instead of a stale value).
+
 ## 0.12.0 — 2026-07-23
 
 ### Added

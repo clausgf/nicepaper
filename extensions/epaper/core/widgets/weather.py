@@ -1,10 +1,12 @@
 from typing import Optional, Union
 
+from babel.dates import format_datetime, get_timezone
+
 from extensions.epaper.config import app_config
 from extensions.epaper.core import charting
 from extensions.epaper.core.datasources.weather import (
-    convert_wind_speed, format_wind_speed, get_weather, metric_title, weather_icon_and_description,
-    wind_direction_label, wind_labels,
+    WeatherStatus, convert_wind_speed, format_wind_speed, get_weather, metric_title,
+    weather_icon_and_description, wind_direction_label, wind_labels,
 )
 from extensions.epaper.models.screenmodel import (
     WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
@@ -29,18 +31,35 @@ class _WeatherWidgetBase(Widget):
 
     def __init__(self, id: str, config: AnyWeatherWidgetModel):
         super().__init__(id, config)
+        self._status: Optional[WeatherStatus] = None
         if not self.config.size:
             self.config.size = _DEFAULT_SIZE
             logger.info(f"Widget {self.id} has no size, assuming {self.config.size}")
 
     async def _fetch(self, ctx: DrawingContext) -> Optional[dict]:
+        """Return the forecast data (fresh or, during an outage, last-known --
+        graceful degradation), or None if there is nothing to show, in which
+        case the configured error message is drawn. get_weather() handles the
+        backoff and never raises. self._status carries the staleness/failure
+        details for _draw_stale_notice() and the dashboard."""
         w, h = self.config.size
-        try:
-            return await get_weather(ctx.paths.weather_dir, self.config.latitude, self.config.longitude)
-        except Exception as e:
-            logger.error(f"Error occurred while fetching weather data for {self.id}: {e}")
+        self._status = await get_weather(ctx.paths.weather_dir, self.config.latitude, self.config.longitude)
+        if self._status.data is None:
             ctx.draw_text((0, 0), size=(w, h), text=app_config.weather_error, font=self.font)
             return None
+        return self._status.data
+
+    def _draw_stale_notice(self, ctx: DrawingContext, size: tuple[int, int]) -> None:
+        """Draw the 'as of HH:MM' marker (top-right, small) when showing cached
+        data during an outage. No-op when data is fresh or the notice is empty."""
+        status = self._status
+        if status is None or status.fresh or status.last_update is None or not app_config.weather_stale_notice:
+            return
+        when = format_datetime(status.last_update, format=app_config.time_format,
+                               tzinfo=get_timezone(app_config.timezone), locale=app_config.locale)
+        text = app_config.weather_stale_notice.format(time=when)
+        row_h = ctx.textsize(text, self.font)[1] + 2
+        ctx.draw_text((0, 0), size=(size[0], row_h), text=text, alignment='rt', font=self.font, ellipsis='...')
 
 
 class WeatherNowWidget(_WeatherWidgetBase):
@@ -88,6 +107,8 @@ class WeatherNowWidget(_WeatherWidgetBase):
             ctx.draw_text((info_x, y), size=(info_w, line_h), text=line,
                           alignment='lt', font=self.font, ellipsis='...')
             y += line_h
+
+        self._draw_stale_notice(ctx, (w, h))
 
 
 class WeatherForecastWidget(_WeatherWidgetBase):

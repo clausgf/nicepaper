@@ -42,8 +42,15 @@ same settings with humanized labels):
   the `RoomCalendar` widget.
 - `weather_update_interval_s` — Open-Meteo polling interval for the `Weather*`
   widgets.
-- `image_error` — message the `Image` widget renders when its image can't be
-  loaded within the fetch timeout.
+- `weather_retry_min_s`, `weather_retry_max_s` — after a failed Open-Meteo
+  fetch, weather backs off starting at `weather_retry_min_s` and doubling per
+  consecutive failure up to `weather_retry_max_s`, so an outage isn't hammered.
+  During the backoff the last-known data is still shown (graceful degradation).
+- `weather_stale_notice` — the `WeatherNow` marker shown while serving cached
+  data during an outage; `{time}` is the last successful update. Empty to hide.
+- `weather_error`, `ical_error`, `image_error` — messages drawn when weather /
+  calendar / image data can't be loaded. (All the default message/label strings
+  are English; edit them here for another language.)
 - `color_background`, `color_primary`, `color_accent` — screen background,
   default text/drawing color, and the color the chart widgets use for their
   primary series (accent defaults to red, the only accent the `bwr` color model
