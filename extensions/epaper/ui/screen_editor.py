@@ -16,10 +16,18 @@ standalone mode doesn't need one (see standalone.py).
 import os
 from typing import Optional
 
+import nicegui.elements.sortable  # noqa: F401  (see below)
 from nicegui import ui
 from nicegui.events import SortableEventArguments
 from niceview import DrillDownWrapper, JsonAdapter, ListAdapter, ModelForm
 from niceview.util import confirm_dialog
+
+# NiceGUI 3.15's sortable is a mixin method (make_sortable), not a `ui.*` element,
+# so nicegui's eager esm-import loop (ui.py, "Eagerly import element packages with
+# 'dist' dirs") misses it: its 'nicegui-sortable' importmap entry is only
+# registered on first make_sortable() call -- too late for our widget list, which
+# is created dynamically after the initial page load. Importing the module here at
+# setup registers the ESM eagerly so 'nicegui-sortable' is in every page's importmap.
 
 from extensions.epaper.config import app_config, resource_paths
 from extensions.epaper.core.datasources.image import clear_cache as clear_image_cache

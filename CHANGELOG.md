@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.13.1 — 2026-08-01
+
+### Changed
+
+- Updated niceview 0.9.1 → 0.10.0.
+
+### Fixed
+
+- Widget-list drag reordering works again. NiceGUI 3.15's sortable is a mixin
+  (`make_sortable`), not a `ui.*` element, so its `nicegui-sortable` importmap
+  entry was never registered eagerly and failed to resolve for the widget list
+  (which is created dynamically after page load). We now import the sortable
+  module at setup so the entry is in every page's importmap.
+
 ## 0.13.0 — 2026-07-24
 
 ### Added
