@@ -30,14 +30,21 @@ content actually changed.
 ## Features
 
 - **Screens from JSON** — layouts made of widgets (`Text`, `Date`,
-  `RoomCalendar`, `WeatherNow`, `WeatherForecast`, `WeatherChart`) rendered
-  onto an RGB canvas with Pillow.
+  `RoomCalendar`, `WeatherNow`, `WeatherForecast`, `WeatherChart`, `Image`,
+  `HomeAssistant`) rendered onto an RGB canvas with Pillow.
 - **Room calendar** — fetches an iCal feed (with recurring-event expansion),
   caches it, and shows the current, next, and further appointments.
 - **Weather** — current conditions, an hourly forecast strip, and a
   configurable temperature/precipitation chart, backed by
   [Open-Meteo](https://open-meteo.com) (no API key needed). Charts are
   hand-drawn with Pillow so they stay crisp on limited e-paper palettes.
+- **Images** — show a picture from a URL or from a file in the project
+  directory, cached once or reloaded on every render, scaled to the widget size
+  with or without keeping its aspect ratio.
+- **Home Assistant** — display any entity's state (or one of its attributes) as
+  text or as a gauge, via HA's REST API and a long-lived access token. Gauges
+  (a 240° dial or a bar) are drawn locally with Pillow, so they stay sharp on a
+  black/white display instead of dithering like a browser screenshot would.
 - **E-paper color models** — render to `bw`, `bwr`, `gs4`, `c7`, or `e6` via
   the `color_model` query parameter.
 - **Update schedules** — plain JSON weekly rules (weekdays, months, times)

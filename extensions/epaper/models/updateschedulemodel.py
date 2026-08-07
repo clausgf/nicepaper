@@ -19,7 +19,8 @@ class WeeklyScheduleModel(BaseModel):
     # renders as ui.input_chips (list[str]'s default niceview widget), with the
     # HH:MM pattern still enforced by pydantic on each chip
     times: List[Annotated[str, Field(pattern=TIME_PATTERN)]] = Field(
-        description="List of times an update is scheduled, each in 'hh:mm' format")
+        description="List of times an update is scheduled, each in 'hh:mm' format, "
+                    "in the configured timezone (the global 'timezone' setting, default Europe/Berlin).")
 
     @field_validator('times')
     @classmethod

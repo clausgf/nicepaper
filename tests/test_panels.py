@@ -29,3 +29,26 @@ def test_humanize_age():
     assert _humanize_age(now - d(minutes=5), now) == "5 min ago"
     assert _humanize_age(now - d(hours=3), now) == "3 h ago"
     assert _humanize_age(now - d(days=2), now) == "2 d ago"
+
+
+def test_default_widgets_have_no_empty_required_fields():
+    """A newly added widget must validate as a whole: niceview enforces
+    required fields at the widget level and commits an item only once it
+    validates, so an empty required string (the old placeholder) would block
+    every other edit in the widget's form until it is filled in."""
+    from extensions.epaper.ui.screen_editor import WIDGET_MODELS, _default_widget
+    for widget_type, model_cls in WIDGET_MODELS.items():
+        widget = _default_widget(widget_type)
+        assert isinstance(widget, model_cls)
+        empty = [name for name, field in model_cls.model_fields.items()
+                 if field.is_required() and getattr(widget, name) in (None, '', [])]
+        assert not empty, f"{widget_type} starts with empty required field(s): {empty}"
+
+
+def test_new_schedule_rule_has_a_starter_time():
+    """Same reason as above: `times` is required, so a new weekly rule can't
+    start out empty or its weekday/month fields wouldn't commit."""
+    from extensions.epaper.ui.schedule_editor import _default_rule
+    rule = _default_rule()
+    assert rule.times
+    assert rule.by_weekdays and rule.by_months  # "every", not an empty restriction

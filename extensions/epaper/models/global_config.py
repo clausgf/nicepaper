@@ -54,10 +54,9 @@ class GlobalConfig(BaseModel):
     wind_speed_unit: str = Field(
         default="kmh",
         description=(
-            "Unit the WeatherNow widget shows wind speed in: kmh, ms, mph or "
-            "kn (knots). Open-Meteo is always fetched in km/h and converted "
-            "locally, so changing this needs no refetch. Weather description "
-            "language follows the 'locale' field (de/en)."
+            "Unit for wind speed: kmh, ms, mph or kn (knots). Open-Meteo is "
+            "always fetched in km/h and converted locally, so changing this "
+            "needs no refetch."
         ),
     )
     weather_retry_min_s: int = Field(default=60, description="Backoff after a failed weather fetch starts at this many seconds and doubles per consecutive failure.")
@@ -65,6 +64,17 @@ class GlobalConfig(BaseModel):
     weather_stale_notice: str = Field(default="as of {time}", description="WeatherNow marker shown when serving cached data during an outage; '{time}' is the last successful update. Empty to hide.")
 
     image_error: str = "Error loading image"
+
+    # Home Assistant (HomeAssistant widget). The token is a secret stored in
+    # plain text in this config file, like every other field -- see SECURITY.md;
+    # give it a read-only user's long-lived access token if that matters.
+    homeassistant_url: str = Field(default="", description="Base URL of the Home Assistant instance, e.g. 'http://homeassistant.local:8123'. Empty disables the HomeAssistant widget.")
+    homeassistant_token: str = Field(default="", description="Long-lived access token, created on the Home Assistant profile page. Stored in plain text in this config file.")
+    homeassistant_update_interval_s: int = Field(default=300, description="How long a fetched entity state is reused before Home Assistant is asked again.")
+    homeassistant_retry_min_s: int = Field(default=60, description="Backoff after a failed Home Assistant fetch starts at this many seconds and doubles per consecutive failure.")
+    homeassistant_retry_max_s: int = Field(default=1800, description="Upper cap for the Home Assistant fetch backoff, in seconds.")
+    homeassistant_error: str = "Error fetching Home Assistant data"
+    homeassistant_stale_notice: str = Field(default="as of {time}", description="HomeAssistant widget marker shown when serving a cached value during an outage; '{time}' is the last successful update. Empty to hide.")
 
     locale: str = 'de_DE.utf8'
     timezone: str = 'Europe/Berlin'

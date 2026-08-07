@@ -48,13 +48,41 @@ same settings with humanized labels):
   During the backoff the last-known data is still shown (graceful degradation).
 - `weather_stale_notice` — the `WeatherNow` marker shown while serving cached
   data during an outage; `{time}` is the last successful update. Empty to hide.
-- `weather_error`, `ical_error`, `image_error` — messages drawn when weather /
-  calendar / image data can't be loaded. (All the default message/label strings
-  are English; edit them here for another language.)
+- `weather_error`, `ical_error`, `image_error`, `homeassistant_error` — messages
+  drawn when weather / calendar / image / Home Assistant data can't be loaded.
+  (All the default message/label strings are English; edit them here for another
+  language.)
 - `color_background`, `color_primary`, `color_accent` — screen background,
   default text/drawing color, and the color the chart widgets use for their
   primary series (accent defaults to red, the only accent the `bwr` color model
   has).
+
+## Home Assistant
+
+The `HomeAssistant` widget (see [Screens, widgets & schedules](screens.md)) needs
+two settings before it can show anything:
+
+- `homeassistant_url` — base URL of the instance, e.g.
+  `http://homeassistant.local:8123`. Empty (the default) disables the widget.
+- `homeassistant_token` — a **long-lived access token**, created in Home
+  Assistant under *your profile → Security → Long-lived access tokens*. It is
+  sent as `Authorization: Bearer …` and is stored in plain text in the config
+  file, so prefer a token belonging to a dedicated, least-privileged user — see
+  [SECURITY.md](../SECURITY.md).
+
+Optional:
+
+- `homeassistant_update_interval_s` — how long a fetched state is reused before
+  Home Assistant is asked again (default 300 s). Entity states are cached per
+  entity, so several widgets showing the same entity cause one request.
+- `homeassistant_retry_min_s`, `homeassistant_retry_max_s` — the same
+  doubling backoff as weather, so an unreachable instance isn't hammered once
+  per widget per render.
+- `homeassistant_stale_notice` — marker shown while a cached value is served
+  during an outage (`{time}` is the last successful update). Empty to hide.
+
+No Home Assistant *add-on* or custom component is needed on the HA side; the
+REST API is built in, and nicepaper only reads entity states.
 
 `epaper_color_models` also lives in the file (and round-trips through it) but is
 not exposed in the card — a nested list of palettes is beyond what the form can

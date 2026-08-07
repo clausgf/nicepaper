@@ -31,13 +31,17 @@ Understanding the intended boundaries helps judge whether something is a bug:
   API-key scheme](docs/development.md#api-keys-for-the-display-api)). Image
   URLs are otherwise unauthenticated: anyone who can reach the endpoint can
   fetch a rendered screen.
-- **Outbound fetches** — nicepaper fetches iCal feeds and Open-Meteo weather
-  data over the network on behalf of a screen's configuration. Treat the
-  configured feed URLs as trusted input; a malicious feed is a configuration
-  problem rather than a bypass of a boundary.
+- **Outbound fetches** — nicepaper fetches iCal feeds, Open-Meteo weather data,
+  images and Home Assistant entity states over the network on behalf of a
+  screen's configuration. Treat the configured URLs as trusted input; a
+  malicious feed is a configuration problem rather than a bypass of a boundary.
 - **Filesystem storage** — screens, schedules, aliases and cached images live in
   plain files under `data/`. Anyone with read access to that directory can read
   the full configuration and rendered images.
+- **Credentials in the config file** — the Home Assistant long-lived access
+  token is stored in plain text in the global config file, like every other
+  setting. Give nicepaper a token of a dedicated, least-privileged Home
+  Assistant user, and protect the config file with filesystem permissions.
 
 Reports about the defaults above are welcome as regular issues; reports about
 ways to bypass a boundary that *is* meant to hold — path traversal through

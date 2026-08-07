@@ -25,6 +25,7 @@ def register(app: FastAPI) -> None:
 
     from extensions.epaper.api.endpoints import build_extension_router
     from extensions.epaper.config import load_global_config, save_global_config
+    from extensions.epaper.core.datasources.homeassistant import read_all_entity_statuses
     from extensions.epaper.core.datasources.weather import read_all_weather_statuses
     from extensions.epaper.paths import EpaperPaths
     from extensions.epaper.ui.panels import dashboard_card, device_config_card, global_config_fields
@@ -61,8 +62,10 @@ def register(app: FastAPI) -> None:
         num_screens = len(list(paths.screen_dir.glob('*.json')))
         num_schedules = len(list(paths.schedule_dir.glob('*.json')))
         weather_statuses = read_all_weather_statuses(paths.weather_dir)
+        homeassistant_statuses = read_all_entity_statuses(paths.homeassistant_dir)
         dashboard_card(num_screens, num_schedules, project_url(project_name, tab='Screens'),
-                       weather_statuses=weather_statuses)
+                       weather_statuses=weather_statuses,
+                       homeassistant_statuses=homeassistant_statuses)
 
     register_project_card('dashboard', _dashboard_card)
 

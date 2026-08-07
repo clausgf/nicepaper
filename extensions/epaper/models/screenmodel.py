@@ -33,7 +33,8 @@ class ImageMetadata(BaseModel):
 
 
 class WidgetModel(BaseModel):
-    widget_type: Literal["Text", "Date", "RoomCalendar", "WeatherNow", "WeatherForecast", "WeatherChart", "Image"]
+    widget_type: Literal["Text", "Date", "RoomCalendar", "WeatherNow", "WeatherForecast", "WeatherChart",
+                         "Image", "HomeAssistant"]
 
     # Tuple[int, int] fields (position/size) aren't renderable by niceview
     # (an unrecognised field type falls back to a plain ui.input bound to
@@ -175,6 +176,36 @@ class ImageWidgetModel(WidgetModel):
     _allows_partial_size: ClassVar[bool] = True
 
 
+HomeAssistantDisplay = Literal["value", "gauge"]
+GaugeStyle = Literal["arc", "bar"]
+
+
+class HomeAssistantWidgetModel(WidgetModel):
+    """Shows one Home Assistant entity's state (or one of its attributes),
+    either as a line of text or as a locally drawn gauge.
+
+    The gauge is rendered here with PIL rather than fetched from Home
+    Assistant: HA's own gauge cards are browser-rendered and not retrievable
+    as an image, and a browser screenshot would dither badly on an e-paper
+    palette (see core/gauge.py). An image Home Assistant *does* serve (a
+    camera snapshot, an add-on-rendered dashboard) can still be shown with
+    the Image widget instead.
+
+    Connection settings (URL, token, intervals) are global, see GlobalConfig."""
+    widget_type: Literal["HomeAssistant"] = "HomeAssistant"
+    entity_id: str = Field(description="Home Assistant entity id, e.g. 'sensor.living_room_temperature'.")
+    attribute: Optional[str] = Field(default=None, description="Show this attribute instead of the entity's state, e.g. 'temperature' of a climate entity. Empty shows the state.")
+    label: Optional[str] = Field(default=None, description="Label for the value. Empty uses the entity's friendly name from Home Assistant.")
+    unit: Optional[str] = Field(default=None, description="Unit appended to the value. Empty uses the entity's unit_of_measurement from Home Assistant.")
+    decimals: int = Field(default=1, ge=0, le=6, description="Decimal places for numeric values. Non-numeric states (e.g. 'on') are shown unchanged.")
+    show_label: bool = Field(default=True, description="Draw the label alongside the value.")
+    display: HomeAssistantDisplay = Field(default="value", description="Draw the value as a line of text, or as a gauge.")
+    alignment: Optional[str] = Field(pattern=r'^[lcr][tcb]$', default="lb", description="Two-letter alignment code for the text display: horizontal (l=left, c=center, r=right) and vertical (t=top, c=center, b=bottom).")
+    gauge_style: GaugeStyle = Field(default="arc", description="Gauge shape: a 240° dial ('arc') or a horizontal bar. Only used when display is 'gauge'.")
+    min_value: float = Field(default=0.0, description="Start of the gauge scale. Values below it are clamped.")
+    max_value: float = Field(default=100.0, description="End of the gauge scale. Values above it are clamped.")
+
+
 # discriminated union: widget_type selects the concrete model and a
 # missing/unknown widget_type is a validation error instead of silently
 # matching the first union member
@@ -182,7 +213,7 @@ AnyWidget = Annotated[
     Union[
         DateWidgetModel, TextWidgetModel, RoomCalendarWidgetModel,
         WeatherNowWidgetModel, WeatherForecastWidgetModel, WeatherChartWidgetModel,
-        ImageWidgetModel,
+        ImageWidgetModel, HomeAssistantWidgetModel,
     ],
     Field(discriminator="widget_type"),
 ]

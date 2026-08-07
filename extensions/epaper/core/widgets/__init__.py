@@ -3,9 +3,10 @@ from .date import DateWidget
 from .roomcalendar import RoomCalendarWidget
 from .weather import WeatherNowWidget, WeatherForecastWidget, WeatherChartWidget
 from .image import ImageWidget
+from .homeassistant import HomeAssistantWidget
 
 __all__ = [
     "TextWidget", "DateWidget", "RoomCalendarWidget",
     "WeatherNowWidget", "WeatherForecastWidget", "WeatherChartWidget",
-    "ImageWidget",
+    "ImageWidget", "HomeAssistantWidget",
 ]

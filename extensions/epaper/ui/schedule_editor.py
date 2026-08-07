@@ -18,6 +18,15 @@ from extensions.epaper.ui.panels import directory_drilldown
 from extensions.epaper.util import check_filename
 
 
+def _default_rule() -> WeeklyScheduleModel:
+    """A new weekly rule. It starts with a time rather than an empty list:
+    `times` is required, and niceview commits an item only once it validates
+    as a whole -- an empty list would block editing weekdays/months until a
+    time is added (and a rule without a time wouldn't schedule anything
+    anyway). Weekdays/months default to "every", see WeeklyScheduleModel."""
+    return WeeklyScheduleModel(times=['08:00'])
+
+
 def schedule_editor_content(paths: EpaperPaths, filename: str) -> None:
     """
     Edit a schedule as a card per weekly rule (WeeklyScheduleModel), backed
@@ -53,8 +62,12 @@ def schedule_editor_content(paths: EpaperPaths, filename: str) -> None:
                 form.render_field('by_weekdays', widget_type='checkbox_group', props='inline dense').widget.classes('w-full')
                 form.render_field('by_months', props='outlined dense').classes('w-full')
                 # times: List[Annotated[str, pattern]] -> ui.input_chips, a real
-                # ui.element (unlike checkbox_group/editgrid), so .classes() works
-                form.render_field('times', props='outlined dense').classes('w-full')
+                # ui.element (unlike checkbox_group/editgrid), so .classes() works.
+                # Which timezone the times are in isn't guessable and the
+                # description is only a tooltip (no hover on a touch device), so
+                # it gets a short permanent hint as well.
+                form.render_field('times', hint="'hh:mm' in the configured timezone",
+                                  props='outlined dense').classes('w-full')
                 form.render_nonfield_errors()
 
     async def delete_rule(key: str):
@@ -66,7 +79,7 @@ def schedule_editor_content(paths: EpaperPaths, filename: str) -> None:
         ui.notify('Rule deleted', type='positive')
 
     def add_rule():
-        adapter.create(WeeklyScheduleModel(times=[]))
+        adapter.create(_default_rule())
         rule_cards.refresh()
 
     rule_cards()

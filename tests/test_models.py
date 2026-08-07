@@ -3,7 +3,7 @@ from pydantic import ValidationError
 from extensions.epaper.models.screenmodel import (
     ScreenModel, TextWidgetModel, RoomCalendarWidgetModel,
     WeatherNowWidgetModel, WeatherForecastWidgetModel, WeatherChartWidgetModel,
-    ImageWidgetModel,
+    ImageWidgetModel, HomeAssistantWidgetModel,
 )
 
 
@@ -264,3 +264,38 @@ def test_weather_widget_discriminated_union_round_trip(widget_type, model_cls, e
     if extra:
         assert reloaded.widgets[0].primary_metric == "precipitation"
         assert reloaded.widgets[0].secondary_metric == "temperature"
+
+
+def test_homeassistant_widget_defaults():
+    w = HomeAssistantWidgetModel(position_x=0, position_y=0, entity_id="sensor.temp")
+    assert w.display == "value" and w.gauge_style == "arc"
+    assert w.attribute is None and w.label is None and w.unit is None
+    assert w.decimals == 1 and w.show_label is True
+    assert (w.min_value, w.max_value) == (0.0, 100.0)
+
+
+def test_homeassistant_widget_requires_an_entity_id():
+    with pytest.raises(ValidationError):
+        HomeAssistantWidgetModel(position_x=0, position_y=0)
+
+
+def test_homeassistant_widget_rejects_unknown_display_and_gauge_style():
+    with pytest.raises(ValidationError):
+        HomeAssistantWidgetModel(position_x=0, position_y=0, entity_id="sensor.temp", display="dial")
+    with pytest.raises(ValidationError):
+        HomeAssistantWidgetModel(position_x=0, position_y=0, entity_id="sensor.temp", gauge_style="needle")
+
+
+def test_homeassistant_widget_round_trips_through_union():
+    screen = ScreenModel(width=400, height=300, widgets=[
+        {"widget_type": "HomeAssistant", "position_x": 10, "position_y": 20,
+         "entity_id": "sensor.living_room_temperature", "display": "gauge",
+         "gauge_style": "bar", "min_value": -10, "max_value": 40, "decimals": 0},
+    ])
+    assert isinstance(screen.widgets[0], HomeAssistantWidgetModel)
+    reloaded = ScreenModel.model_validate_json(screen.model_dump_json())
+    widget = reloaded.widgets[0]
+    assert isinstance(widget, HomeAssistantWidgetModel)
+    assert widget.entity_id == "sensor.living_room_temperature"
+    assert (widget.display, widget.gauge_style) == ("gauge", "bar")
+    assert (widget.min_value, widget.max_value, widget.decimals) == (-10.0, 40.0, 0)

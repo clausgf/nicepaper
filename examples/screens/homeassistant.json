@@ -1,0 +1,76 @@
+{
+  "width": 800,
+  "height": 480,
+  "update_schedule_id": "default",
+  "widgets": [
+    {
+      "widget_type": "Text",
+      "position_x": 20,
+      "position_y": 16,
+      "text": "Home",
+      "alignment": "lt",
+      "font_name": "Ubuntu-Bold.ttf",
+      "font_size": 28
+    },
+    {
+      "widget_type": "HomeAssistant",
+      "position_x": 20,
+      "position_y": 70,
+      "size_width": 180,
+      "size_height": 150,
+      "entity_id": "sensor.living_room_temperature",
+      "display": "gauge",
+      "gauge_style": "arc",
+      "min_value": -10,
+      "max_value": 40
+    },
+    {
+      "widget_type": "HomeAssistant",
+      "position_x": 220,
+      "position_y": 70,
+      "size_width": 180,
+      "size_height": 150,
+      "entity_id": "sensor.living_room_humidity",
+      "display": "gauge",
+      "gauge_style": "arc",
+      "min_value": 0,
+      "max_value": 100,
+      "decimals": 0
+    },
+    {
+      "widget_type": "HomeAssistant",
+      "position_x": 420,
+      "position_y": 80,
+      "size_width": 360,
+      "size_height": 80,
+      "entity_id": "sensor.power_consumption",
+      "label": "Power",
+      "display": "gauge",
+      "gauge_style": "bar",
+      "min_value": 0,
+      "max_value": 3000,
+      "decimals": 0
+    },
+    {
+      "widget_type": "HomeAssistant",
+      "position_x": 420,
+      "position_y": 180,
+      "size_width": 360,
+      "size_height": 30,
+      "entity_id": "climate.hall",
+      "attribute": "temperature",
+      "label": "Hall target",
+      "unit": "°C",
+      "alignment": "lt"
+    },
+    {
+      "widget_type": "HomeAssistant",
+      "position_x": 420,
+      "position_y": 215,
+      "size_width": 360,
+      "size_height": 30,
+      "entity_id": "binary_sensor.front_door",
+      "alignment": "lt"
+    }
+  ]
+}

@@ -18,6 +18,7 @@ from babel.dates import format_datetime, get_timezone
 from niceview import DirectoryAdapter, DrillDownWrapper, FileEntry, ModelForm
 
 from extensions.epaper.config import app_config, resource_paths
+from extensions.epaper.core.datasources.homeassistant import EntityStatus
 from extensions.epaper.core.datasources.weather import WeatherStatus
 from extensions.epaper.core.screen import get_aliases, set_alias
 from extensions.epaper.paths import EpaperPaths
@@ -41,6 +42,24 @@ _SLIDE_CSS = '''
 ui.add_css(_SLIDE_CSS, shared=True)
 
 
+# Short hints for fields nobody can guess from the label alone (see
+# _render_row): Babel/CLDR patterns and the '{time}' placeholder of the
+# stale-data notices. The full explanation stays in the model description,
+# which niceview shows as a tooltip.
+_DATE_PATTERN_HINT = 'CLDR pattern, e.g. EEEE, dd. MMMM yyyy'
+_SHORT_DATE_PATTERN_HINT = 'CLDR pattern, e.g. dd.MM.yy'
+_TIME_PATTERN_HINT = 'CLDR pattern, e.g. HH:mm'
+_PATTERN_HINTS = {
+    'date_format': _SHORT_DATE_PATTERN_HINT,
+    'date_format_long': _DATE_PATTERN_HINT,
+    'roomcalendar_date_format_long': _DATE_PATTERN_HINT,
+    'roomcalendar_date_format_short': _SHORT_DATE_PATTERN_HINT,
+    'time_format': _TIME_PATTERN_HINT,
+    'roomcalendar_time_format': _TIME_PATTERN_HINT,
+}
+_STALE_NOTICE_HINT = "'{time}' is replaced by the last successful update"
+
+
 def slide_class(direction: str) -> str:
     """CSS class for a slide-in-from-left/right animation, keyed by
     navigation direction ('right' when drilling into a detail view,
@@ -48,13 +67,22 @@ def slide_class(direction: str) -> str:
     return 'slide-in-left' if direction == 'left' else 'slide-in-right'
 
 
-def _render_row(form: ModelForm, *field_names: str, props: str = 'outlined dense') -> None:
+def _render_row(form: ModelForm, *field_names: str, props: str = 'outlined dense',
+                hints: Optional[dict] = None) -> None:
     """Render several short fields side by side to save vertical space.
     Shared with screen_editor.py/schedule_editor.py (imported explicitly,
-    not part of the public API of this module)."""
+    not part of the public API of this module).
+
+    `hints` maps a field name to a short hint rendered below its widget. Field
+    descriptions are tooltips (niceview's default), which a touch device can't
+    show, so fields whose value is unguessable without help — format patterns,
+    alignment codes, placeholders like '{time}' — get a compact permanent hint
+    on top of the full description in the tooltip."""
+    hints = hints or {}
     with ui.row().classes('w-full gap-2'):
         for name in field_names:
-            form.render_field(name, props=props).classes('flex-grow')
+            extra = {'hint': hints[name]} if name in hints else {}
+            form.render_field(name, props=props, **extra).classes('flex-grow')
 
 
 def _entry_caption(item: FileEntry) -> str:
@@ -157,22 +185,19 @@ def _humanize_age(dt: Optional[datetime.datetime], now: datetime.datetime) -> st
     return f'{minutes // (60 * 24)} d ago'
 
 
-def _weather_status_row(status: WeatherStatus, now: datetime.datetime) -> None:
-    """One dashboard health line for a weather location: colour + icon by
-    severity, with a tooltip carrying the last error and retry time."""
-    coord = f'{status.latitude:.2f},{status.longitude:.2f}'
-    if not status.failing:
-        icon, color, text, tip = 'cloud_done', 'positive', f'Weather {coord}: updated {_humanize_age(status.last_update, now)}', None
-    else:
-        retry = ''
-        if status.retry_after and status.retry_after > now:
-            mins = max(1, int((status.retry_after - now).total_seconds() // 60))
-            retry = f', retry in {mins} min'
-        tip = f'{status.fail_count} failed attempt(s){retry}' + (f'\nLast error: {status.error}' if status.error else '')
-        if status.data is not None:
-            icon, color, text = 'cloud_off', 'warning', f'Weather {coord}: stale, last OK {_humanize_age(status.last_update, now)}'
-        else:
-            icon, color, text = 'cloud_off', 'negative', f'Weather {coord}: unavailable'
+def _failure_tooltip(status, now: datetime.datetime) -> str:
+    """Tooltip text for a failing datasource: attempts, next retry, last error.
+    Shared by the weather and Home Assistant health lines, whose status objects
+    carry the same failure fields."""
+    retry = ''
+    if status.retry_after and status.retry_after > now:
+        mins = max(1, int((status.retry_after - now).total_seconds() // 60))
+        retry = f', retry in {mins} min'
+    return (f'{status.fail_count} failed attempt(s){retry}'
+            + (f'\nLast error: {status.error}' if status.error else ''))
+
+
+def _health_row(icon: str, color: str, text: str, tip: Optional[str]) -> None:
     with ui.row().classes('items-center gap-1 no-wrap'):
         ui.icon(icon, color=color).props('size=xs')
         label = ui.label(text).classes('text-caption')
@@ -180,8 +205,38 @@ def _weather_status_row(status: WeatherStatus, now: datetime.datetime) -> None:
             label.tooltip(tip)
 
 
+def _weather_status_row(status: WeatherStatus, now: datetime.datetime) -> None:
+    """One dashboard health line for a weather location: colour + icon by
+    severity, with a tooltip carrying the last error and retry time."""
+    coord = f'{status.latitude:.2f},{status.longitude:.2f}'
+    if not status.failing:
+        icon, color, text, tip = 'cloud_done', 'positive', f'Weather {coord}: updated {_humanize_age(status.last_update, now)}', None
+    else:
+        tip = _failure_tooltip(status, now)
+        if status.data is not None:
+            icon, color, text = 'cloud_off', 'warning', f'Weather {coord}: stale, last OK {_humanize_age(status.last_update, now)}'
+        else:
+            icon, color, text = 'cloud_off', 'negative', f'Weather {coord}: unavailable'
+    _health_row(icon, color, text, tip)
+
+
+def _homeassistant_status_row(status: EntityStatus, now: datetime.datetime) -> None:
+    """One dashboard health line per cached Home Assistant entity, same
+    severity scheme as the weather lines above."""
+    if not status.failing:
+        icon, color, text, tip = 'sensors', 'positive', f'HA {status.entity_id}: updated {_humanize_age(status.last_update, now)}', None
+    else:
+        tip = _failure_tooltip(status, now)
+        if status.state is not None:
+            icon, color, text = 'sensors_off', 'warning', f'HA {status.entity_id}: stale, last OK {_humanize_age(status.last_update, now)}'
+        else:
+            icon, color, text = 'sensors_off', 'negative', f'HA {status.entity_id}: unavailable'
+    _health_row(icon, color, text, tip)
+
+
 def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
-                   weather_statuses: Sequence[WeatherStatus] = ()) -> None:
+                   weather_statuses: Sequence[WeatherStatus] = (),
+                   homeassistant_statuses: Sequence[EntityStatus] = ()) -> None:
     """
     Compact always-visible summary card for nice4iot's project Dashboard
     tab (register_project_card('dashboard', ...) requires the card to
@@ -190,9 +245,9 @@ def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
     tab='Screens')), since URL construction is nice4iot-specific and
     doesn't belong in this UI-only module.
 
-    weather_statuses (read from the weather cache by the caller) render one
-    health line per location, so a weather outage is visible here without
-    opening a screen.
+    weather_statuses / homeassistant_statuses (read from the respective caches
+    by the caller) render one health line per location/entity, so an outage of
+    either datasource is visible here without opening a screen.
     """
     now = datetime.datetime.now(ZoneInfo(app_config.timezone))
     with ui.card().classes('w-full'):
@@ -202,6 +257,8 @@ def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
         ui.label(f'{num_screens} screen(s), {num_schedules} schedule(s)').classes('text-caption text-grey-7')
         for status in weather_statuses:
             _weather_status_row(status, now)
+        for entity_status in homeassistant_statuses:
+            _homeassistant_status_row(entity_status, now)
 
 
 async def device_config_card(paths: EpaperPaths, device_name: str, image_base_url: str) -> None:
@@ -273,7 +330,7 @@ def global_config_fields(persist: Callable[[], None]) -> None:
     with ui.column().classes('w-full gap-2'):
         ui.label('General').classes('text-subtitle2')
         _render_row(form, 'locale', 'timezone')
-        _render_row(form, 'date_format', 'time_format')
+        _render_row(form, 'date_format', 'time_format', hints=_PATTERN_HINTS)
 
         ui.label('Font & Colors').classes('text-subtitle2')
         with ui.row().classes('w-full gap-2'):
@@ -290,7 +347,8 @@ def global_config_fields(persist: Callable[[], None]) -> None:
         form.render_field('ical_error', props='outlined dense').classes('w-full')
         _render_row(form, 'no_appointments', 'next_appointment')
         _render_row(form, 'current_appointment', 'further_appointments')
-        _render_row(form, 'roomcalendar_date_format_long', 'roomcalendar_date_format_short', 'roomcalendar_time_format')
+        _render_row(form, 'roomcalendar_date_format_long', 'roomcalendar_date_format_short',
+                    'roomcalendar_time_format', hints=_PATTERN_HINTS)
 
         ui.label('Weather').classes('text-subtitle2')
         with ui.row().classes('w-full gap-2'):
@@ -298,10 +356,36 @@ def global_config_fields(persist: Callable[[], None]) -> None:
             form.render_field('wind_speed_unit', widget_type='ui.select',
                                options=['kmh', 'ms', 'mph', 'kn'],
                                props='outlined dense').classes('flex-grow')
-        form.render_field('weather_error', props='outlined dense').classes('w-full')
+        _render_row(form, 'weather_retry_min_s', 'weather_retry_max_s')
+        _render_row(form, 'weather_error', 'weather_stale_notice',
+                    hints={'weather_stale_notice': _STALE_NOTICE_HINT})
 
         ui.label('Image').classes('text-subtitle2')
         form.render_field('image_error', props='outlined dense').classes('w-full')
+
+        ui.label('Home Assistant').classes('text-subtitle2')
+        # explicit labels here: the humanized field names would all read
+        # "Homeassistant ..." (one word, wrong spelling) and repeat the
+        # section heading in every field
+        form.render_field('homeassistant_url', label='Home Assistant URL',
+                          props='outlined dense').classes('w-full')
+        # the token is a secret: masked in the field, still stored as plain
+        # text in the config file (see GlobalConfig / SECURITY.md)
+        form.render_field('homeassistant_token', label='Long-lived access token',
+                          props='outlined dense type=password').classes('w-full')
+        with ui.row().classes('w-full gap-2'):
+            form.render_field('homeassistant_update_interval_s', label='Update interval s',
+                              props='outlined dense').classes('flex-grow')
+            form.render_field('homeassistant_retry_min_s', label='Retry min s',
+                              props='outlined dense').classes('flex-grow')
+            form.render_field('homeassistant_retry_max_s', label='Retry max s',
+                              props='outlined dense').classes('flex-grow')
+        with ui.row().classes('w-full gap-2'):
+            form.render_field('homeassistant_error', label='Error message',
+                              props='outlined dense').classes('flex-grow')
+            form.render_field('homeassistant_stale_notice', label='Stale notice',
+                              hint=_STALE_NOTICE_HINT,
+                              props='outlined dense').classes('flex-grow')
 
         form.render_nonfield_errors()
 

@@ -32,11 +32,13 @@ from niceview.util import confirm_dialog
 from extensions.epaper.config import app_config, resource_paths
 from extensions.epaper.core.datasources.image import clear_cache as clear_image_cache
 from extensions.epaper.models.screenmodel import (
-    DateWidgetModel, ImageWidgetModel, RoomCalendarWidgetModel, ScreenModel, TextWidgetModel, WidgetModel,
-    WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
+    DateWidgetModel, HomeAssistantWidgetModel, ImageWidgetModel, RoomCalendarWidgetModel, ScreenModel,
+    TextWidgetModel, WidgetModel, WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
 )
 from extensions.epaper.paths import EpaperPaths
-from extensions.epaper.ui.panels import _render_row, directory_drilldown, slide_class
+from extensions.epaper.ui.panels import (
+    _DATE_PATTERN_HINT, _PATTERN_HINTS, _render_row, directory_drilldown, slide_class,
+)
 from extensions.epaper.util import check_filename
 
 WIDGET_MODELS: dict[str, type[WidgetModel]] = {
@@ -47,6 +49,7 @@ WIDGET_MODELS: dict[str, type[WidgetModel]] = {
     'WeatherForecast': WeatherForecastWidgetModel,
     'WeatherChart': WeatherChartWidgetModel,
     'Image': ImageWidgetModel,
+    'HomeAssistant': HomeAssistantWidgetModel,
 }
 WIDGET_ICONS: dict[str, str] = {
     'Text': 'text_fields',
@@ -56,6 +59,7 @@ WIDGET_ICONS: dict[str, str] = {
     'WeatherForecast': 'view_column',
     'WeatherChart': 'show_chart',
     'Image': 'image',
+    'HomeAssistant': 'sensors',
 }
 WIDGET_TITLES: dict[str, str] = {
     'Text': 'Text Widget',
@@ -65,10 +69,17 @@ WIDGET_TITLES: dict[str, str] = {
     'WeatherForecast': 'Weather (Forecast) Widget',
     'WeatherChart': 'Weather (Chart) Widget',
     'Image': 'Image Widget',
+    'HomeAssistant': 'Home Assistant Widget',
 }
 
 # image files selectable by the Image widget (Pillow-readable raster formats)
 IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')
+
+# Field descriptions are tooltips (niceview's default), which a touch device
+# can't show. The two-letter alignment code and the Babel/CLDR format patterns
+# are unusable without help, so those fields carry a compact permanent hint as
+# well -- see _render_row() in panels.py.
+_ALIGNMENT_HINT = 'Horizontal l/c/r + vertical t/c/b'
 
 
 def _widget_label(widget: WidgetModel) -> str:
@@ -86,6 +97,10 @@ def _widget_label(widget: WidgetModel) -> str:
         return f'{widget.latitude:.2f}, {widget.longitude:.2f}'
     if isinstance(widget, ImageWidgetModel):
         return (widget.url if widget.source_type == 'url' else widget.file) or '(no image)'
+    if isinstance(widget, HomeAssistantWidgetModel):
+        entity = widget.entity_id or '(no entity)'
+        detail = f'.{widget.attribute}' if widget.attribute else ''
+        return f'{entity}{detail} · {widget.display}'
     return widget.widget_type
 
 
@@ -123,15 +138,23 @@ def _screen_row_warning(paths: EpaperPaths, screen_key: str) -> Optional[str]:
 def _default_widget(widget_type: str) -> WidgetModel:
     """A new widget of the given type with placeholder values for its
     required fields -- filled in by the user in the detail form right
-    after creation."""
+    after creation.
+
+    The placeholders are deliberately non-empty: niceview enforces required
+    fields at the widget level and commits an item only once it validates as
+    a whole, so a widget created with empty required strings would block
+    every other edit in its form until they are filled in."""
     if widget_type == 'Text':
-        return TextWidgetModel(position_x=0, position_y=0, text='')
+        return TextWidgetModel(position_x=0, position_y=0, text='Text')
     if widget_type == 'Date':
         return DateWidgetModel(position_x=0, position_y=0)
     if widget_type == 'RoomCalendar':
-        return RoomCalendarWidgetModel(position_x=0, position_y=0, room_number='', room_name='', ical_url='')
+        return RoomCalendarWidgetModel(position_x=0, position_y=0, room_number='000', room_name='Room',
+                                       ical_url='https://example.com/calendar.ics')
     if widget_type == 'Image':
         return ImageWidgetModel(position_x=0, position_y=0)
+    if widget_type == 'HomeAssistant':
+        return HomeAssistantWidgetModel(position_x=0, position_y=0, entity_id='sensor.example')
     if widget_type in WIDGET_MODELS and issubclass(WIDGET_MODELS[widget_type], (
             WeatherNowWidgetModel, WeatherForecastWidgetModel, WeatherChartWidgetModel)):
         return WIDGET_MODELS[widget_type](position_x=0, position_y=0, latitude=0.0, longitude=0.0)
@@ -292,14 +315,15 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
             ui.label('Content').classes('text-subtitle2')
             if isinstance(widget, TextWidgetModel):
                 form.render_field('text', props='outlined dense').classes('w-full')
-                form.render_field('alignment', props='outlined dense').classes('w-32')
+                form.render_field('alignment', hint=_ALIGNMENT_HINT, props='outlined dense').classes('w-40')
             elif isinstance(widget, DateWidgetModel):
-                form.render_field('date_format', props='outlined dense').classes('w-full')
-                form.render_field('alignment', props='outlined dense').classes('w-32')
+                form.render_field('date_format', hint=_DATE_PATTERN_HINT,
+                                  props='outlined dense').classes('w-full')
+                form.render_field('alignment', hint=_ALIGNMENT_HINT, props='outlined dense').classes('w-40')
             elif isinstance(widget, RoomCalendarWidgetModel):
                 _render_row(form, 'room_number', 'room_name')
                 form.render_field('ical_url', props='outlined dense').classes('w-full')
-                _render_row(form, 'date_format_long', 'date_format', 'time_format')
+                _render_row(form, 'date_format_long', 'date_format', 'time_format', hints=_PATTERN_HINTS)
             elif isinstance(widget, WeatherNowWidgetModel):
                 _render_row(form, 'latitude', 'longitude')
             elif isinstance(widget, WeatherForecastWidgetModel):
@@ -322,11 +346,11 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
                     else:
                         form.render_field('url', props='outlined dense').classes('w-full')
 
-                with ui.row().classes('w-full items-center gap-3'):
-                    ui.label('Source').classes('text-caption')
-                    form.render_field('source_type', widget_type='ui.toggle',
-                                      options=['url', 'file']).on(
-                        'update:model-value', lambda: image_source_field.refresh())
+                # no hand-written caption next to the toggle: niceview renders
+                # the field's own label above widgets that have no label slot
+                form.render_field('source_type', widget_type='ui.toggle',
+                                  options=['url', 'file']).on(
+                    'update:model-value', lambda: image_source_field.refresh())
                 image_source_field()
 
                 def _reload_image() -> None:
@@ -338,6 +362,33 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
                     form.render_field('reload_each_time', label='Reload on every rendering', props='dense')
                     ui.space()
                     ui.button('Reload now', icon='refresh', on_click=_reload_image).props('flat dense')
+            elif isinstance(widget, HomeAssistantWidgetModel):
+                # only the fields that matter for the chosen display are shown
+                # (gauge scale vs. text alignment), same pattern as the Image
+                # widget's source_type above
+                @ui.refreshable
+                def display_fields() -> None:
+                    if widget.display == 'gauge':
+                        with ui.row().classes('w-full items-center gap-3'):
+                            form.render_field('gauge_style', widget_type='ui.toggle', options=['arc', 'bar'])
+                            form.render_field('min_value', props='outlined dense').classes('flex-grow')
+                            form.render_field('max_value', props='outlined dense').classes('flex-grow')
+                    else:
+                        form.render_field('alignment', hint=_ALIGNMENT_HINT,
+                                          props='outlined dense').classes('w-40')
+
+                form.render_field('entity_id', props='outlined dense').classes('w-full')
+                _render_row(form, 'attribute', 'label', 'unit')
+                with ui.row().classes('w-full items-center gap-3'):
+                    form.render_field('decimals', props='outlined dense').classes('w-32')
+                    form.render_field('display', widget_type='ui.toggle',
+                                      options=['value', 'gauge']).on(
+                        'update:model-value', lambda: display_fields.refresh())
+                    form.render_field('show_label', props='dense')
+                display_fields()
+                if not app_config.homeassistant_url:
+                    ui.label('No Home Assistant URL configured — set it in the global E-Paper settings.'
+                             ).classes('text-caption text-negative')
             form.render_nonfield_errors()
 
     def _open_detail(key: str) -> None:

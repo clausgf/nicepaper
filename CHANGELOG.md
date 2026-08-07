@@ -2,6 +2,57 @@
 
 ## Unreleased
 
+## 0.14.0 — 2026-08-07
+
+### Added
+
+- New `HomeAssistant` widget: shows one Home Assistant entity's state — or one
+  of its attributes (`attribute`) — as a line of text or as a gauge
+  (`display`). `label`/`unit` default to the entity's `friendly_name`/
+  `unit_of_measurement`, `decimals` rounds numeric values, `show_label` toggles
+  the label. Gauges are drawn locally with Pillow (new
+  `extensions/epaper/core/gauge.py`) as a 240° dial or a horizontal bar
+  (`gauge_style`) on the `min_value` … `max_value` scale; out-of-range values
+  are clamped and non-numeric states (`on`, `unavailable`, …) leave the scale
+  empty. Entity states are fetched through HA's REST API, cached per entity,
+  and — like weather — back off exponentially on failure, keep showing the
+  last-known value with a `homeassistant_stale_notice` marker, and surface the
+  outage as a health line on the nice4iot Dashboard card.
+- New global settings for it: `homeassistant_url`, `homeassistant_token`
+  (a long-lived access token, masked in the card), plus
+  `homeassistant_update_interval_s`, `homeassistant_retry_min_s`,
+  `homeassistant_retry_max_s`, `homeassistant_error` and
+  `homeassistant_stale_notice`. Empty URL/token disables the widget.
+- `examples/screens/homeassistant.json` — arc/bar gauges and text values.
+
+### Changed
+
+- Updated niceview 0.10.0 → 0.14.1, which changes how every form behaves:
+  - A field's model **description is now shown as a tooltip** (it used to fill
+    the placeholder, i.e. it was effectively invisible). Fields whose value
+    can't be guessed from the label — the two-letter `alignment` codes, the
+    Babel/CLDR format patterns, the schedule times' timezone, the `{time}`
+    placeholder of the stale-data notices — additionally carry a short
+    permanent hint below the widget, since a tooltip needs a hover a touch
+    device can't do.
+  - **Required fields are marked with `*` and enforced in the form**, and an
+    edited item is only committed once it validates as a whole. New widgets
+    and new weekly schedule rules therefore start with non-empty placeholder
+    values (`Text` → "Text", `RoomCalendar` → example room/URL,
+    `HomeAssistant` → `sensor.example`, a new rule → 08:00); previously they
+    started empty, which would now block every other edit in the same form
+    until the empty field was filled in.
+  - `wind_speed_unit`'s description no longer repeats where the *language*
+    comes from — that belongs to `locale`.
+
+### Fixed
+
+- The global settings card now also exposes `weather_retry_min_s`,
+  `weather_retry_max_s` and `weather_stale_notice`, which 0.13.0 added to the
+  config file but never rendered — they were only editable by hand.
+- The schedule editor states the timezone the wake times are in (the global
+  `timezone` setting) instead of leaving it to be guessed.
+
 ## 0.13.1 — 2026-08-01
 
 ### Changed

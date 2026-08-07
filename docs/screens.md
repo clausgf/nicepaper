@@ -30,6 +30,30 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   font of its own. The selectable files live in the project directory — in the
   nice4iot extension that is the project directory where *Project Files* are
   managed, standalone it is the `data/` directory.
+- **`HomeAssistant`** — shows one [Home Assistant](https://www.home-assistant.io)
+  entity, fetched through HA's REST API (`GET /api/states/<entity_id>`). Pick
+  the entity with `entity_id` and optionally read one of its attributes instead
+  of the state (`attribute`, e.g. `temperature` of a `climate` entity).
+  `label`/`unit` default to the entity's own `friendly_name`/
+  `unit_of_measurement`, `decimals` rounds numeric values, and `show_label`
+  toggles the label. `display` selects how the value is drawn:
+  - `value` — one line of text (`alignment` as for `Text`).
+  - `gauge` — a gauge on the `min_value` … `max_value` scale, either a 240° dial
+    (`gauge_style: arc`) or a horizontal bar (`bar`). Values outside the scale
+    are clamped; a non-numeric state (`on`, `unavailable`, …) leaves the scale
+    empty and just shows the text.
+
+  Gauges are drawn locally with Pillow (`extensions/epaper/core/gauge.py`), not
+  fetched from Home Assistant: HA's own gauge cards are browser-rendered and
+  can't be retrieved as an image, and a screenshot would dither on an e-paper
+  palette. The filled part is solid (in `COLOR_ACCENT`), the rest stays an
+  outline, so a gauge is still readable on a pure black/white display. An image
+  Home Assistant *does* serve — a camera snapshot, an add-on-rendered dashboard —
+  can be shown with the `Image` widget instead. The URL, token and intervals are
+  global settings (see [Configuration](configuration.md)); as with weather,
+  fetches back off on failure, the last-known value keeps being shown with the
+  `homeassistant_stale_notice` marker, and the outage appears on the nice4iot
+  Dashboard.
 - **`WeatherNow`** / **`WeatherForecast`** / **`WeatherChart`** — current
   conditions, an hourly forecast strip, and one configurable bar/line chart.
   `WeatherNow` shows temperature, the condition, and wind (speed, direction as
@@ -108,6 +132,10 @@ formats):
 - `examples/screens/weather.json` — all three `Weather*` widgets (current
   conditions, forecast strip, and a combined temperature+precipitation chart)
   for Berlin; adjust `latitude`/`longitude` for your location.
+- `examples/screens/homeassistant.json` — `HomeAssistant` widgets as arc and bar
+  gauges plus text values (an attribute of a `climate` entity and a
+  `binary_sensor`). Replace the entity ids with your own and configure the
+  Home Assistant URL/token first.
 - `examples/aliases.json` — maps the alias `hallway` to the `roomcalendar`
   screen, see [Display aliases](#display-aliases).
 - `examples/organizer_names.json` — example entries for `organizer_names_file`,

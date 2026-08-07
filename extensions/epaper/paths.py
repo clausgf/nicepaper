@@ -56,6 +56,12 @@ class EpaperPaths:
         return self.root / "weather"
 
     @property
+    def homeassistant_dir(self) -> Path:
+        """Cached Home Assistant entity states (one JSON file per entity),
+        including the failure/backoff state the dashboard reads."""
+        return self.root / "homeassistant"
+
+    @property
     def alias_file(self) -> Path:
         return self.root / "aliases.json"
 
@@ -65,5 +71,5 @@ class EpaperPaths:
 
     def ensure_dirs(self) -> None:
         for d in (self.screen_dir, self.schedule_dir, self.image_dir, self.ical_dir,
-                  self.weather_dir, self.image_cache_dir):
+                  self.weather_dir, self.image_cache_dir, self.homeassistant_dir):
             d.mkdir(parents=True, exist_ok=True)
