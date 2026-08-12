@@ -3,8 +3,8 @@ Small hand-rolled chart primitive for e-paper: a combined bar/line chart
 with up to two independent Y axes, drawn directly with PIL's ImageDraw
 (via DrawingContext) -- no charting library.
 
-Widgets always draw once onto one RGB canvas; quantization to the
-requested color_model's palette happens afterwards in imagecache.py
+Widgets always draw once onto one RGB canvas; quantization to the screen's
+color_model palette happens afterwards in imagecache.py
 (Image.quantize(), dithered by default). Anti-aliased output (like a
 typical plotting library produces) would dither into visual noise once
 quantized down to a 2-3 color palette, so this helper snaps every
@@ -12,9 +12,10 @@ coordinate to an int and never anti-aliases.
 
 Color handling: axes/gridlines/labels use ctx.color_primary (black, an
 exact member of every configured palette). The primary-axis series uses
-app_config.color_accent (pure red by default) -- the only accent bwr has
-besides black/white, and an exact palette member of c7/e6 too, so it never
-dithers regardless of which color_model was requested. The secondary-axis
+ctx.color_accent (pure red by default) -- the only accent bwr has besides
+black/white, and an exact palette member of c7/e6 too, so it never dithers
+on those; a display preset for a black/white panel sets the accent to
+black instead, since red could only quantize there. The secondary-axis
 series is drawn dashed in ctx.color_primary instead of a second color,
 since bw/bwr can't tell two accent colors apart -- line style stays the
 primary signal, color is a bonus on richer palettes.
@@ -33,8 +34,6 @@ too-small margin at a large configured font size.
 import math
 from dataclasses import dataclass
 from typing import Literal, Optional, Sequence
-
-from extensions.epaper.config import app_config
 
 Axis = Literal['primary', 'secondary']
 Kind = Literal['bar', 'line']
@@ -234,7 +233,7 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
             ctx.draw_text((int(right_x), int(box_y)), size=(right_margin - label_gap, row_h),
                           text=secondary_labels[i], alignment=align_r, font=label_font)
 
-    accent = app_config.color_accent or ctx.color_primary
+    accent = ctx.color_accent or ctx.color_primary
     bar_gap = 2
     for s in series:
         is_primary = s.axis == 'primary'

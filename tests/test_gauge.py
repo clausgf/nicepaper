@@ -5,9 +5,15 @@ from extensions.epaper.core.drawingcontext import DrawingContext
 from extensions.epaper.core.gauge import draw_gauge, value_fraction
 
 
+# the gauge fill takes its color from the drawing context (a screen or a
+# widget can override it), so the context under test has to carry one
+_ACCENT = tuple(int(app_config.color_accent.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
+
+
 def _render(size=(160, 130), **kwargs):
     image = Image.new("RGB", size, color=(255, 255, 255))
-    ctx = DrawingContext(image, (255, 255, 255), (0, 0, 0), ("Ubuntu-Regular.ttf", 14))
+    ctx = DrawingContext(image, (255, 255, 255), (0, 0, 0), ("Ubuntu-Regular.ttf", 14),
+                         color_accent=_ACCENT)
     draw_gauge(ctx, (0, 0), size, **kwargs)
     return image
 
@@ -18,9 +24,8 @@ def _ink(image) -> int:
 
 
 def _accent_pixels(image) -> int:
-    accent = tuple(int(app_config.color_accent.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
     w, h = image.size
-    return sum(1 for x in range(w) for y in range(h) if image.getpixel((x, y)) == accent)
+    return sum(1 for x in range(w) for y in range(h) if image.getpixel((x, y)) == _ACCENT)
 
 
 def test_value_fraction_maps_and_clamps():

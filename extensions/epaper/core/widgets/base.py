@@ -37,8 +37,14 @@ class Widget:
             p1 = (ctx.origin[0] + self.config.size[0] - 1, ctx.origin[1] + self.config.size[1] - 1)
             if self.config.init_background:
                 ctx.draw.rectangle([p0, p1], fill=ctx.color_background)
-            if self.config.show_bounding_box:
+            if ctx.force_bounding_box:
                 ctx.draw.rectangle([p0, p1], outline=ctx.color_primary)
+        elif ctx.force_bounding_box:
+            # an auto-sized widget has no box to outline -- its extent is only
+            # decided while drawing -- so mark its anchor instead. Without this
+            # the preview's outline toggle would do nothing at all for the
+            # common case of a widget that sizes itself.
+            ctx.draw_origin_marker()
         # each font aspect falls back to the context's default independently,
         # so overriding just the name or just the size takes effect
         font_name, font_size = self.config.resolved_font(*ctx.font_model)

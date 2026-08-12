@@ -1,4 +1,6 @@
+import asyncio
 import datetime
+import io
 from typing import Callable
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Header, Path as PathParam, Query, Response, status
@@ -10,15 +12,14 @@ from extensions.epaper.util import logger, clean_path_parameter
 from extensions.epaper.core.screen import get_screen_by_id
 from extensions.epaper.paths import EpaperPaths
 
-_color_model_ids = ", ".join(c.id for c in app_config.epaper_color_models)
-
 _RESPONSES = {
     200: {
         "content": {"image/png": {}},
         "description": (
-            "The rendered screen image. The `ETag` header identifies this "
-            "image version; `Cache-Control: max-age` tells the display how "
-            "many seconds the image stays valid at most."
+            "The rendered screen image, quantized to the palette the screen "
+            "is configured for. The `ETag` header identifies this image "
+            "version; `Cache-Control: max-age` tells the display how many "
+            "seconds the image stays valid at most."
         ),
     },
     status.HTTP_304_NOT_MODIFIED: {
@@ -27,37 +28,57 @@ _RESPONSES = {
     404: {"description": "No screen configuration exists for this id."},
 }
 
+_RAW_DESCRIPTION = (
+    "Return the unquantized RGB render instead of the palette image. For "
+    "debugging what quantization did to a color; a display never needs it."
+)
 
-async def _render_screen_image(paths: EpaperPaths, id: str, if_none_match: Optional[str], color_model: Optional[str]) -> Response:
+_BOXES_DESCRIPTION = (
+    "Outline every widget's box, marking the anchor of widgets that size "
+    "themselves. Renders on demand and is never cached, so it cannot leak "
+    "into the image a display fetches. For laying out a screen in the "
+    "editor; a display never needs it."
+)
+
+
+async def _render_screen_image(paths: EpaperPaths, id: str, if_none_match: Optional[str],
+                               raw: bool = False, boxes: bool = False) -> Response:
     """
     Shared logic behind both the standalone and the nice4iot-extension
     image endpoint: render (if needed) and return the current PNG for a
     screen rooted at `paths`.
+
+    Which palette the image is quantized to is the screen's own setting,
+    not a request parameter -- a screen is laid out for one panel, so the
+    display doesn't need to know its own palette (and can't get it wrong).
     """
     id = clean_path_parameter(id)
-    logger.info(f"GET screen/{id}/image.png with If-None-Match={if_none_match} and color_model={color_model}")
+    logger.info(f"GET screen/{id}/image.png with If-None-Match={if_none_match}, raw={raw}, boxes={boxes}")
     screen = await get_screen_by_id(paths, id)
     if screen is None:
         raise HTTPException(status_code=404, detail="Screen not found or not parsable")
 
-    # determine color model
-    color_model_dict = {c.id: c for c in app_config.epaper_color_models}
-    if color_model is not None:
-        if color_model in color_model_dict:
-            color_model = color_model_dict[color_model]
-        else:
-            logger.info(f"Unknown color model {color_model} in request, using default. Available models: {list(color_model_dict.keys())}")
-            color_model = None
+    if boxes:
+        # an editor view, not a display's image: rendered on demand and
+        # returned without touching the cache or its ETag, so nothing a
+        # display later fetches can carry the outlines
+        image = await screen.render_preview(boxes=True, raw=raw)
+        buffer = io.BytesIO()
+        await asyncio.to_thread(image.save, buffer, format="PNG", compress_level=1)
+        return Response(buffer.getvalue(), media_type="image/png",
+                        headers={"Cache-Control": "no-store"})
 
     # update the image if needed
-    await screen.update_if_needed(color_model=color_model)
+    await screen.update_if_needed()
 
     # collect new response header fields
     meta = await screen.get_metadata()
     if meta is None:
         raise HTTPException(status_code=500, detail="Error getting metadata")
 
-    etag = meta.version
+    # meta.version identifies the served (quantized) image; the raw
+    # variant is different bytes and so must not share its ETag
+    etag = f"{meta.version}-raw" if raw else meta.version
     expires_at = meta.expires_at
     if expires_at:
         now = datetime.datetime.now(ZoneInfo(app_config.timezone))
@@ -74,7 +95,7 @@ async def _render_screen_image(paths: EpaperPaths, id: str, if_none_match: Optio
     if if_none_match is not None and if_none_match == etag:
         return Response("", status.HTTP_304_NOT_MODIFIED, headers=headers)
 
-    filename = await screen.get_image_path(color_model=color_model)
+    filename = await screen.get_image_path(raw=raw)
     return FileResponse(path=filename, media_type="image/png", headers=headers)
 
 
@@ -95,17 +116,19 @@ def build_standalone_router(paths: EpaperPaths) -> APIRouter:
     async def get_screen_image(
         id: str = PathParam(description="Screen id (the screen's JSON file name without extension) or an alias defined in the alias file."),
         if_none_match: Optional[str] = Header(None, description="`ETag` of the image version the display already has; if it is still current, the response is `304 Not Modified`."),
-        color_model: Optional[str] = Query(None, description=f"Quantize the image to an e-paper palette. Available: {_color_model_ids}. Omitted or unknown values return the RGB image."),
+        raw: bool = Query(False, description=_RAW_DESCRIPTION),
+        boxes: bool = Query(False, description=_BOXES_DESCRIPTION),
     ):
         """
-        Render (if needed) and return the current PNG image for a screen.
+        Render (if needed) and return the current PNG image for a screen,
+        quantized to the palette configured on that screen.
 
         The image is re-rendered when the screen configuration changed or the
         previous image expired; otherwise it is served from the cache. Displays
         should poll this endpoint, send the last `ETag` as `If-None-Match` and
         sleep for `Cache-Control: max-age` seconds between polls.
         """
-        return await _render_screen_image(paths, id, if_none_match, color_model)
+        return await _render_screen_image(paths, id, if_none_match, raw, boxes)
 
     return router
 
@@ -131,9 +154,10 @@ def build_extension_router(paths_for_project: Callable[[str], EpaperPaths]) -> A
         project_name: str = PathParam(description="nice4iot project name."),
         id: str = PathParam(description="Screen id (the screen's JSON file name without extension) or an alias defined in the alias file."),
         if_none_match: Optional[str] = Header(None),
-        color_model: Optional[str] = Query(None, description=f"Quantize the image to an e-paper palette. Available: {_color_model_ids}. Omitted or unknown values return the RGB image."),
+        raw: bool = Query(False, description=_RAW_DESCRIPTION),
+        boxes: bool = Query(False, description=_BOXES_DESCRIPTION),
     ):
         paths = paths_for_project(project_name)
-        return await _render_screen_image(paths, id, if_none_match, color_model)
+        return await _render_screen_image(paths, id, if_none_match, raw, boxes)
 
     return router

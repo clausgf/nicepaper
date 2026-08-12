@@ -12,6 +12,7 @@ nicepaper
 │   ├── __init__.py              # register(app) -- nice4iot extension entry point
 │   ├── paths.py                 # EpaperPaths: per-root file locations
 │   ├── config.py                # settings that are the same for every root
+│   ├── catalog.py               # display presets + palettes (package + per-root)
 │   ├── api/endpoints.py         # build_standalone_router() / build_extension_router()
 │   ├── ui
 │   │   ├── panels.py            # content-only rendering (reused by both modes)
@@ -24,9 +25,9 @@ nicepaper
 │   │   ├── charting.py          # hand-rolled bar/line charts (no plotting library)
 │   │   ├── widgets/             # Text, Date, RoomCalendar, Weather* widgets
 │   │   └── datasources/         # iCal and Open-Meteo weather loading/caching
-│   ├── models/                  # pydantic models for screens and schedules
+│   ├── models/                  # pydantic models for screens, schedules, displays
 │   ├── wire/huffman_de.py       # fixed German Huffman codebook (LoRaWAN, WIP)
-│   └── resources/               # fonts/icons, bundled as package data
+│   └── resources/               # fonts/icons + display/palette catalogs (package data)
 ├── tests                       # pytest suite (unit + acceptance)
 ├── data                        # standalone-mode runtime data (not in git)
 │   ├── screens/                  # screen configuration JSON files
@@ -84,8 +85,8 @@ In extension mode:
   [Display aliases](screens.md#display-aliases)), and the card then shows the
   resulting device-specific image URL — so the device firmware only
   ever needs to know its own name, never the screen id, and every
-  existing query parameter/header (`color_model`, `If-None-Match`, ...)
-  keeps working unchanged since it's the same image endpoint.
+  header (`If-None-Match`) keeps working unchanged since it's the same
+  image endpoint.
 
 `extensions/epaper/__init__.py` defers every nice4iot-specific import
 (`app.extensions`, `app.paths`, `app.routes`) into `register()`'s

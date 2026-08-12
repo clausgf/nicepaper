@@ -11,7 +11,8 @@ from pathlib import Path
 from pydantic import DirectoryPath, Field
 from pydantic_settings import BaseSettings
 
-from extensions.epaper.models.global_config import ColorModel, GlobalConfig
+from extensions.epaper.models.display import ColorModel
+from extensions.epaper.models.global_config import GlobalConfig
 
 __all__ = ["ColorModel", "GlobalConfig", "app_config", "resource_paths", "load_global_config", "save_global_config"]
 

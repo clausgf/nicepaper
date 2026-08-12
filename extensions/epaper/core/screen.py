@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-import hashlib
 import json
 import os
 from zoneinfo import ZoneInfo
@@ -8,11 +7,12 @@ from PIL import Image
 from typing import Optional
 import aiofiles
 
+from extensions.epaper.catalog import get_color_model
 from extensions.epaper.config import ColorModel, app_config
 from extensions.epaper.util import logger
 from extensions.epaper.core import widgets
 from extensions.epaper.core.drawingcontext import DrawingContext
-from extensions.epaper.core.imagecache import ImageCache
+from extensions.epaper.core.imagecache import ImageCache, quantize
 from extensions.epaper.core.updateschedule import UpdateSchedule, get_schedule_by_id
 from extensions.epaper.models.screenmodel import ImageMetadata, ScreenModel
 from extensions.epaper.paths import EpaperPaths
@@ -58,31 +58,34 @@ class Screen:
             self.widgets.append(widget_obj)
 
 
-    async def get_image_path(self, color_model: Optional[ColorModel] = None) -> str:
+    async def get_image_path(self, raw: bool = False) -> Optional[str]:
         """
-        Get the current image path for the color model given.
+        Path of the image to serve: quantized to this screen's palette,
+        or the unquantized RGB render when the screen has no palette.
+        `raw` forces the RGB render regardless -- the editor preview shows
+        it next to the quantized image, so a color that dithers can be
+        compared against what was actually drawn.
         """
-        return await self.image_cache.get_image_path(color_model)
+        return await self.image_cache.get_image_path(None if raw else self.color_model)
 
 
-    async def get_image(self, color_model: Optional[ColorModel] = None) -> Image.Image:
+    async def get_image(self, raw: bool = False) -> Optional[Image.Image]:
         """
-        Get the current image for the color model given.
+        The image to serve, see get_image_path().
         """
-        return await self.image_cache.get_image(color_model)
+        return await self.image_cache.get_image(None if raw else self.color_model)
 
 
-    async def get_metadata(self) -> ImageMetadata:
+    async def get_metadata(self) -> Optional[ImageMetadata]:
         """
         Get the metadata for the current image.
         """
         return await self.image_cache.get_metadata()
 
 
-    async def update_if_needed(self, color_model: Optional[ColorModel] = None):
+    async def update_if_needed(self):
         """
-        Update the screen image if needed. The color model is just a hint
-        to prepare the quantized image in the cache in advance.
+        Update the screen image if needed.
         """
         update_needed = False
         meta = await self.get_metadata()
@@ -92,10 +95,10 @@ class Screen:
         update_needed = update_needed or self.config_mtime > meta.last_update_at
         update_needed = update_needed or now > meta.expires_at  #  TODO: does it make sense not to regenerate on every request and use the expires only for controlling the client wakeup?
         if update_needed:
-            await self._update(color_model)
+            await self._update()
 
 
-    async def _update(self, color_model: Optional[ColorModel] = None):
+    async def _update(self):
         """
         Update the screen image.
         """
@@ -104,36 +107,76 @@ class Screen:
 
         expires_at, rgb_image = await self._create_image()
 
-        # create a hash of the raw pixel data as version/etag
-        version = await asyncio.to_thread(
-            lambda: hashlib.sha256(rgb_image.tobytes()).hexdigest())
-
-        meta = ImageMetadata(last_update_at=now, expires_at=expires_at, version=version)
-        await self.image_cache.put_data(rgb_image, meta, color_model)
+        # the version/ETag is the hash of what actually gets served, which
+        # the cache computes since it owns that decision (see ImageCache)
+        await self.image_cache.put_data(rgb_image, last_update_at=now, expires_at=expires_at,
+                                        color_model=self.color_model)
 
 
-    async def _create_image(self):
+    @property
+    def colors(self) -> tuple[str, str, str]:
+        """This screen's (background, primary, accent) color: its own
+        fields where set, the global defaults otherwise."""
+        return self.config.resolved_colors(
+            app_config.color_background, app_config.color_primary, app_config.color_accent)
+
+    @property
+    def color_model(self) -> Optional[ColorModel]:
+        """The palette this screen is served in, or None to serve it
+        unquantized. An unknown id resolves to None (logged in
+        catalog.get_color_model()) rather than failing the render: a
+        screen that outlives a palette still has to produce an image."""
+        return get_color_model(self.config.color_model, self.paths)
+
+    async def render_preview(self, boxes: bool = False, raw: bool = False) -> Image.Image:
+        """Render this screen fresh for the editor preview, bypassing the
+        cache entirely.
+
+        Only for views a display never asks for -- currently the widget
+        outlines. They deliberately don't go through the cache: the cached
+        image is what displays fetch, and it must not depend on what an
+        editor happened to look at. A full render costs on the order of
+        ten milliseconds, so re-rendering per preview refresh is cheaper
+        than the bookkeeping a third cached variant would need."""
+        _, image = await self._create_image(force_bounding_box=boxes)
+        color_model = None if raw else self.color_model
+        if color_model is None:
+            return image
+        return await asyncio.to_thread(quantize, image, color_model)
+
+
+    async def _create_image(self, force_bounding_box: bool = False):
         # Draw widgets
-        image = Image.new(mode="RGB", size=self.config.size, color=app_config.color_background)
-        ctx = DrawingContext(image, app_config.color_background, app_config.color_primary, app_config.font, paths=self.paths)
+        background, primary, accent = self.colors
+        image = Image.new(mode="RGB", size=self.config.size, color=background)
+        ctx = DrawingContext(image, background, primary, app_config.font,
+                             color_accent=accent, paths=self.paths)
+        ctx.force_bounding_box = force_bounding_box
 
         next_update = None
         if self.update_schedule:
             next_update = self.update_schedule.get_next_update()
 
         for w in self.widgets:
+            # point the context at this widget's colors before drawing it,
+            # the same way origin is set below -- each aspect falls back to
+            # the screen's own color independently
+            w_primary, w_accent = w.config.resolved_colors(primary, accent)
             if w.config.clipping and w.config.size:
                 # draw onto an isolated, size-bounded sub-image instead of
                 # the shared canvas: PIL silently drops anything a widget
                 # draws beyond an image's own bounds, so this clips
                 # overflow instead of letting it bleed into neighbors
-                sub_image = Image.new(mode="RGB", size=w.config.size, color=app_config.color_background)
-                sub_ctx = DrawingContext(sub_image, app_config.color_background, app_config.color_primary,
-                                          app_config.font, paths=self.paths)
+                sub_image = Image.new(mode="RGB", size=w.config.size, color=background)
+                sub_ctx = DrawingContext(sub_image, background, w_primary, app_config.font,
+                                         color_accent=w_accent, paths=self.paths)
+                sub_ctx.force_bounding_box = force_bounding_box
                 widget_update = await w.draw(sub_ctx)
                 image.paste(sub_image, w.config.position)
             else:
                 ctx.origin = w.config.position
+                ctx.color_primary = w_primary
+                ctx.color_accent = w_accent
                 widget_update = await w.draw(ctx)
             if widget_update:
                 if next_update is None or widget_update < next_update:
@@ -155,6 +198,27 @@ def _file_mtime(path) -> Optional[datetime.datetime]:
         return datetime.datetime.fromtimestamp(os.path.getmtime(path), tz=ZoneInfo("UTC"))
     except OSError:
         return None
+
+
+def _effective_mtime(paths: EpaperPaths, screen_model_file) -> Optional[datetime.datetime]:
+    """The screen's mtime, or the root palette file's if that is newer.
+
+    Everything a screen renders with lives in the screen file itself --
+    except the palette, which the screen only references by id. Folding
+    color_models.json's mtime in here means an edited palette invalidates
+    the screen cache *and* makes update_if_needed() re-render, through
+    the mechanism that already exists for an edited screen, with no
+    second staleness check anywhere. The palettes shipped in the package
+    need no such handling: changing those means a redeploy, hence a
+    restart.
+    """
+    config_mtime = _file_mtime(screen_model_file)
+    if config_mtime is None:
+        return None
+    palette_mtime = _file_mtime(paths.color_model_file)
+    if palette_mtime is not None and palette_mtime > config_mtime:
+        return palette_mtime
+    return config_mtime
 
 
 def _schedule_changed(paths: EpaperPaths, screen: Screen) -> bool:
@@ -214,7 +278,7 @@ async def get_screen_by_id(paths: EpaperPaths, id: str) -> Optional[Screen]:
     id = await _resolve_alias(paths, id)
     cache_key = (str(paths.root), id)
     screen_model_file = paths.screen_dir / f"{id}.json"
-    config_mtime = _file_mtime(screen_model_file)
+    config_mtime = _effective_mtime(paths, screen_model_file)
     if config_mtime is None:
         logger.info(f"Screen model file {screen_model_file} not found")
         _screens.pop(cache_key, None)

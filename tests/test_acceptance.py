@@ -29,6 +29,7 @@ def screen_id():
         json.dump({
             "width": 400,
             "height": 300,
+            "color_model": "bw",
             "widgets": [
                 {"widget_type": "Text", "position_x": 10, "position_y": 10, "size_width": 380, "size_height": 30, "text": "Acceptance"},
                 {"widget_type": "Date", "position_x": 10, "position_y": 50, "size_width": 380, "size_height": 30},
@@ -83,17 +84,20 @@ def test_screen_change_produces_new_image(client, screen_id):
     assert r2.headers["etag"] != etag
 
 
-def test_color_model_quantization(client, screen_id):
-    """color_model returns a palette image; unknown values fall back to RGB."""
-    r = client.get(f"/api/screen/{screen_id}/image.png", params={"color_model": "bw"})
+def test_screen_palette_and_raw_render(client, screen_id):
+    """A display gets the image quantized to the screen's own palette, with
+    no say in the matter; ?raw=true returns the RGB render the editor
+    preview compares it against."""
+    r = client.get(f"/api/screen/{screen_id}/image.png")
     assert r.status_code == 200
     image = Image.open(io.BytesIO(r.content))
     assert image.mode == "P", "quantized image should use a palette"
 
-    r2 = client.get(f"/api/screen/{screen_id}/image.png", params={"color_model": "nonsense"})
+    r2 = client.get(f"/api/screen/{screen_id}/image.png", params={"raw": "true"})
     assert r2.status_code == 200
     image2 = Image.open(io.BytesIO(r2.content))
-    assert image2.mode == "RGB", "unknown color model should fall back to RGB"
+    assert image2.mode == "RGB", "the raw render should be unquantized"
+    assert r2.headers["etag"] != r.headers["etag"], "different bytes must not share an ETag"
 
 
 def test_unknown_screen_returns_404(client):

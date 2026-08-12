@@ -1,6 +1,6 @@
 import os
 import math
-from typing import Tuple
+from typing import Optional
 from PIL import Image, ImageFont, ImageDraw
 
 from extensions.epaper.util import logger
@@ -61,17 +61,31 @@ icon_resource_manager = IconResourceManager(resource_paths.icon_path)
 
 class DrawingContext:
 
-    def __init__(self, image, color_background: Tuple[int, int, int], color_primary: Tuple[int, int, int], font_model, paths=None):
+    def __init__(self, image, color_background: str, color_primary: str, font_model,
+                 color_accent: Optional[str] = None, paths=None):
         self.img = image
         self.draw = ImageDraw.Draw(image)
         self.font_provider = font_resource_manager
         self.icon_provider = icon_resource_manager
         self.color_background = color_background
+        # color_primary/color_accent are the screen's colors when the
+        # context is built and are re-pointed at the current widget's
+        # overrides before each draw() (Screen._create_image(), the same
+        # way origin is), so a widget's own colors need no plumbing of
+        # their own -- ctx.color_primary is simply always "the color to
+        # draw in right here"
         self.color_primary = color_primary
+        self.color_accent = color_accent or color_primary
         self.font_model = font_model
         self.font = self.get_font(font_model[0], font_model[1])
         self.origin = (0,0)
         self.size = image.size
+        # editor-only: draw every widget's outline. Set for the preview's
+        # outline toggle, never for the image a display fetches (see
+        # Screen.render_preview()) -- which is why this is a render-time
+        # flag and not, as it used to be, a per-widget model field that
+        # ended up in the served image.
+        self.force_bounding_box = False
         # per-root file locations (screens/schedules/ical cache/...), so
         # widgets that need to read/write files (e.g. RoomCalendarWidget's
         # ical cache) work the same standalone and as a nice4iot extension
@@ -92,6 +106,17 @@ class DrawingContext:
         y = math.floor(self.origin[1] + xy[1] - image.height / 2)
         self.img.paste(image, (x, y))
         return image.size
+
+
+    def draw_origin_marker(self, arm: int = 8):
+        """An L-shaped corner mark at the current origin, for the editor's
+        outline toggle: it shows where an auto-sized widget is anchored,
+        which is exactly the position_x/position_y pair being edited. A
+        corner rather than a full crosshair, so it reads as "the box starts
+        here" and never covers content above or left of the anchor."""
+        x, y = self.origin
+        self.draw.line([(x, y), (x + arm, y)], fill=self.color_primary)
+        self.draw.line([(x, y), (x, y + arm)], fill=self.color_primary)
 
 
     def draw_line(self, xys, *args, **params):

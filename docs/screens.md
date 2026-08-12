@@ -46,7 +46,7 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   Gauges are drawn locally with Pillow (`extensions/epaper/core/gauge.py`), not
   fetched from Home Assistant: HA's own gauge cards are browser-rendered and
   can't be retrieved as an image, and a screenshot would dither on an e-paper
-  palette. The filled part is solid (in `COLOR_ACCENT`), the rest stays an
+  palette. The filled part is solid (in the accent color), the rest stays an
   outline, so a gauge is still readable on a pure black/white display. An image
   Home Assistant *does* serve — a camera snapshot, an add-on-rendered dashboard —
   can be shown with the `Image` widget instead. The URL, token and intervals are
@@ -67,7 +67,12 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   secondary right) — e.g. `Temperatur (°C)`, `Wind (km/h)` — in the `LOCALE`
   language. All three are backed by [Open-Meteo](https://open-meteo.com)
   (no API key needed; the DWD ICON model for German/European locations) and
-  are placed by `latitude`/`longitude`. Icons reuse the bundled
+  are placed by `latitude`/`longitude` — leave **both** empty to use the
+  default location from the global settings (see
+  [Configuration](configuration.md)). The fallback is all-or-nothing: filling
+  in only one of the two keeps the other at 0 rather than completing it from
+  the global setting, which would put the widget somewhere neither setting
+  describes. Icons reuse the bundled
   `fa-solid-900.ttf` (no extra font/image assets). Charts are hand-drawn with
   Pillow, not a plotting library, so they render crisply on bilevel/limited
   palettes instead of dithering, with gridlines/axis labels rounded to nice
@@ -79,17 +84,97 @@ A screen's `widgets` list is made of typed widgets, each positioned with
 ### Clipping and debug outline
 
 A widget's `clipping` flag cuts off content that overflows its box instead of
-letting it bleed into neighboring widgets; `show_bounding_box` draws its box
-outline, handy while laying out a screen.
+letting it bleed into neighboring widgets.
 
-## Color models
+For laying out a screen, the **outline toggle** in the preview's toolbar shows
+every widget's box at once. It renders on demand and is never cached, so the
+outlines can't reach a display — which is why it replaced the old per-widget
+`show_bounding_box` flag: that one was part of the screen and got drawn into
+the image a display fetches, so it had to be remembered and turned off again.
 
-Rendered images can be quantized to e-paper palettes via the `color_model`
-query parameter: `bw`, `bwr`, `gs4`, `c7`, `e6`
-(`/api/screen/<id>/image.png?color_model=bwr`). The management UI's Image
-Preview shows the same palettes as tabs. `COLOR_ACCENT` (see
-[Configuration](configuration.md)) is the RGB color the chart widgets use for
-their primary series — red by default, the only accent the `bwr` model has.
+A widget that sizes itself has no box to outline (its extent is only decided
+while drawing), so the toggle marks its anchor — the `position_x`/`position_y`
+point — with a small corner instead.
+
+## Displays, palettes and colors
+
+A screen is laid out for one panel, so the panel's properties are screen
+settings — not something a display asks for per request:
+
+| Field | Meaning |
+| --- | --- |
+| `width`, `height` | canvas size in pixels |
+| `color_model` | id of the palette the image is quantized to before it is served (`bw`, `bwr`, `bwy`, `gs4`, `c7`, `e6`). Empty serves the unquantized RGB image. |
+| `color_background`, `color_primary`, `color_accent` | this screen's colors; each empty field falls back to the global default (see [Configuration](configuration.md)) |
+| `display_id` | which display preset was applied last, see below |
+
+`/api/screen/<id>/image.png` serves the image quantized to that screen's
+`color_model`, so the display needs no palette knowledge of its own and can't
+ask for the wrong one — it is also exactly what the editor's Image Preview
+shows. `?raw=true` returns the unquantized RGB render the quantization started
+from, for debugging a color that dithers; a display never needs it.
+`?boxes=true` renders the screen with every widget outlined — see
+[Clipping and debug outline](#clipping-and-debug-outline). Both are editor
+views; neither touches the cached image.
+
+The preview is framed by a pixel ruler with labelled ticks on all four sides,
+and moving the mouse over it shows the exact pixel under the cursor — widgets
+are positioned by typing `position_x`/`position_y`, so the preview is only
+useful if it can be read back as coordinates. Both are scale-independent: the
+ruler is placed in percentages and the readout divides by the rendered size, so
+they stay correct at whatever width the browser scales the image to.
+
+Individual widgets can override `color_primary`/`color_accent` for themselves,
+each aspect falling back to the screen's color independently — the same
+per-aspect override `font_name`/`font_size` use. These two fields are not in
+the editor form yet and are set in the screen JSON directly.
+
+### Display presets
+
+Instead of typing size, palette and colors by hand, pick a panel from the
+**Display** list. It fills in all of the above — for a black/white panel it also
+sets the accent to black, since red could only quantize to black there anyway.
+
+Adding a screen offers the display list up front, since size and palette are
+the first decisions about a screen and every widget position depends on them.
+The same list is in the screen's settings, so the panel can be picked or
+changed later just as well.
+
+**No preset** is the default, and a listed choice in both — for a panel that
+isn't in the catalog, or when you'd rather set size, palette and colors
+yourself. A new screen then starts blank at 800×480 (no palette, so it is
+served as RGB, and the global colors apply); picking it for an existing screen
+only drops the `display_id` record and leaves its values untouched.
+
+A preset is a **template, applied once**: after that the screen's own fields are
+what renders, they stay editable, and a preset that is later changed or removed
+never alters an existing screen. `display_id` only records which one was used.
+
+The catalog ships with the package (currently Waveshare 4.2"/7.5"/7.3" and the
+Seeed XIAO 7.5" panel) and is extended per data root by an optional
+`data/displays.json` (`<project>/.epaper/displays.json` in extension mode).
+Entries are merged by `id`, the root file wins, so it can both add panels that
+aren't shipped and correct one that is:
+
+```json
+[
+  {
+    "id": "my-panel", "name": "My 5.83\" panel", "vendor": "Waveshare",
+    "width": 648, "height": 480, "color_model": "bw",
+    "color_background": "#ffffff", "color_primary": "#000000", "color_accent": "#000000",
+    "gxepd2_class": "GxEPD2_583"
+  }
+]
+```
+
+`gxepd2_class` is informational only — nicepaper renders a PNG and never talks
+to a panel driver. It is shown under the display list so a panel can be found
+by the name its firmware knows it under.
+
+Palettes work the same way: an optional `data/color_models.json` adds to (or
+overrides) the shipped ones. Unlike `displays.json`, editing it changes what
+gets served — a screen references a palette by id rather than containing it —
+so a change there re-renders every screen using it.
 
 ## Display aliases
 

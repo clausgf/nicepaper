@@ -2,6 +2,119 @@
 
 ## Unreleased
 
+## 0.15.0 — 2026-08-12
+
+### Added
+
+- **Display presets.** A screen can be set up by picking a panel from a
+  searchable **Display** list in its settings instead of typing size, palette
+  and colors by hand. The catalog ships with the package
+  (`extensions/epaper/resources/displays.json`: Waveshare 4.2", 7.5" b/w and
+  b/w/r, 7.3" ACeP and Spectra 6, Seeed XIAO 7.5") and is extended per data
+  root by an optional `data/displays.json`, merged by `id` with the root file
+  winning. Each entry carries `width`/`height`, `color_model`, the three colors
+  and an informational `gxepd2_class` (shown as a hint below the list; nothing
+  reads it at render time). A preset is a template applied once — the screen's
+  own fields stay the source of truth, so editing or removing a preset never
+  changes an existing screen. `ScreenModel.display_id` only records which one
+  was applied last.
+- Adding a screen now offers to pick the display it is for, and the new screen
+  starts from that preset. Both display lists offer **No preset** as an
+  explicit choice, and it is the default: a new screen starts blank at 800x480
+  exactly as before unless a panel is picked, and picking "No preset" for an
+  existing screen only drops the `display_id` record without touching its
+  values. `panels.directory_drilldown()` gained an optional `confirm_add` hook
+  for the dialog; the schedules list passes none and keeps creating files
+  straight away.
+- New `bwy` palette (black/yellow on white), matching the B/W+Y panels
+  OpenDisplay lists.
+- New global settings `latitude`/`longitude` (default 52.52 / 13.405): the
+  default forecast location for every `Weather*` widget that sets none of its
+  own. `WeatherWidgetModel.latitude`/`longitude` therefore became **optional**
+  — leaving both empty (or 0, which is what a cleared number field stores)
+  uses the default. The fallback is all-or-nothing: setting only one
+  coordinate keeps the other at 0 instead of completing it from the global
+  setting. One consequence: the exact point 0/0 can no longer be addressed.
+  New weather widgets are created without coordinates and so follow the
+  default, rather than starting at 0/0 in the Atlantic as they used to.
+- New `ScreenModel` fields `color_model`, `color_background`, `color_primary`
+  and `color_accent`: a screen is bound to one panel, so its palette and colors
+  are screen settings. Each is optional and falls back to the global default.
+- New `WidgetModel` fields `color_primary` and `color_accent`, each falling
+  back to the screen's color independently (the same per-aspect override
+  `font_name`/`font_size` use). Not in the editor form yet — see
+  [docs/development.md](docs/development.md).
+- Palettes can be added or overridden per data root through an optional
+  `data/color_models.json`. Editing it re-renders every screen using it (a
+  screen references a palette by id rather than containing it).
+
+### Removed
+
+- **`WidgetModel.show_bounding_box`.** Outlines are now a preview-only view
+  (the toggle above), so the flag no longer has a job: its only effect was to
+  bake an outline into the image a display fetches. An existing screen file
+  that still contains the key loads fine — it is ignored — and drops it on the
+  next save. A screen that relied on it to draw a permanent frame around a
+  widget has to draw that frame itself.
+
+### Changed
+
+- **Every `alignment` now defaults to `lt` instead of `lb`** — `Text`, `Date`
+  and `HomeAssistant`. With `b` and no size, text is drawn *above*
+  `position_y`, so the number being edited pointed at the bottom of the text
+  rather than its top. **This moves existing text**: screen files do not store
+  the default, so any such widget without an explicit `alignment` renders
+  differently after the update — vertically offset by its own text height when
+  auto-sized, or top- instead of bottom-aligned inside its box. Set
+  `"alignment": "lb"` explicitly to keep the old placement. The default,
+  pattern and description now live in one shared `_AlignmentField`, so the
+  three can't drift apart again.
+- **The `color_model` query parameter is gone.** `/api/screen/<id>/image.png`
+  now serves the image quantized to the palette configured *on the screen*, so
+  a display needs no palette knowledge of its own and can't request the wrong
+  one. A screen without a `color_model` is served unquantized as before.
+  Displays that passed `?color_model=` must have the palette set on their
+  screen instead — the parameter is now ignored.
+- The editor's Image Preview is a single image instead of one tab per palette:
+  a screen has one palette now, so there is only one image a display would get.
+  It is framed by a pixel ruler (thin border, labelled ticks on all four sides)
+  and shows the pixel under the mouse pointer, so a position seen in the
+  preview can be read off and typed into `position_x`/`position_y`. Ticks use
+  round 1/2/5 x 10^k steps and are placed in percentages, so they stay correct
+  however the browser scales the image; the readout is client-side only, so
+  moving the mouse sends nothing to the server.
+- New `?raw=true` parameter returns the unquantized RGB render, for debugging a
+  color that dithers. A display never needs it.
+- New outline toggle in the preview's toolbar (which now lets the URL take the
+  remaining width): it outlines every widget at once. Backed by a new
+  `?boxes=true` parameter that renders on demand and is returned with
+  `Cache-Control: no-store` and no `ETag`, so the outlines can never reach a
+  display or the cached image. A widget that sizes itself gets its anchor
+  marked with a small corner, since it has no box to outline.
+- The `ETag` is now the hash of the image that is actually served (plus the
+  palette it was quantized with) instead of the hash of the RGB render. Two
+  clients on different palettes used to receive the same `ETag` for different
+  bytes, and a palette edited in place kept its old `ETag`.
+- `epaper_color_models` was removed from `GlobalConfig` and the palettes moved
+  to `extensions/epaper/resources/color_models.json`. `load_global_config()`
+  copies persisted fields over the model defaults, so a catalog kept in that
+  file froze at whatever an installation wrote once and never picked up
+  palettes added in a later release. An existing `global_config.json` that
+  still has the key loads fine and drops it on the next save.
+- `GlobalConfig`'s three colors are now the *defaults*, applied where a screen
+  (and within it, a widget) sets none.
+- `ColorModel` moved from `extensions.epaper.models.global_config` to
+  `extensions.epaper.models.display`, next to the new `DisplayModel`.
+  `extensions.epaper.config` re-exports it as before.
+- `Screen.get_image()`/`get_image_path()` take `raw: bool` instead of a
+  `color_model`; `Screen.update_if_needed()` takes no argument. `ImageCache`
+  now builds the metadata (including the version) in `put_data()`, since it
+  owns which of the two images gets served.
+- [SECURITY.md](SECURITY.md) documents how to serve `image.png` over plain HTTP
+  to displays whose firmware can't do TLS: a second, LAN-restricted listener in
+  the reverse proxy (validated Caddy configuration included) rather than a
+  second listener inside nicepaper, plus what that does and does not protect.
+
 ## 0.14.0 — 2026-08-07
 
 ### Added

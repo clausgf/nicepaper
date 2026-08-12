@@ -45,7 +45,7 @@ uv run uvicorn main:app --reload
 - Management UI: <http://127.0.0.1:8000/ui>
 - API docs: <http://127.0.0.1:8000/docs>
 - Display image: `http://127.0.0.1:8000/api/screen/<id>/image.png`
-  (optional `?color_model=bw|bwr|gs4|c7|e6`)
+  (quantized to the screen's own palette; `?raw=true` for the RGB render)
 
 `<id>` is the name of a JSON file in `data/screens` without the extension, or
 an alias from `data/aliases.json`.
@@ -75,6 +75,24 @@ uv run python -m extensions.epaper.wire.huffman_de
 ```
 
 ## Roadmap / open points
+
+### Per-widget colors in the editor
+
+`WidgetModel` has `color_primary`/`color_accent`, and rendering honours them
+(each falling back to the screen's color independently, like `font_name`/
+`font_size`), but the widget detail form doesn't render them yet — they can
+only be set in the screen JSON. Adding them is a *Appearance*-section pair of
+`ui.color_input` fields in `screen_editor.py`'s `_widget_detail()`, next to the
+font row.
+
+### Getting the GxEPD2 class to the firmware
+
+A display preset carries the matching GxEPD2 display class
+(`gxepd2_class`, e.g. `GxEPD2_750_T7`) purely as a hint in the UI. A device
+firmware still has to be built with the right class hard-coded. Open question
+whether nicepaper should expose it — e.g. on a per-device endpoint next to the
+image URL — so a firmware could check it against what it was built with and
+warn on a mismatch.
 
 ### API keys for the display API
 

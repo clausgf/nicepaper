@@ -40,6 +40,12 @@ same settings with humanized labels):
   without a refetch.
 - `ical_update_interval_s`, `ical_max_days` — iCal feed polling/lookahead for
   the `RoomCalendar` widget.
+- `latitude`, `longitude` — the default forecast location, used by every
+  `Weather*` widget that sets no coordinates of its own (defaults to 52.52 /
+  13.405, Berlin). Most installations show the same place on every screen, so
+  this is usually the only place a location needs to be set. A widget
+  overrides it by setting **both** of its own coordinates; see
+  [Screens, widgets & schedules](screens.md).
 - `weather_update_interval_s` — Open-Meteo polling interval for the `Weather*`
   widgets.
 - `weather_retry_min_s`, `weather_retry_max_s` — after a failed Open-Meteo
@@ -52,10 +58,12 @@ same settings with humanized labels):
   drawn when weather / calendar / image / Home Assistant data can't be loaded.
   (All the default message/label strings are English; edit them here for another
   language.)
-- `color_background`, `color_primary`, `color_accent` — screen background,
-  default text/drawing color, and the color the chart widgets use for their
-  primary series (accent defaults to red, the only accent the `bwr` color model
-  has).
+- `color_background`, `color_primary`, `color_accent` — the **default**
+  background, text/drawing and accent color (accent defaults to red, the only
+  accent the `bwr` palette has; it is used for the chart widgets' primary
+  series and the gauge fill). A screen, and within a screen a single widget,
+  can override each of them — see
+  [Screens, widgets & schedules](screens.md#displays-palettes-and-colors).
 
 ## Home Assistant
 
@@ -84,9 +92,21 @@ Optional:
 No Home Assistant *add-on* or custom component is needed on the HA side; the
 REST API is built in, and nicepaper only reads entity states.
 
-`epaper_color_models` also lives in the file (and round-trips through it) but is
-not exposed in the card — a nested list of palettes is beyond what the form can
-render.
+## Display and palette catalogs
+
+The panel presets and the e-paper palettes are **not** in `global_config.json`.
+They ship with the package (`extensions/epaper/resources/displays.json`,
+`color_models.json`), so an entry added in a new nicepaper release actually
+reaches an existing installation — a catalog persisted in the config file would
+freeze at whatever that file contained when it was first written. Each is
+extended per data root by an optional file of the same name in the root
+(`data/displays.json`, `data/color_models.json`), merged by `id` with the root
+file winning. See
+[Screens, widgets & schedules](screens.md#display-presets) for the format.
+
+The palettes used to live here as `epaper_color_models`. An old config file that
+still has that key loads fine — pydantic ignores it — and drops it on the next
+save.
 
 ## Resource paths (environment variables)
 
@@ -104,3 +124,9 @@ provider setup was removed — nice4iot integration, if pursued, handles auth on
 its own). Put the UI behind an authenticating reverse proxy if it shouldn't be
 reachable by anyone who can reach the host. See [SECURITY.md](../SECURITY.md)
 for the full security model.
+
+Displays whose firmware can't do TLS are served by exposing *only* the image
+endpoint over plain HTTP in that same reverse proxy, restricted to the LAN the
+displays are on — there is deliberately no second listener inside nicepaper for
+this. A ready-to-adapt Caddy configuration is in
+[SECURITY.md](../SECURITY.md#serving-display-images-over-plain-http).

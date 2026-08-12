@@ -66,6 +66,17 @@ class EpaperPaths:
         return self.root / "aliases.json"
 
     @property
+    def display_file(self) -> Path:
+        """Optional per-root panel presets, merged over the ones shipped
+        with the package (see catalog.py). Absent by default."""
+        return self.root / "displays.json"
+
+    @property
+    def color_model_file(self) -> Path:
+        """Optional per-root palettes, merged the same way as display_file."""
+        return self.root / "color_models.json"
+
+    @property
     def organizer_names_file(self) -> Path:
         return self.root / "organizer_names.json"
 

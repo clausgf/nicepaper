@@ -23,6 +23,21 @@ _TimeFormatField = Annotated[
     ),
 ]
 
+_ALIGNMENT_PATTERN = r'^[lcr][tcb]$'
+# 'lt', not the 'lb' every alignment used to default to: with vertical
+# alignment 'b' and no size, text is drawn *above* position_y, so the number
+# being edited pointed at the bottom of the text rather than at its top.
+# Shared by every widget with an alignment, so they can't drift apart again.
+_DEFAULT_ALIGNMENT = "lt"
+_ALIGNMENT_DESCRIPTION = (
+    "Two-letter alignment code: horizontal (l=left, c=center, r=right) and "
+    "vertical (t=top, c=center, b=bottom)."
+)
+_AlignmentField = Annotated[
+    Optional[str],
+    Field(pattern=_ALIGNMENT_PATTERN, default=_DEFAULT_ALIGNMENT, description=_ALIGNMENT_DESCRIPTION),
+]
+
 
 class ImageMetadata(BaseModel):
     last_update_at: datetime.datetime
@@ -47,9 +62,13 @@ class WidgetModel(BaseModel):
     size_height: Optional[int] = Field(default=None, description="Widget height in pixels. Width and height only take effect together; leave both empty (or 0) for automatic sizing.")
     init_background: Optional[bool] = True
     clipping: Optional[bool] = Field(default=False, description="Cut off content that overflows this widget's size instead of letting it bleed into neighboring widgets.")
-    show_bounding_box: Optional[bool] = Field(default=False, description="Draw an outline around this widget's box. Useful while laying out a screen.")
     font_name: Optional[str] = Field(default=None, description="Font file name. Leave empty to use the screen's default font name (independent of font size).")
     font_size: Optional[int] = Field(default=None, description="Font size in points. 0 or empty to use the screen's default font size (independent of font name).")
+    # TODO: not rendered in the widget form yet (screen_editor.py excludes
+    # them) -- editable in the screen JSON only until the editor gets a
+    # per-widget color section.
+    color_primary: Optional[str] = Field(default=None, description="Text/drawing color for this widget. Leave empty to use the screen's primary color.")
+    color_accent: Optional[str] = Field(default=None, description="Accent color for this widget (chart series, gauge fill). Leave empty to use the screen's accent color.")
 
     # widgets that give a lone width/height a meaning (Image: scale to that
     # dimension, keep aspect ratio) set this True to opt out of the
@@ -100,17 +119,23 @@ class WidgetModel(BaseModel):
         override just the name, just the size, or both."""
         return (self.font_name or default_name, self.font_size or default_size)
 
+    def resolved_colors(self, default_primary: str, default_accent: str) -> Tuple[str, str]:
+        """This widget's (primary, accent) color, each falling back to the
+        screen's independently -- the same per-aspect override as
+        resolved_font()."""
+        return (self.color_primary or default_primary, self.color_accent or default_accent)
+
 
 class TextWidgetModel(WidgetModel):
     widget_type: Literal["Text"] = "Text"
     text: str
-    alignment: Optional[str] = Field(pattern=r'^[lcr][tcb]$', default="lb", description="Two-letter alignment code: horizontal (l=left, c=center, r=right) and vertical (t=top, c=center, b=bottom).")
+    alignment: _AlignmentField
 
 
 class DateWidgetModel(WidgetModel):
     widget_type: Literal["Date"] = "Date"
     date_format: _DateFormatField
-    alignment: Optional[str] = Field(pattern=r'^[lcr][tcb]$', default="lb", description="Two-letter alignment code: horizontal (l=left, c=center, r=right) and vertical (t=top, c=center, b=bottom).")
+    alignment: _AlignmentField
 
 
 class RoomCalendarWidgetModel(WidgetModel):
@@ -125,8 +150,32 @@ class RoomCalendarWidgetModel(WidgetModel):
 
 class WeatherWidgetModel(WidgetModel):
     """Shared fields for the Open-Meteo-backed weather widgets below."""
-    latitude: float = Field(description="Latitude of the forecast location, e.g. 52.52.")
-    longitude: float = Field(description="Longitude of the forecast location, e.g. 13.405.")
+    latitude: Optional[float] = Field(default=None, description="Latitude of the forecast location, e.g. 52.52. Leave both coordinates empty to use the configured default location.")
+    longitude: Optional[float] = Field(default=None, description="Longitude of the forecast location, e.g. 13.405. Leave both coordinates empty to use the configured default location.")
+
+    def resolved_location(self, default_latitude: float,
+                          default_longitude: float) -> Optional[Tuple[float, float]]:
+        """This widget's (latitude, longitude), or the configured default
+        when it has none. None when neither is configured.
+
+        Unlike the font, which falls back per aspect, the fallback is
+        all-or-nothing: a location is one value in two fields, so filling
+        in half of it must not silently pull the other half from the
+        global setting -- that would put the widget somewhere neither
+        setting describes.
+
+        "Empty" has to include 0.0, not just None: niceview's ui.number
+        round-trips a cleared field as 0 (see the size property above), so
+        0 is what an emptied coordinate field actually stores. The cost is
+        that exactly 0/0 -- Null Island, in the Gulf of Guinea -- can't be
+        addressed; every other coordinate, including the rest of the
+        equator and the prime meridian, still can, since only a *pair* of
+        zeroes counts as empty."""
+        if self.latitude or self.longitude:
+            return (self.latitude or 0.0, self.longitude or 0.0)
+        if default_latitude or default_longitude:
+            return (default_latitude, default_longitude)
+        return None
 
 
 class WeatherNowWidgetModel(WeatherWidgetModel):
@@ -200,7 +249,7 @@ class HomeAssistantWidgetModel(WidgetModel):
     decimals: int = Field(default=1, ge=0, le=6, description="Decimal places for numeric values. Non-numeric states (e.g. 'on') are shown unchanged.")
     show_label: bool = Field(default=True, description="Draw the label alongside the value.")
     display: HomeAssistantDisplay = Field(default="value", description="Draw the value as a line of text, or as a gauge.")
-    alignment: Optional[str] = Field(pattern=r'^[lcr][tcb]$', default="lb", description="Two-letter alignment code for the text display: horizontal (l=left, c=center, r=right) and vertical (t=top, c=center, b=bottom).")
+    alignment: Optional[str] = Field(pattern=_ALIGNMENT_PATTERN, default=_DEFAULT_ALIGNMENT, description=f"{_ALIGNMENT_DESCRIPTION} Only used when display is 'value'.")
     gauge_style: GaugeStyle = Field(default="arc", description="Gauge shape: a 240° dial ('arc') or a horizontal bar. Only used when display is 'gauge'.")
     min_value: float = Field(default=0.0, description="Start of the gauge scale. Values below it are clamped.")
     max_value: float = Field(default=100.0, description="End of the gauge scale. Values above it are clamped.")
@@ -220,9 +269,38 @@ AnyWidget = Annotated[
 
 
 class ScreenModel(BaseModel):
+    """
+    One screen: its canvas, the palette it is served in, and its widgets.
+
+    A screen is bound to one panel, so everything the panel decides lives
+    here rather than being negotiated per request. `display_id` records
+    which preset (see models/display.py) filled these fields in the
+    editor, but is never read back at render time -- the fields below are
+    the source of truth, and stay editable afterwards.
+    """
     # Tuple[int, int] -- see the same note on WidgetModel above.
     width: int = Field(description="Canvas width in pixels.")
     height: int = Field(description="Canvas height in pixels.")
+    display_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Id of the display preset last applied to this screen. A "
+            "reminder of which panel this screen is laid out for; picking "
+            "one fills in the size, palette and colors below, which then "
+            "stay editable and are what actually gets rendered."
+        ),
+    )
+    color_model: Optional[str] = Field(
+        default=None,
+        description=(
+            "Id of the palette the image is quantized to before it is "
+            "served, e.g. 'bwr'. Leave empty to serve the unquantized RGB "
+            "image (the display then has to quantize it itself)."
+        ),
+    )
+    color_background: Optional[str] = Field(default=None, description="Background color of this screen. Leave empty to use the global default.")
+    color_primary: Optional[str] = Field(default=None, description="Default text/drawing color of this screen. Leave empty to use the global default.")
+    color_accent: Optional[str] = Field(default=None, description="Accent color of this screen (chart series, gauge fill). Leave empty to use the global default.")
     update_schedule_id: Optional[str] = Field(
         default="default",
         description=(
@@ -237,3 +315,13 @@ class ScreenModel(BaseModel):
     @property
     def size(self) -> Tuple[int, int]:
         return (self.width, self.height)
+
+    def resolved_colors(self, default_background: str, default_primary: str,
+                        default_accent: str) -> Tuple[str, str, str]:
+        """This screen's (background, primary, accent) color, each falling
+        back to the global default independently -- the same per-aspect
+        override WidgetModel.resolved_colors() then applies once more on
+        top, for a single widget."""
+        return (self.color_background or default_background,
+                self.color_primary or default_primary,
+                self.color_accent or default_accent)

@@ -45,8 +45,10 @@ content actually changed.
   text or as a gauge, via HA's REST API and a long-lived access token. Gauges
   (a 240° dial or a bar) are drawn locally with Pillow, so they stay sharp on a
   black/white display instead of dithering like a browser screenshot would.
-- **E-paper color models** — render to `bw`, `bwr`, `gs4`, `c7`, or `e6` via
-  the `color_model` query parameter.
+- **Display presets** — pick a panel (Waveshare 4.2"/7.5"/7.3", Seeed XIAO
+  7.5", or your own) and the screen gets its size, palette and colors. Images
+  are served quantized to `bw`, `bwr`, `bwy`, `gs4`, `c7` or `e6`, so a display needs
+  no palette knowledge of its own.
 - **Update schedules** — plain JSON weekly rules (weekdays, months, times)
   decide when a screen expires and is re-rendered.
 - **Display aliases** — address a display by a stable friendly name; several
@@ -75,7 +77,7 @@ uv run uvicorn main:app --reload
 - Management UI: <http://127.0.0.1:8000/ui>
 - API docs: <http://127.0.0.1:8000/docs>
 - Display image: `http://127.0.0.1:8000/api/screen/simple/image.png`
-  (optional `?color_model=bw|bwr|gs4|c7|e6`)
+  (quantized to the screen's own palette; `?raw=true` for the RGB render)
 
 This standalone server is for development and debugging only. For a real
 deployment nicepaper runs as a

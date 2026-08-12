@@ -9,7 +9,8 @@ browser-rendered gauge) would.
 
 Color follows the same convention as charting.py: the scale/outline/labels
 use ctx.color_primary (black, an exact member of every palette), the filled
-value uses app_config.color_accent (red by default). On a bw display the
+value uses ctx.color_accent (red by default, but a display preset for a
+black/white panel sets it to black). On a bw display the
 fill and the outline are the same color, so the *shape* has to carry the
 information: the empty part of the scale stays an outline, the filled part
 is solid.
@@ -21,8 +22,6 @@ font size.
 """
 import math
 from typing import Literal, Optional, Tuple
-
-from extensions.epaper.config import app_config
 
 GaugeStyle = Literal['arc', 'bar']
 
@@ -167,7 +166,7 @@ def draw_gauge(ctx, position: Tuple[int, int], size: Tuple[int, int], *,
         return
     font = font or ctx.font
     value_font = value_font or font
-    accent = app_config.color_accent or ctx.color_primary
+    accent = ctx.color_accent or ctx.color_primary
     fraction = None if value is None else value_fraction(value, min_value, max_value)
     if value_text is None:
         value_text = _format_scale_value(value) if value is not None else ''

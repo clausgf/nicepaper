@@ -43,7 +43,13 @@ class _WeatherWidgetBase(Widget):
         backoff and never raises. self._status carries the staleness/failure
         details for _draw_stale_notice() and the dashboard."""
         w, h = self.config.size
-        self._status = await get_weather(ctx.paths.weather_dir, self.config.latitude, self.config.longitude)
+        location = self.config.resolved_location(app_config.latitude, app_config.longitude)
+        if location is None:
+            logger.warning(f"Widget {self.id} has no location and no default location is "
+                           f"configured (see the latitude/longitude global settings)")
+            ctx.draw_text((0, 0), size=(w, h), text=app_config.weather_error, font=self.font)
+            return None
+        self._status = await get_weather(ctx.paths.weather_dir, *location)
         if self._status.data is None:
             ctx.draw_text((0, 0), size=(w, h), text=app_config.weather_error, font=self.font)
             return None

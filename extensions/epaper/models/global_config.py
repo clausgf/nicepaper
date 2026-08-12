@@ -1,15 +1,5 @@
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 from pydantic import BaseModel, Field
-
-
-class ColorModel(BaseModel):
-    """
-    Color model for the e-paper display.
-    """
-    id: str
-    name: str
-    palette: List[Tuple[int, int, int]]
-    background_color_index: int = 1
 
 
 class GlobalConfig(BaseModel):
@@ -37,6 +27,17 @@ class GlobalConfig(BaseModel):
     (verified), so color_background/color_primary/color_accent are plain
     hex strings rendered via niceview's native ui.color_input widget,
     no tuple at all -- nicer than a 3-number-field flatten would have been.
+
+    The palette catalog (epaper_color_models) used to live here too and
+    has moved to a package resource -- see models/display.py: this file
+    is copied over the model defaults on load, so anything catalog-shaped
+    kept here freezes at whatever an installation wrote once and never
+    picks up entries added in a later release. An old config file that
+    still contains the field loads fine (pydantic ignores it) and drops
+    it on the next save.
+
+    The three colors below stay: they are the *defaults*, applied where a
+    screen (and, within a screen, a widget) doesn't set its own.
     """
     ical_update_interval_s: int = 600
     ical_max_days: int = 30
@@ -51,6 +52,8 @@ class GlobalConfig(BaseModel):
 
     weather_update_interval_s: int = 900
     weather_error: str = "Error fetching weather data"
+    latitude: float = Field(default=52.52, description="Default latitude for weather widgets that set no location of their own.")
+    longitude: float = Field(default=13.405, description="Default longitude for weather widgets that set no location of their own.")
     wind_speed_unit: str = Field(
         default="kmh",
         description=(
@@ -93,24 +96,13 @@ class GlobalConfig(BaseModel):
     color_accent: Optional[str] = Field(
         default="#ff0000",
         description=(
-            "Chart widgets' primary-series color. Red is the only accent "
-            "the bwr color model has besides black/white, and an exact "
-            "palette member of c7/e6 too, so it never dithers regardless "
-            "of which color_model a display requests."
+            "Accent color for the chart widgets' primary series and the "
+            "gauge fill. Red is the only accent the bwr palette has besides "
+            "black/white, and an exact member of c7/e6 too. A screen or a "
+            "widget can override it -- a display preset for a black/white "
+            "panel does, since red would only quantize to black there."
         ),
     )
-
-    # not exposed in global_config_card() (a nested list of models with a
-    # nested list of tuples is well beyond what niceview can render), kept
-    # here only so it round-trips through the JSON file like every other
-    # field
-    epaper_color_models: List[ColorModel] = [
-        ColorModel(id='bw', name='Black on white', palette=[(0, 0, 0), (255, 255, 255)]),
-        ColorModel(id='bwr', name='Black/Red on white', palette=[(0, 0, 0), (255, 255, 255), (255, 0, 0)]),
-        ColorModel(id='gs4', name='4-Greyscale on white', palette=[(0, 0, 0), (255, 255, 255), (128, 128, 128), (192, 192, 192)]),
-        ColorModel(id='c7', name='7-color C7', palette=[(0, 0, 0), (255, 255, 255), (0, 255, 0), (0, 0, 255), (255, 0, 0), (255, 255, 0), (255, 165, 0)]),
-        ColorModel(id='e6', name='Spectra E6', palette=[(0, 0, 0), (255, 255, 255), (255, 255, 0), (255, 0, 0), (0, 0, 255), (0, 255, 0)]),
-    ]
 
     @property
     def font(self) -> Tuple[str, int]:

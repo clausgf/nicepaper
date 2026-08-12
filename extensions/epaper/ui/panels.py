@@ -58,6 +58,7 @@ _PATTERN_HINTS = {
     'roomcalendar_time_format': _TIME_PATTERN_HINT,
 }
 _STALE_NOTICE_HINT = "'{time}' is replaced by the last successful update"
+_LOCATION_HINT = 'Used by weather widgets that set no location'
 
 
 def slide_class(direction: str) -> str:
@@ -100,7 +101,8 @@ def _entry_caption(item: FileEntry) -> str:
 
 def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[], str]],
                          title: str, render_content: Callable[[str], None],
-                         row_warning: Optional[Callable[[str], Optional[str]]] = None) -> DrillDownWrapper:
+                         row_warning: Optional[Callable[[str], Optional[str]]] = None,
+                         confirm_add: Optional[Callable[[Callable[[], None]], None]] = None) -> DrillDownWrapper:
     """
     Shared DrillDownWrapper wiring for a directory of JSON files, used
     identically by screen_editor.screens_wrapper() and
@@ -122,6 +124,15 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
     the screens list to flag a screen whose update_schedule_id points at a
     missing schedule file; this function stays generic and knows nothing
     about screen semantics.
+
+    confirm_add(create) is an optional hook that gets to run before a file
+    is created: it receives the callback that actually creates and opens
+    the file, and decides whether and when to call it -- e.g. from a
+    dialog's confirm button, as the screens list does to ask which display
+    the new screen is for. Without it, Add creates the file straight away,
+    the no-dialog style above. It must call `create` synchronously (from a
+    NiceGUI event handler is fine); DrillDownWrapper calls on_add without
+    awaiting, so an async hook would silently do nothing.
     """
     directory = DirectoryAdapter(dir_path, default_content=default_content)
 
@@ -157,8 +168,14 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
         render_content(f'{key}.json')
 
     def handle_add() -> None:
-        entry = directory.create()
-        wrapper.open(entry.name)
+        def create() -> None:
+            entry = directory.create()
+            wrapper.open(entry.name)
+
+        if confirm_add is None:
+            create()
+        else:
+            confirm_add(create)
 
     wrapper = DrillDownWrapper.from_adapter(
         FileEntry, directory,
@@ -351,6 +368,8 @@ def global_config_fields(persist: Callable[[], None]) -> None:
                     'roomcalendar_time_format', hints=_PATTERN_HINTS)
 
         ui.label('Weather').classes('text-subtitle2')
+        _render_row(form, 'latitude', 'longitude',
+                    hints={'latitude': _LOCATION_HINT, 'longitude': _LOCATION_HINT})
         with ui.row().classes('w-full gap-2'):
             form.render_field('weather_update_interval_s', props='outlined dense').classes('flex-grow')
             form.render_field('wind_speed_unit', widget_type='ui.select',

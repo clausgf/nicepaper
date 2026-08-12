@@ -179,11 +179,31 @@ def test_widget_alignment_pattern():
         TextWidgetModel(**base, alignment="xx")
 
 
-def test_weather_now_widget_requires_coordinates():
-    with pytest.raises(ValidationError):
-        WeatherNowWidgetModel(position_x=0, position_y=0)
+def test_weather_now_widget_coordinates_are_optional():
+    """They used to be required; an empty pair now means "use the default
+    location from the global settings"."""
+    assert WeatherNowWidgetModel(position_x=0, position_y=0).latitude is None
     widget = WeatherNowWidgetModel(position_x=0, position_y=0, latitude=52.52, longitude=13.405)
     assert widget.latitude == 52.52
+
+
+def test_weather_location_falls_back_as_a_pair():
+    def location(**coords):
+        return WeatherNowWidgetModel(position_x=0, position_y=0, **coords).resolved_location(52.52, 13.405)
+
+    assert location(latitude=48.14, longitude=11.58) == (48.14, 11.58), "own location wins"
+    assert location() == (52.52, 13.405), "no location at all -> the default"
+    # a cleared ui.number round-trips as 0, so a zero pair is "empty" too
+    assert location(latitude=0.0, longitude=0.0) == (52.52, 13.405)
+    # ... but half a location must not be completed from the global setting,
+    # which would put the widget somewhere neither setting describes
+    assert location(latitude=48.14) == (48.14, 0.0)
+    assert location(longitude=11.58) == (0.0, 11.58)
+
+
+def test_weather_location_is_none_when_nothing_is_configured():
+    widget = WeatherNowWidgetModel(position_x=0, position_y=0)
+    assert widget.resolved_location(0.0, 0.0) is None
 
 
 def test_weather_forecast_widget_default_forecast_hours():
