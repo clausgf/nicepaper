@@ -478,8 +478,14 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
             if message:
                 ui.label(message).classes('text-caption text-negative')
 
-        def on_display_change(e) -> None:
-            _select_display(e.value)
+        def on_display_change() -> None:
+            # takes no event argument on purpose: an .on() handler is passed
+            # GenericEventArguments, which carries .args (the raw Quasar
+            # payload) and no .value -- reading e.value here raised an
+            # AttributeError that died in the server log, so picking a preset
+            # silently did nothing. The element's own value is already updated
+            # by the time this runs, so read it from there.
+            _select_display(display_select.value)
             _screen_settings.refresh()
 
         with ui.column().classes('w-full gap-2'):
@@ -487,11 +493,11 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
             # with_input makes the select searchable -- the catalog is meant
             # to grow past what fits in a scroll list
             display_hint = _display_hint(displays.get(screen.display_id))
-            screen_form.render_field(
+            display_select = screen_form.render_field(
                 'display_id', label='Display', widget_type='ui.select', options=display_options,
                 with_input=True, props='outlined dense',
-                **({'hint': display_hint} if display_hint else {})).classes('w-full').on(
-                'update:model-value', on_display_change)
+                **({'hint': display_hint} if display_hint else {})).classes('w-full')
+            display_select.on('update:model-value', on_display_change)
             _render_row(screen_form, 'width', 'height')
             screen_form.render_field(
                 'color_model', widget_type='ui.select', options=color_model_options,

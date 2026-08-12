@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.15.1 — 2026-08-12
+
+### Fixed
+
+- Picking a display preset in the screen settings did nothing: the select's
+  handler read `e.value` off the `GenericEventArguments` that an `.on()`
+  handler receives, which carries the raw payload in `.args` and has no
+  `.value`. The resulting `AttributeError` was caught and logged server-side,
+  so the browser showed no error and the fields below simply stayed as they
+  were. The handler now takes the new id from the element itself, and a
+  regression test drives the actual select rather than only the function
+  behind it — which was green throughout.
+
 ## 0.15.0 — 2026-08-12
 
 ### Added

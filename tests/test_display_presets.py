@@ -115,6 +115,53 @@ def test_black_and_white_presets_do_not_ask_for_a_red_accent():
             assert display.color_accent == display.color_primary, display.id
 
 
+# --- the editor's display select ------------------------------------------
+
+# pushing the rebuilt form to a client needs a running NiceGUI loop; without
+# one the send is dropped and leaves an un-awaited coroutine behind. Narrowly
+# filtered rather than silenced, so other RuntimeWarnings still surface.
+@pytest.mark.filterwarnings(
+    "ignore:coroutine 'AwaitableResponse._fire' was never awaited:RuntimeWarning")
+def test_picking_a_display_applies_the_preset(tmp_path, monkeypatch):
+    """Regression: the select's handler used to read `e.value` off the
+    GenericEventArguments an .on() handler receives, which has no such
+    attribute -- so picking a preset raised in the server log and changed
+    nothing. _apply_display() was green throughout; only the wiring was
+    broken, which is why this test drives the actual element.
+    """
+    from nicegui import ui
+    from nicegui.client import Client
+    from nicegui.page import page
+    from nicegui.events import GenericEventArguments, handle_event
+    from extensions.epaper.ui.screen_editor import screen_editor_content
+
+    paths = EpaperPaths(root=tmp_path)
+    paths.ensure_dirs()
+    (paths.screen_dir / "s.json").write_text(json.dumps({"width": 800, "height": 480, "widgets": []}))
+    # ui.notify needs a running NiceGUI loop, which a unit test has no business
+    # starting; the notification is not what is under test here
+    monkeypatch.setattr(ui, "notify", lambda *a, **kw: None)
+
+    with Client(page("/test-display-select"), request=None) as client:
+        screen_editor_content(paths, "s.json", "/api/screen")
+        select = next(e for e in client.elements.values()
+                      if type(e).__name__ == "Select" and e._props.get("label") == "Display")
+        option = next(o for o in select._props["options"] if o["label"].startswith("Waveshare 4.2"))
+        # dispatch the way NiceGUI does: every listener for the event, through
+        # handle_event (which is what adapts the handler's signature)
+        for listener in select._event_listeners.values():
+            if listener.type == "update:modelValue":
+                handle_event(listener.handler, GenericEventArguments(
+                    sender=select, client=client, args=option))
+
+    written = json.loads((paths.screen_dir / "s.json").read_text())
+    display = catalog.get_display("waveshare_4in2")
+    assert written["display_id"] == display.id
+    assert (written["width"], written["height"]) == (display.width, display.height)
+    assert written["color_model"] == display.color_model
+    assert written["color_accent"] == display.color_accent
+
+
 # --- preview ruler --------------------------------------------------------
 
 def test_ruler_ticks_are_round_numbers_covering_the_screen():
