@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+## 0.15.2 — 2026-08-13
+
+### Fixed
+
+- **The global settings card came up empty**, in nice4iot's E-Paper card and in
+  the standalone Global tab alike. `global_config_fields()` still excluded
+  `epaper_color_models`, which 0.15.0 removed from `GlobalConfig`, and
+  `ModelForm` rejects an unknown field name with a `ValueError` — so building
+  the form raised before it rendered anything. The card is now built without an
+  exclude list, and a test renders it and checks every `GlobalConfig` field has
+  a widget.
+
+### Changed
+
+- niceview 0.14.1 → 0.16.0. Two things follow from it:
+  - `DrillDownWrapper`'s `on_add` is awaitable (0.15.0). The new-screen dialog
+    is now awaited inside the Add click like any other dialog, so
+    `panels.directory_drilldown()`'s `confirm_add` hook changed shape: it is an
+    `async` callable returning whether to go ahead, instead of one that was
+    handed a `create` callback to invoke itself. That detour only existed
+    because the coroutine used to be dropped unawaited.
+  - The Screens and Schedules title rows look slightly different (0.16.0): the
+    buttons are joined in a button group at the right edge and carry tooltips.
+    That comes from niceview's new shared chrome style; nicepaper does not set
+    one of its own. `set_chrome_style()` is application-wide, and as a
+    nice4iot extension nicepaper shares that application — and the per-widget
+    `chrome_style=` would not help either, since the file lists render their
+    own rows (computed mtime/size caption, conditional warning icon) rather
+    than niceview's.
+- Screen-settings fields react through `ModelForm`'s own `on_change` (niceview
+  passes the field name and its new value) instead of `element.on(
+  'update:model-value', ...)`. This drops both raw listeners and with them the
+  assumption that NiceGUI's internal listener runs before ours — and the
+  `GenericEventArguments` vs `ValueChangeEventArguments` confusion that broke
+  preset selection in 0.15.0.
+
 ## 0.15.1 — 2026-08-12
 
 ### Fixed

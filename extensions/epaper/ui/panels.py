@@ -10,7 +10,7 @@ page / card system (extensions/epaper/__init__.py's register(app)).
 """
 import datetime
 from pathlib import Path
-from typing import Callable, Optional, Sequence, Union
+from typing import Awaitable, Callable, Optional, Sequence, Union
 from zoneinfo import ZoneInfo
 
 from nicegui import context, ui
@@ -102,7 +102,7 @@ def _entry_caption(item: FileEntry) -> str:
 def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[], str]],
                          title: str, render_content: Callable[[str], None],
                          row_warning: Optional[Callable[[str], Optional[str]]] = None,
-                         confirm_add: Optional[Callable[[Callable[[], None]], None]] = None) -> DrillDownWrapper:
+                         confirm_add: Optional[Callable[[], Awaitable[bool]]] = None) -> DrillDownWrapper:
     """
     Shared DrillDownWrapper wiring for a directory of JSON files, used
     identically by screen_editor.screens_wrapper() and
@@ -125,14 +125,14 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
     missing schedule file; this function stays generic and knows nothing
     about screen semantics.
 
-    confirm_add(create) is an optional hook that gets to run before a file
-    is created: it receives the callback that actually creates and opens
-    the file, and decides whether and when to call it -- e.g. from a
-    dialog's confirm button, as the screens list does to ask which display
-    the new screen is for. Without it, Add creates the file straight away,
-    the no-dialog style above. It must call `create` synchronously (from a
-    NiceGUI event handler is fine); DrillDownWrapper calls on_add without
-    awaiting, so an async hook would silently do nothing.
+    confirm_add() is an optional async hook that runs before a file is
+    created and answers whether to go ahead -- e.g. by awaiting a dialog,
+    as the screens list does to ask which display the new screen is for.
+    Without it, Add creates the file straight away, the no-dialog style
+    above. It is awaited inside the Add click (niceview 0.15.0 made
+    on_add awaitable for exactly this; before that the coroutine was
+    dropped silently, which is why this hook used to take a callback
+    instead of returning an answer).
     """
     directory = DirectoryAdapter(dir_path, default_content=default_content)
 
@@ -167,15 +167,11 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
         name_input.on('blur', do_rename)
         render_content(f'{key}.json')
 
-    def handle_add() -> None:
-        def create() -> None:
-            entry = directory.create()
-            wrapper.open(entry.name)
-
-        if confirm_add is None:
-            create()
-        else:
-            confirm_add(create)
+    async def handle_add() -> None:
+        if confirm_add is not None and not await confirm_add():
+            return
+        entry = directory.create()
+        wrapper.open(entry.name)
 
     wrapper = DrillDownWrapper.from_adapter(
         FileEntry, directory,
@@ -342,7 +338,10 @@ def global_config_fields(persist: Callable[[], None]) -> None:
     care which.
     """
     font_names = sorted(p.name for p in resource_paths.font_path.glob('*') if p.is_file())
-    form = ModelForm.from_item(app_config, exclude=['epaper_color_models'], on_change=lambda e: persist())
+    # no exclude: every GlobalConfig field is renderable since the palette
+    # catalog moved out of it (a name here that no longer exists is a hard
+    # ValueError from ModelForm, which takes the whole card down)
+    form = ModelForm.from_item(app_config, on_change=lambda e: persist())
 
     with ui.column().classes('w-full gap-2'):
         ui.label('General').classes('text-subtitle2')

@@ -52,3 +52,28 @@ def test_new_schedule_rule_has_a_starter_time():
     rule = _default_rule()
     assert rule.times
     assert rule.by_weekdays and rule.by_months  # "every", not an empty restriction
+
+
+def test_global_config_card_renders_every_field():
+    """Regression: the form excluded 'epaper_color_models' after that field
+    had been removed from GlobalConfig, which ModelForm rejects with a
+    ValueError -- so the whole global settings card came up empty, in
+    nice4iot and standalone alike. Renders the card for real, since the
+    failure was in building it, not in any helper below it."""
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.models.global_config import GlobalConfig
+    from extensions.epaper.ui.panels import global_config_fields
+
+    with Client(page("/test-global-config"), request=None) as client:
+        global_config_fields(persist=lambda: None)
+        labels = {e._props.get("label") for e in client.elements.values()}
+
+    # a field from each section, so a silently dropped group is noticed too
+    for expected in ("Locale", "Font name", "Color accent", "Latitude",
+                     "Weather error", "Home Assistant URL"):
+        assert expected in labels, f"{expected!r} missing from the global settings card"
+
+    # every setting should have a widget; none may be skipped silently
+    assert len([e for e in labels if e]) >= len(GlobalConfig.model_fields)

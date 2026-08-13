@@ -15,7 +15,7 @@ standalone mode doesn't need one (see standalone.py).
 """
 import math
 import os
-from typing import Callable, Optional
+from typing import Optional
 
 import nicegui.elements.sortable  # noqa: F401  (see below)
 from nicegui import ui
@@ -450,9 +450,23 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
 
     @ui.refreshable
     def _screen_settings() -> None:
-        screen_form = ModelForm.from_item(
-            screen, exclude=['widgets'],
-            on_change=lambda e: (persist_screen(), sync_preview()))
+        def on_field_change(e) -> None:
+            """One handler for the whole form: niceview passes a
+            FieldChangeEventArguments, which names the field that changed
+            and carries its new value. Reacting per field from here rather
+            than wiring element.on('update:model-value', ...) keeps this
+            independent of listener order -- and of the fact that an .on()
+            handler is passed GenericEventArguments, which has no .value
+            (the mistake that made picking a preset do nothing in 0.15.0)."""
+            persist_screen()
+            sync_preview()
+            if e.field_name == 'display_id':
+                _select_display(e.value)
+                _screen_settings.refresh()
+            elif e.field_name == 'update_schedule_id':
+                schedule_warning.refresh()
+
+        screen_form = ModelForm.from_item(screen, exclude=['widgets'], on_change=on_field_change)
         schedule_ids = _schedule_ids(paths)
         # keep a dangling current value selectable so it isn't silently
         # dropped by the select (and stays visible + flagged)
@@ -478,26 +492,15 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
             if message:
                 ui.label(message).classes('text-caption text-negative')
 
-        def on_display_change() -> None:
-            # takes no event argument on purpose: an .on() handler is passed
-            # GenericEventArguments, which carries .args (the raw Quasar
-            # payload) and no .value -- reading e.value here raised an
-            # AttributeError that died in the server log, so picking a preset
-            # silently did nothing. The element's own value is already updated
-            # by the time this runs, so read it from there.
-            _select_display(display_select.value)
-            _screen_settings.refresh()
-
         with ui.column().classes('w-full gap-2'):
             ui.label('Display').classes('text-subtitle2')
             # with_input makes the select searchable -- the catalog is meant
             # to grow past what fits in a scroll list
             display_hint = _display_hint(displays.get(screen.display_id))
-            display_select = screen_form.render_field(
+            screen_form.render_field(
                 'display_id', label='Display', widget_type='ui.select', options=display_options,
                 with_input=True, props='outlined dense',
                 **({'hint': display_hint} if display_hint else {})).classes('w-full')
-            display_select.on('update:model-value', on_display_change)
             _render_row(screen_form, 'width', 'height')
             screen_form.render_field(
                 'color_model', widget_type='ui.select', options=color_model_options,
@@ -515,8 +518,7 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
             with ui.row().classes('w-full gap-2'):
                 screen_form.render_field(
                     'update_schedule_id', widget_type='ui.select', options=schedule_options,
-                    props='outlined dense clearable').classes('flex-grow').on(
-                    'update:model-value', lambda: schedule_warning.refresh())
+                    props='outlined dense clearable').classes('flex-grow')
             schedule_warning()
 
     def _widget_list() -> None:
@@ -738,10 +740,6 @@ def screens_wrapper(paths: EpaperPaths, image_base_url: str) -> DrillDownWrapper
     # preset: picking a panel is a deliberate choice, and a preselected one
     # would be silently applied by anyone who just clicks Create.
     chosen: dict[str, Optional[str]] = {'display_id': None}
-    # the create-and-open callback directory_drilldown() hands us, held
-    # until the dialog is confirmed (it is the same callback every time,
-    # so the button's handler is registered once rather than per click)
-    pending: dict[str, Optional[Callable[[], None]]] = {'create': None}
 
     def new_screen_content() -> str:
         screen = ScreenModel(width=800, height=480)
@@ -759,20 +757,18 @@ def screens_wrapper(paths: EpaperPaths, image_base_url: str) -> DrillDownWrapper
                                    with_input=True).classes('w-full').props('outlined dense')
         with ui.row().classes('w-full place-content-end'):
             ui.space()
-            ui.button('Cancel', on_click=add_dialog.close)
+            ui.button('Cancel', on_click=lambda: add_dialog.submit(False))
+            ui.button('Create', on_click=lambda: add_dialog.submit(True))
 
-            def on_create() -> None:
-                chosen['display_id'] = display_select.value
-                add_dialog.close()
-                create = pending['create']
-                if create is not None:
-                    create()
-
-            ui.button('Create', on_click=on_create)
-
-    def confirm_add(create: Callable[[], None]) -> None:
-        pending['create'] = create
-        add_dialog.open()
+    async def confirm_add() -> bool:
+        """Ask which display the new screen is for; False cancels the Add.
+        Awaited inside the Add click (niceview 0.15.0), the same shape as
+        the Add-widget dialog above -- dismissing the dialog is a falsy
+        result, so clicking outside it cancels too."""
+        if not await add_dialog:
+            return False
+        chosen['display_id'] = display_select.value
+        return True
 
     return directory_drilldown(
         paths.screen_dir,
