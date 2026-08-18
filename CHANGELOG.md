@@ -1,6 +1,100 @@
 # Changelog
 
-## Unreleased
+## 0.16.0 — 2026-08-18
+
+### Fixed
+
+- **An Image widget set to a file crashed its own form** in a project that had
+  no image files yet. The file select was built from the project directory,
+  niceview rejects a select without options with a `ValueError`, and that took
+  the whole widget form down. It now falls back to a plain field saying there
+  are no image files yet. Found by the new test that renders every widget
+  type's form (`tests/test_ui.py`); nothing had exercised a widget form before.
+
+### Changed
+
+- **The editor is split by concern instead of by "editor".** `ui/panels.py`
+  (a grab bag of drilldown, dashboard, device card and global settings) and
+  the 816-line `ui/screen_editor.py` are gone; in their place, one module per
+  thing: `drilldown.py` (file list ↔ editor chrome), `preview.py` (image,
+  pixel ruler, toolbar), `widget_types.py` (everything type-specific about a
+  widget), `screen_editor.py` (the screen itself), `global_settings.py`,
+  `cards.py`, and `forms.py` for the vocabulary they share. The largest module
+  is now 415 lines instead of 816.
+- **A widget type is declared in three places instead of six.** The editor
+  used to spread the same eight type names over three parallel dicts
+  (`WIDGET_MODELS`/`WIDGET_ICONS`/`WIDGET_TITLES`) and three if-chains
+  (`_default_widget`, `_widget_label`, the per-type half of the detail form),
+  so adding a type meant finding all of them and keeping them in step. They
+  are now one `WIDGET_TYPES` entry each in `ui/widget_types.py`, next to the
+  model and the drawing class. `core/widgets/WIDGET_CLASSES` replaces the
+  `getattr(widgets, widget_type + "Widget")` lookup in `core/screen.py`: the
+  naming convention was invisible from either end, and a typo resolved to
+  None at render time rather than being a missing key. Documented in
+  docs/development.md, "Adding a widget type".
+- **Every form in the extension is now a layout plus field_infos**: the widget
+  forms, the global settings and the schedule rules follow the Screen Settings
+  from earlier in this release. Field styling is set once per form
+  (`ui/forms.py`'s `FORM_STYLE`) rather than repeated per call site — the
+  `props='outlined dense'` that appeared 44 times is gone, as is `_render_row()`
+  with it (its last caller went with the change; say the word if you want it
+  back). Two side effects worth knowing: fields in a row now share the width
+  evenly (`flex-1`) instead of growing from their content, and the Image
+  widget's "Reload now" button sits below the reload checkbox rather than
+  beside it, since a layout renders fields and `extra` renders what is not one.
+- **The screen's name is edited in its Screen Settings**, next to the size,
+  palette and colors — the name is a setting of the screen, not chrome
+  around it. The field itself still belongs to
+  `panels.directory_drilldown()`, which owns the rename (it needs the
+  `DirectoryAdapter` and the wrapper's key), but is now handed to the
+  content as `render_content(filename, render_name_field)` instead of being
+  rendered above it. A schedule has no settings panel to put it in and
+  keeps it on top, where it was. **API change:** the `render_content`
+  callback of `directory_drilldown()` takes a second argument, and
+  `screen_editor_content()` / `schedule_editor_content()` take an optional
+  `render_name_field` as their last parameter.
+- **The Screen Settings are a niceview form layout** (`layout=` +
+  `field_infos=`) instead of hand-placed `render_field()` calls. Same
+  fields, same headings, same spacing — `'## Title'` from niceview 0.18.0
+  is a section heading without a card, and the `':classes'` entries keep
+  the panel's `gap-2`. `base_props='outlined dense'` and
+  `default_classes='w-full'` replace the per-field repetition, and fields
+  in a row now share the width evenly (`flex-1`) rather than growing from
+  their content (`flex-grow`). `exclude=['widgets']` is gone: a layout
+  defines which fields are rendered, so the field set is stated once, and
+  an unknown or duplicated name is a `ValueError` naming its position
+  instead of a field silently missing from the form.
+- **The preview image stops scaling up at 48rem** (`max-w-3xl`, Tailwind's
+  md breakpoint). It is there to judge a layout, not to read it at 1:1, and
+  on a wide window it took the whole content column. Scaling down is
+  unchanged, ruler and pixel readout included — both are placed in
+  percentages.
+- niceview 0.16.0 → 0.22.0. The chrome buttons — Add/Delete/Back in the
+  Screens and Schedules title rows, which niceview's `DrillDownWrapper`
+  draws, not nicepaper — now bring no look of their own: `ChromeStyle.
+  button_props` ships empty, so what was `dense flat` since 0.16.0 is a
+  plain Quasar button until the *application* says otherwise. As a
+  nice4iot extension nicepaper is not that application and still sets no
+  chrome style of its own; standalone mode is, and sets none either, so
+  its title-row buttons currently look like Quasar's defaults.
+  Two smaller changes ride along and are visible in both modes: chrome
+  buttons are only joined in a `ui.button_group` when more than one of
+  them is on screen (0.16.1) — for a `DrillDownWrapper` that is never,
+  since Add belongs to the list view and Delete to the detail view — and
+  an icon-only chrome button is round unless it sits in such a group
+  (0.16.2, `ChromeStyle.icon_button_props`, also empty by default).
+  0.18.1 makes `clearable` reach `ui.color_input` (and `ui.input`,
+  `ui.number`, `ui.textarea`, the date/time widgets), where NiceGUI has no
+  such argument and the flag used to be dropped silently — which is what
+  the Screen Settings' three color fields ask for.
+  0.19.0–0.22.0 are otherwise additive for what nicepaper uses: form
+  actions (`FormAction`, a `'@name'` button in a layout, `chrome_actions=`
+  in every wrapper's title row), a `place` axis and replaceable `ChromeText`
+  and dialog/notification chrome, an application-wide `FieldStyle`, and
+  `BoundFieldAdapter` — none of which nicepaper sets or calls yet, so they
+  change nothing here. One default does reach us: since 0.22.0 a `ModelList`
+  renders at full width (`w-full`), so the Screens and Schedules lists fill
+  their column instead of shrinking to the longest name.
 
 ## 0.15.2 — 2026-08-13
 

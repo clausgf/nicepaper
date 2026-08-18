@@ -2,7 +2,7 @@
 Page assembly for standalone mode only: header/tabs-nav chrome and the
 @ui.page routes. Never imported by the nice4iot extension entry point
 (extensions/epaper/__init__.py) -- there, nice4iot owns the page chrome
-and only the content functions in ui/panels.py, ui/screen_editor.py and
+and only the content functions in ui/cards.py, ui/screen_editor.py and
 ui/schedule_editor.py are reused.
 """
 from contextlib import contextmanager
@@ -10,7 +10,7 @@ from nicegui import ui
 
 from extensions.epaper.config import save_global_config
 from extensions.epaper.paths import EpaperPaths
-from extensions.epaper.ui.panels import global_config_card
+from extensions.epaper.ui.global_settings import global_config_card
 from extensions.epaper.ui.schedule_editor import schedules_wrapper
 from extensions.epaper.ui.screen_editor import screens_wrapper
 

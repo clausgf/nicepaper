@@ -19,7 +19,8 @@ from extensions.epaper.config import app_config
 from extensions.epaper.core.screen import get_screen_by_id
 from extensions.epaper.models.screenmodel import ScreenModel
 from extensions.epaper.paths import EpaperPaths
-from extensions.epaper.ui.screen_editor import _apply_display, _ruler_ticks
+from extensions.epaper.ui.preview import ruler_ticks
+from extensions.epaper.ui.screen_editor import _apply_display
 
 
 def _write_screen(paths: EpaperPaths, screen_id: str, **fields) -> None:
@@ -166,7 +167,7 @@ def test_picking_a_display_applies_the_preset(tmp_path, monkeypatch):
 
 def test_ruler_ticks_are_round_numbers_covering_the_screen():
     for extent in (400, 300, 800, 480, 880, 528, 640, 384):
-        ticks = _ruler_ticks(extent)
+        ticks = ruler_ticks(extent)
         assert ticks[0] == 0
         assert ticks[-1] <= extent, "a tick past the edge would sit outside the image"
         assert len(ticks) >= 4, f"{extent} px deserves more than {len(ticks)} ticks"
@@ -179,8 +180,8 @@ def test_ruler_ticks_are_round_numbers_covering_the_screen():
 
 
 def test_ruler_ticks_survive_a_degenerate_screen():
-    assert _ruler_ticks(0) == [0]
-    assert _ruler_ticks(1)[0] == 0
+    assert ruler_ticks(0) == [0]
+    assert ruler_ticks(1)[0] == 0
 
 
 # --- palette / endpoint ---------------------------------------------------

@@ -28,7 +28,8 @@ def register(app: FastAPI) -> None:
     from extensions.epaper.core.datasources.homeassistant import read_all_entity_statuses
     from extensions.epaper.core.datasources.weather import read_all_weather_statuses
     from extensions.epaper.paths import EpaperPaths
-    from extensions.epaper.ui.panels import dashboard_card, device_config_card, global_config_fields
+    from extensions.epaper.ui.cards import dashboard_card, device_config_card
+    from extensions.epaper.ui.global_settings import global_config_fields
     from extensions.epaper.ui.schedule_editor import schedules_wrapper
     from extensions.epaper.ui.screen_editor import screens_wrapper
 
@@ -73,7 +74,7 @@ def register(app: FastAPI) -> None:
     # Lets a device be assigned a screen and shows the resulting
     # device-specific image URL (an alias, keyed by device name, resolved
     # by the same screens/{id}/image.png route _screens_tab already uses --
-    # see device_config_card()'s docstring in ui/panels.py).
+    # see device_config_card()'s docstring in ui/cards.py).
     def _device_card(project_name: str, device_name: str):
         paths = _paths_for_project(project_name)
         return device_config_card(paths, device_name, f'/api/ext/epaper/{project_name}/screens')

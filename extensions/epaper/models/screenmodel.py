@@ -64,9 +64,9 @@ class WidgetModel(BaseModel):
     clipping: Optional[bool] = Field(default=False, description="Cut off content that overflows this widget's size instead of letting it bleed into neighboring widgets.")
     font_name: Optional[str] = Field(default=None, description="Font file name. Leave empty to use the screen's default font name (independent of font size).")
     font_size: Optional[int] = Field(default=None, description="Font size in points. 0 or empty to use the screen's default font size (independent of font name).")
-    # TODO: not rendered in the widget form yet (screen_editor.py excludes
-    # them) -- editable in the screen JSON only until the editor gets a
-    # per-widget color section.
+    # TODO: not rendered in the widget form yet (no WIDGET_TYPES layout
+    # names them, see ui/widget_types.py) -- editable in the screen JSON
+    # only until the editor gets a per-widget color section.
     color_primary: Optional[str] = Field(default=None, description="Text/drawing color for this widget. Leave empty to use the screen's primary color.")
     color_accent: Optional[str] = Field(default=None, description="Accent color for this widget (chart series, gauge fill). Leave empty to use the screen's accent color.")
 

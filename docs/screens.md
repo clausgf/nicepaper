@@ -103,6 +103,7 @@ settings — not something a display asks for per request:
 
 | Field | Meaning |
 | --- | --- |
+| `Name` | the screen's file name and its id in `/api/screen/<id>/…`; editing it renames the file (editor only, not a field of the screen JSON) |
 | `width`, `height` | canvas size in pixels |
 | `color_model` | id of the palette the image is quantized to before it is served (`bw`, `bwr`, `bwy`, `gs4`, `c7`, `e6`). Empty serves the unquantized RGB image. |
 | `color_background`, `color_primary`, `color_accent` | this screen's colors; each empty field falls back to the global default (see [Configuration](configuration.md)) |
@@ -110,7 +111,7 @@ settings — not something a display asks for per request:
 
 `/api/screen/<id>/image.png` serves the image quantized to that screen's
 `color_model`, so the display needs no palette knowledge of its own and can't
-ask for the wrong one — it is also exactly what the editor's Image Preview
+ask for the wrong one — it is also exactly what the editor's preview
 shows. `?raw=true` returns the unquantized RGB render the quantization started
 from, for debugging a color that dithers; a display never needs it.
 `?boxes=true` renders the screen with every widget outlined — see
@@ -122,7 +123,9 @@ and moving the mouse over it shows the exact pixel under the cursor — widgets
 are positioned by typing `position_x`/`position_y`, so the preview is only
 useful if it can be read back as coordinates. Both are scale-independent: the
 ruler is placed in percentages and the readout divides by the rendered size, so
-they stay correct at whatever width the browser scales the image to.
+they stay correct at whatever width the browser scales the image to. The frame
+stops growing at 48rem — a preview is for judging the layout, not for reading
+it at 1:1 — and scales down freely below that.
 
 Individual widgets can override `color_primary`/`color_accent` for themselves,
 each aspect falling back to the screen's color independently — the same

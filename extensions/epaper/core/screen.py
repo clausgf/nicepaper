@@ -42,20 +42,13 @@ class Screen:
         self.image_cache = ImageCache(paths.image_dir, self.id)
 
         logger.info(f"Creating screen id={self.id}")
-        # create widgets
         for id, widget_config in enumerate(self.config.widgets):
             logger.debug(f"creating widget from {widget_config}")
-            widget_classname = widget_config.widget_type + "Widget"
-
-            # get widget class by name
-            widget_class = getattr(widgets, widget_classname, None)
+            widget_class = widgets.WIDGET_CLASSES.get(widget_config.widget_type)
             if widget_class is None:
-                logger.error(f"Error creating widget: Unknown widget class {widget_classname}")
+                logger.error(f"Error creating widget: no drawing class for {widget_config.widget_type!r}")
                 continue
-
-            # create widget instance
-            widget_obj = widget_class(id, widget_config)
-            self.widgets.append(widget_obj)
+            self.widgets.append(widget_class(id, widget_config))
 
 
     async def get_image_path(self, raw: bool = False) -> Optional[str]:
@@ -234,7 +227,7 @@ async def get_aliases(paths: EpaperPaths) -> dict[str, str]:
     """
     All entries in the alias file (name -> screen id), or {} if the file
     doesn't exist or can't be parsed. Shared by _resolve_alias() below and
-    the device-config UI card (ui/panels.py's device_config_card), which
+    the device-config UI card (ui/cards.py's device_config_card), which
     lets a nice4iot device be assigned a screen by writing an alias keyed
     by the device's own name.
     """

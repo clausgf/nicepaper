@@ -6,7 +6,7 @@ class GlobalConfig(BaseModel):
     """
     Settings that are the same for every screen regardless of which
     project/root it belongs to -- JSON-persisted and editable via a single
-    card (panels.global_config_card()), unlike the old env-var-based
+    card (ui/global_settings.py), unlike the old env-var-based
     pydantic-settings Config: nice4iot's register_global_card() and the
     standalone "Global" tab both need something a user can actually edit
     and save, not just override at process startup.

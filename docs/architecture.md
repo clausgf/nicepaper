@@ -14,8 +14,15 @@ nicepaper
 │   ├── config.py                # settings that are the same for every root
 │   ├── catalog.py               # display presets + palettes (package + per-root)
 │   ├── api/endpoints.py         # build_standalone_router() / build_extension_router()
-│   ├── ui
-│   │   ├── panels.py            # content-only rendering (reused by both modes)
+│   ├── ui                       # content-only rendering, reused by both modes
+│   │   ├── forms.py             # form vocabulary: field styling, spacing, hints
+│   │   ├── drilldown.py         # file list <-> editor chrome, inline rename
+│   │   ├── screen_editor.py     # screen settings + widget list
+│   │   ├── widget_types.py      # per-widget-type table: icon, title, form
+│   │   ├── preview.py           # preview image, pixel ruler, toolbar
+│   │   ├── schedule_editor.py   # one card per weekly rule
+│   │   ├── global_settings.py   # the GlobalConfig form
+│   │   ├── cards.py             # nice4iot dashboard + device cards
 │   │   └── standalone.py        # @ui.page routes + chrome, standalone only
 │   ├── core
 │   │   ├── screen.py            # screen rendering, screen cache

@@ -61,6 +61,30 @@ uv run ruff check
 uv run pytest
 ```
 
+## Adding a widget type
+
+A widget type is declared in exactly three places, all keyed by the same
+`widget_type` string:
+
+1. **`models/screenmodel.py`** — the model: a `WidgetModel` subclass with
+   `widget_type: Literal["Foo"] = "Foo"`, added to the `AnyWidget` union and to
+   the `Literal[...]` on the base class.
+2. **`core/widgets/`** — the drawing class (a `Widget` subclass with
+   `async def draw(ctx)`), registered in `WIDGET_CLASSES` in that package's
+   `__init__.py`.
+3. **`ui/widget_types.py`** — one `WIDGET_TYPES` entry: icon, title, the one-line
+   summary for the widget list, the defaults a new instance starts with, and the
+   *Content* section of its form as a niceview layout. The *Layout* and
+   *Appearance* sections come from the shared `_layout()`.
+
+A form whose fields depend on the widget's own values (as the Image widget's
+url/file and the Home Assistant widget's gauge/value do) makes `content` a
+callable of `(widget, paths)` and names the deciding field in `refresh_on`.
+Anything that is not a field at all — a button, a warning — goes in `extra`.
+
+`tests/test_ui.py` renders every registered type's form, so a layout naming a
+field that doesn't exist fails there rather than in the browser.
+
 ## Regenerating the low-bandwidth codec
 
 `extensions/epaper/wire/huffman_de.py` holds a fixed German Huffman codebook
@@ -81,9 +105,10 @@ uv run python -m extensions.epaper.wire.huffman_de
 `WidgetModel` has `color_primary`/`color_accent`, and rendering honours them
 (each falling back to the screen's color independently, like `font_name`/
 `font_size`), but the widget detail form doesn't render them yet — they can
-only be set in the screen JSON. Adding them is a *Appearance*-section pair of
-`ui.color_input` fields in `screen_editor.py`'s `_widget_detail()`, next to the
-font row.
+only be set in the screen JSON. Adding them means naming both fields in the
+*Appearance* section of `ui/widget_types.py`'s `_layout()`, next to the font
+row, plus a `ui.color_input` entry each in its `_field_infos()` — once, for
+every widget type.
 
 ### Getting the GxEPD2 class to the firmware
 
