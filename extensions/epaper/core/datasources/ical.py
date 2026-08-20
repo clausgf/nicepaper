@@ -23,7 +23,8 @@ def _get_session() -> aiohttp.ClientSession:
     """
     global _session
     if _session is None or _session.closed:
-        _session = aiohttp.ClientSession(raise_for_status=True)
+        headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0"}
+        _session = aiohttp.ClientSession(raise_for_status=True, headers=headers)
     return _session
 
 
@@ -45,6 +46,7 @@ def _extract_events(ical_text: str, start_date: datetime.datetime, end_date: dat
         dtend_prop = event.get('DTEND')
         organizer = event.get('ORGANIZER')
         summary = event.get('SUMMARY')
+        categories = event.get('CATEGORIES','') # categories is an optional, comma-separated list of strings
         if dtstart_prop is None or dtend_prop is None or summary is None:
             continue
         dtstart = dtstart_prop.dt
@@ -82,7 +84,8 @@ def _extract_events(ical_text: str, start_date: datetime.datetime, end_date: dat
             "dtstart": dtstart.isoformat(),
             "dtend": dtend.isoformat(),
             "organizer": str(organizer).strip() if organizer else "",
-            "summary": summary.strip()
+            "summary": summary.strip(),
+            "categories": categories.strip(),
         })
 
     result.sort(key=lambda e: datetime.datetime.fromisoformat(e.get("dtstart")))
