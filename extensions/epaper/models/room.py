@@ -1,0 +1,117 @@
+"""
+Room model: a room's identity and its booking source.
+
+A room carries only its master data and which booking system feeds it. 
+It deliberately does *not* carry any rendering settings. Nor does it 
+list the displays in the room -- that
+is a device->room relation stored in the device bindings
+(models/devicebinding.py), keyed by nice4iot device name, so a room never
+holds a device id that a deleted device could leave dangling.
+
+**Identity & storage.** A room has a stable surrogate `id`, generated once at
+creation and never changed. The room is stored as `<id>.json`.
+"""
+from typing import Annotated, Literal, Optional
+from uuid import uuid4
+
+import niceview
+from pydantic import BaseModel, Field, field_validator
+
+RoomType = Literal["meeting", "conference", "lecture", "seminar", "office", "lab", "other"]
+
+# Labels for RoomType (stored as the ids above). Kept with the model so both
+# the form (room_type's FieldInfo) and the room list read the same names.
+ROOM_TYPE_LABELS: dict[str, str] = {
+    "meeting": "Meeting room",
+    "conference": "Conference room",
+    "lecture": "Lecture hall",
+    "seminar": "Seminar room",
+    "office": "Office",
+    "lab": "Lab",
+    "other": "Other",
+}
+
+
+class RoomModel(BaseModel):
+    # --- Identity / master data -------------------------------------------
+    id: Annotated[str,
+            Field(default_factory=lambda: uuid4().hex,
+                  description='Stable surrogate id: generated once, never changed, and also the '
+                              "room's file name. It is what device bindings reference, so a room "
+                              'can be renamed freely.'),
+            niceview.Field(editable=False, hidden=True)
+        ]
+
+    room_number: Annotated[str,
+            Field(description="Room number shown on the sign, e.g. 'A-101'.")
+        ] = '000'
+
+    room_name: Annotated[str,
+            Field(description="Human-readable room name, e.g. 'North Conference'.")
+        ] = 'Room'
+
+    building: Annotated[Optional[str],
+            Field(description='Building the room is in.')
+        ] = None
+
+    floor: Annotated[Optional[str],
+            Field(description="Floor/level, e.g. 'G', '1', '-1'.")
+        ] = None
+
+    room_type: Annotated[RoomType,
+            Field(description='Kind of room.'),
+            niceview.Field(widget_type='ui.select', options=ROOM_TYPE_LABELS)
+        ] = 'meeting'
+
+    capacity: Annotated[Optional[int],
+            Field(ge=0, description='Seating capacity (number of people).'),
+            niceview.Field()
+        ] = None
+
+    notes: Annotated[Optional[str],
+            Field(description='Free-text notes about the room.'),
+            niceview.Field(widget_type='ui.textarea')
+        ] = None
+
+    photo: Annotated[Optional[str],
+            Field(description='Room photo: a file in the project directory (the same place the '
+                              'Image widget reads from). Empty = no photo.'),
+            niceview.Field(hint='File in the project directory')
+        ] = None
+
+    # --- Booking source ---------------------------------------------------
+    booking_system_id: Annotated[Optional[str],
+            Field(title="Booking system",
+                 description='Booking system (Settings > Booking systems) that feeds '
+                             'this room. Empty = the room has no booking source yet.'),
+            niceview.Field(label='Booking system', hint="Booking system providing the calendar")
+        ] = None
+
+    booking_ical_url: Annotated[str,
+            Field(description='Room-specific part of the iCal/ICS feed url, added to the '
+                              'booking system\'s base URL when the booking system is an '
+                              'iCal type. Empty = inherit the booking system\'s own URL.'),
+            niceview.Field(label='iCal URL', hint='http(s):// or webcal://')
+        ] = ""
+
+    @field_validator("booking_ical_url")
+    @classmethod
+    def _check_ical_url(cls, v: Optional[str]) -> Optional[str]:
+        # Lenient on purpose: empty is fine (inherit the system URL), and a
+        # calendar feed is legitimately http(s):// or webcal://; anything else
+        # is a typo worth catching before it silently never loads.
+        if v and not v.startswith(("http://", "https://", "webcal://")):
+            raise ValueError("iCal URL must start with http://, https:// or webcal://")
+        return v
+
+    class Meta:
+        title = "Room"
+        description = "A room's identity and its booking source."
+        layout = [
+            ['## Room',
+                ['room_number:w-1/4', 'room_name'],
+                ['building', 'floor:w-1/4'],
+                ['room_type', 'capacity:w-1/4'],
+                'photo', 'notes'],
+            ['## Booking system', ['booking_system_id:shrink', 'booking_ical_url']],
+        ]

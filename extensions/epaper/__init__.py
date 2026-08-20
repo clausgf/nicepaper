@@ -11,17 +11,21 @@ called by nice4iot itself, which does have app.* available.
 """
 from fastapi import FastAPI
 
+from extensions.epaper.ui import simplified_ui
+
 
 def register(app: FastAPI) -> None:
     from pathlib import Path
 
     from app.config import app_config as nice4iot_app_config
     from app.extensions import (
-        mount_extension_router, register_device_card, register_global_card,
-        register_project_card, register_project_tab,
+        mount_extension_router, 
+        register_global_card, register_project_page,
+        register_device_card, register_project_card,
+        register_project_tab,
     )
     from app.paths import extension_project_dir
-    from app.routes import project_url
+    from app.routes import project_extension_url
 
     from extensions.epaper.api.endpoints import build_extension_router
     from extensions.epaper.config import load_global_config, save_global_config
@@ -52,6 +56,7 @@ def register(app: FastAPI) -> None:
         global_config_fields(persist=lambda: save_global_config(_global_config_path))
 
     register_global_card('E-Paper', _global_card)
+    register_project_page(simplified_ui.render)
 
     # --- REST -----------------------------------------------------------
     router = build_extension_router(_paths_for_project)
@@ -64,7 +69,7 @@ def register(app: FastAPI) -> None:
         num_schedules = len(list(paths.schedule_dir.glob('*.json')))
         weather_statuses = read_all_weather_statuses(paths.weather_dir)
         homeassistant_statuses = read_all_entity_statuses(paths.homeassistant_dir)
-        dashboard_card(num_screens, num_schedules, project_url(project_name, tab='Screens'),
+        dashboard_card(num_screens, num_schedules, project_extension_url(project_name, 'epaper'),
                        weather_statuses=weather_statuses,
                        homeassistant_statuses=homeassistant_statuses)
 

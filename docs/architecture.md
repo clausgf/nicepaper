@@ -85,15 +85,16 @@ In extension mode:
   routes of our own. No built-in login here either — nice4iot's own
   auth and per-project activation gate access.
 - Each nice4iot **device**'s General tab gets an "E-Paper" card
-  (`register_device_card('general', ...)`) to optionally assign one of
-  the project's screens to that device. Assigning a screen adds an
-  entry to `<project>/.epaper/aliases.json` keyed by the device's own
-  name (the same alias mechanism described under
-  [Display aliases](screens.md#display-aliases)), and the card then shows the
+  (`register_device_card('general', ...)`) to assign the device a screen
+  (the image it renders) and a room (where it hangs). Both are stored in
+  `<project>/.epaper/device_bindings.json` keyed by the device's own name
+  (the same binding described under
+  [Display bindings](screens.md#display-bindings)), and the card then shows the
   resulting device-specific image URL — so the device firmware only
   ever needs to know its own name, never the screen id, and every
   header (`If-None-Match`) keeps working unchanged since it's the same
-  image endpoint.
+  image endpoint. The room half is the device→room relation the simplified
+  UI reads back as the displays in a room.
 
 `extensions/epaper/__init__.py` defers every nice4iot-specific import
 (`app.extensions`, `app.paths`, `app.routes`) into `register()`'s

@@ -40,6 +40,17 @@ class EpaperPaths:
         return self.root / "screens"
 
     @property
+    def room_dir(self) -> Path:
+        """Rooms of the simplified UI, one JSON file per room (RoomModel)."""
+        return self.root / "rooms"
+
+    @property
+    def booking_dir(self) -> Path:
+        """Booking systems of the simplified UI, one JSON file per system
+        (BookingSystemModel)."""
+        return self.root / "booking"
+
+    @property
     def schedule_dir(self) -> Path:
         return self.root / "schedules"
 
@@ -62,8 +73,11 @@ class EpaperPaths:
         return self.root / "homeassistant"
 
     @property
-    def alias_file(self) -> Path:
-        return self.root / "aliases.json"
+    def device_bindings_file(self) -> Path:
+        """Typed collection file mapping a nice4iot device name to its
+        DeviceBinding (room + screen). Replaces the old aliases.json, which
+        core/devicebinding.py migrates from on first read."""
+        return self.root / "device_bindings.json"
 
     @property
     def display_file(self) -> Path:
@@ -81,6 +95,7 @@ class EpaperPaths:
         return self.root / "organizer_names.json"
 
     def ensure_dirs(self) -> None:
-        for d in (self.screen_dir, self.schedule_dir, self.image_dir, self.ical_dir,
-                  self.weather_dir, self.image_cache_dir, self.homeassistant_dir):
+        for d in (self.screen_dir, self.room_dir, self.booking_dir, self.schedule_dir,
+                  self.image_dir, self.ical_dir, self.weather_dir, self.image_cache_dir,
+                  self.homeassistant_dir):
             d.mkdir(parents=True, exist_ok=True)

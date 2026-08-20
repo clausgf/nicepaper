@@ -32,9 +32,9 @@ runs nicepaper as a [nice4iot](https://github.com/clausgf/nice4iot) extension
    ```
 
    `examples/screens/roomcalendar.json` shows the `RoomCalendar` widget; edit
-   its `ical_url` (and `examples/aliases.json`, `examples/organizer_names.json`
-   if needed) before copying it in — see [Screens, widgets &
-   schedules](screens.md).
+   its `ical_url` (and `examples/device_bindings.json`,
+   `examples/organizer_names.json` if needed) before copying it in — see
+   [Screens, widgets & schedules](screens.md).
 
 ## Run the standalone server
 
@@ -48,7 +48,7 @@ uv run uvicorn main:app --reload
   (quantized to the screen's own palette; `?raw=true` for the RGB render)
 
 `<id>` is the name of a JSON file in `data/screens` without the extension, or
-an alias from `data/aliases.json`.
+a display name bound to a screen in `data/device_bindings.json`.
 
 ## Tests and linting
 

@@ -6,10 +6,13 @@
 
 - **[Screens, widgets & schedules](screens.md)** — the JSON configuration
   formats: screens and their widgets (`Text`, `Date`, `RoomCalendar`,
-  `Weather*`), color models, display aliases, and update schedules, with the
+  `Weather*`), color models, display bindings, and update schedules, with the
   ready-to-copy `examples/` files.
 - **[Configuration](configuration.md)** — process-level settings (`Config` /
   environment variables): locale, timezone, update intervals, accent color.
+- **[Simplified UI](simplified-ui.md)** — the room-focused, e-paper-only
+  extension page: its page frame, two-level sidebar navigation, and sections
+  (Rooms, Displays, Booking systems).
 
 ## Running and deploying
 
@@ -20,6 +23,9 @@
   server and the nice4iot extension.
 - **[Security policy](../SECURITY.md)** — the intended security boundaries and
   how to report a vulnerability.
+- **[nice4iot extension-interface wishlist](nice4iot-extension-wishlist.md)** —
+  what the extension still needs from nice4iot (device listing, telemetry, …)
+  and what it does in the meantime.
 
 ## Design notes
 

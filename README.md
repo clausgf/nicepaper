@@ -51,7 +51,8 @@ content actually changed.
   no palette knowledge of its own.
 - **Update schedules** — plain JSON weekly rules (weekdays, months, times)
   decide when a screen expires and is re-rendered.
-- **Display aliases** — address a display by a stable friendly name; several
+- **Display bindings** — address a display by its stable name, bound to the
+  screen it renders (and, in nice4iot mode, the room it hangs in); several
   displays can share one screen.
 - **Management UI** — Screens and Schedules tabs: create/delete files, edit a
   screen's canvas and drag-reorderable widget list with live RGB/palette
@@ -115,7 +116,7 @@ Full documentation lives in [docs/](docs/README.md):
 
 | Document | Contents |
 |---|---|
-| [Screens, widgets & schedules](docs/screens.md) | The JSON configuration formats, color models, aliases, and the `examples/` files |
+| [Screens, widgets & schedules](docs/screens.md) | The JSON configuration formats, color models, display bindings, and the `examples/` files |
 | [Configuration](docs/configuration.md) | Process settings and environment variables |
 | [Development](docs/development.md) | Install from source, run, tests, codec regeneration |
 | [Architecture](docs/architecture.md) | Project layout and standalone vs. nice4iot extension mode |

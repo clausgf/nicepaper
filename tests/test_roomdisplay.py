@@ -1,0 +1,105 @@
+import datetime
+import types
+
+import extensions.epaper.core.roomdisplay as rd
+from extensions.epaper.core.devicebinding import get_device_binding, set_device_binding
+from extensions.epaper.core.room import create_room, room_adapter
+from extensions.epaper.paths import EpaperPaths
+
+NOW = datetime.datetime.now(datetime.timezone.utc)
+
+
+def _paths(tmp_path) -> EpaperPaths:
+    paths = EpaperPaths(root=tmp_path)
+    paths.ensure_dirs()
+    return paths
+
+
+def _fake_devices(*devices):
+    return lambda project: list(devices)
+
+
+def _dev(name, last_seen=NOW):
+    return types.SimpleNamespace(name=name, last_seen_at=last_seen)
+
+
+def test_no_devices_outside_nice4iot(tmp_path):
+    # default _project_devices can't import app.* here -> empty, grid degrades
+    assert rd.display_rows(_paths(tmp_path), "proj") == []
+
+
+def test_display_rows_join_room_and_online(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    room.building, room.floor, room.room_number = "B", "1", "A-101"
+    room_adapter(paths, room.id).save(room)
+    set_device_binding(paths, "d-online", room_id=room.id, screen_id="scr")
+    set_device_binding(paths, "d-stale", room_id=room.id)
+
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(
+        _dev("d-online", NOW),
+        _dev("d-stale", NOW - datetime.timedelta(hours=1)),
+        _dev("d-unbound", None),
+    ))
+
+    rows = {r.device_name: r for r in rd.display_rows(paths, "proj")}
+    assert set(rows) == {"d-online", "d-stale", "d-unbound"}
+    assert rows["d-online"].online is True and rows["d-stale"].online is False
+    assert rows["d-unbound"].online is False  # last_seen None
+    # room columns come from the device's own bound room
+    assert (rows["d-online"].building, rows["d-online"].room_number) == ("B", "A-101")
+    assert rows["d-online"].screen_id == "scr"
+    assert rows["d-unbound"].building == ""  # not in a room
+    # unavailable columns stay empty
+    assert rows["d-online"].rssi is None and rows["d-online"].battery_voltage is None
+
+
+def test_display_rows_room_filter(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    set_device_binding(paths, "in-room", room_id=room.id)
+    set_device_binding(paths, "other", room_id="somewhere-else")
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(_dev("in-room"), _dev("other")))
+
+    names = [r.device_name for r in rd.display_rows(paths, "proj", room_id=room.id)]
+    assert names == ["in-room"]
+
+
+def test_assignable_devices_excludes_this_room(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    set_device_binding(paths, "here", room_id=room.id)
+    monkeypatch.setattr(rd, "_project_devices",
+                        _fake_devices(_dev("here"), _dev("free"), _dev("elsewhere")))
+    set_device_binding(paths, "elsewhere", room_id="other-room")
+    assert rd.assignable_devices(paths, "proj", room.id) == ["elsewhere", "free"]
+
+
+def test_adapter_update_writes_only_screen_id(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    set_device_binding(paths, "d", room_id=room.id)
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(_dev("d")))
+
+    adapter = rd.RoomDisplaysAdapter(paths, "proj", room.id)
+    row = adapter.read("d")
+    row.screen_id = "scr"
+    adapter.update(row)
+    binding = get_device_binding(paths, "d")
+    assert binding.screen_id == "scr" and binding.room_id == room.id  # room kept
+
+    # clearing the screen ('') unassigns the screen, keeps the room
+    row.screen_id = ""
+    adapter.update(row)
+    assert get_device_binding(paths, "d").screen_id is None
+
+
+def test_adapter_delete_unassigns_from_room(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    set_device_binding(paths, "d", room_id=room.id, screen_id="scr")
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(_dev("d")))
+
+    rd.RoomDisplaysAdapter(paths, "proj", room.id).delete("d")
+    binding = get_device_binding(paths, "d")
+    assert binding.room_id is None and binding.screen_id == "scr"  # device + screen kept

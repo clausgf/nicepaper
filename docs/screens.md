@@ -179,13 +179,17 @@ overrides) the shipped ones. Unlike `displays.json`, editing it changes what
 gets served — a screen references a palette by id rather than containing it —
 so a change there re-renders every screen using it.
 
-## Display aliases
+## Display bindings
 
-An optional `data/aliases.json` file maps friendly names to screen ids, e.g.
-`{"hallway": "epaper_43bw"}`, so a display can be addressed by a stable name
-instead of the screen file name, and several displays can share one screen.
-(In nice4iot extension mode, assigning a screen to a device writes such an
-alias automatically — see [Architecture](architecture.md).)
+An optional `data/device_bindings.json` file maps a display's name to the
+screen it renders (and, in nice4iot mode, the room it hangs in), e.g.
+`{"hallway": {"screen_id": "epaper_43bw"}}`. A display can then be addressed
+by a stable name instead of the screen file name, and several displays can
+share one screen. (In nice4iot extension mode, assigning a screen or room to a
+device writes this file automatically — see [Architecture](architecture.md).)
+
+An older `data/aliases.json` (the bare `{"hallway": "epaper_43bw"}` format) is
+migrated to `device_bindings.json` automatically on first use.
 
 ## Update schedules
 
@@ -224,8 +228,8 @@ formats):
   gauges plus text values (an attribute of a `climate` entity and a
   `binary_sensor`). Replace the entity ids with your own and configure the
   Home Assistant URL/token first.
-- `examples/aliases.json` — maps the alias `hallway` to the `roomcalendar`
-  screen, see [Display aliases](#display-aliases).
+- `examples/device_bindings.json` — binds the display name `hallway` to the
+  `roomcalendar` screen, see [Display bindings](#display-bindings).
 - `examples/organizer_names.json` — example entries for `organizer_names_file`,
   used to extract an organizer's name from an event summary when the iCal feed
   has no `ORGANIZER` field.

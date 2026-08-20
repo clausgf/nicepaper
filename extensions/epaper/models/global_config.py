@@ -39,8 +39,8 @@ class GlobalConfig(BaseModel):
     The three colors below stay: they are the *defaults*, applied where a
     screen (and, within a screen, a widget) doesn't set its own.
     """
-    ical_update_interval_s: int = 600
-    ical_max_days: int = 30
+    ical_update_interval_s: int = 600  # TODO remove, use booking system
+    ical_max_days: int = 30  # TODO remove, use booking system
     ical_error: str = "Error fetching calendar data"
     no_appointments: str = "No appointments"
     next_appointment: str = "Next appointment"

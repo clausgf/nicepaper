@@ -1,5 +1,85 @@
 # Changelog
 
+## 0.17.0 — 2026-08-20
+
+### Added
+
+- **Simplified UI: page frame and navigation.** A new room-focused,
+  e-paper-only extension page (`extensions/epaper/ui/simplified_ui/`,
+  `register_project_page`) with its own chrome: a header (hamburger + brand
+  + nice4iot user menu), a two-level sidebar in a responsive left drawer
+  (inline from `lg`, an overlay below), and in-place view switching. Sections:
+  Rooms (list + per-room detail with occupancy/settings/displays), Displays,
+  and Einstellungen › Buchungssysteme (iCal config). The section views are
+  scaffolding over demo data — the frame and navigation are the deliverable;
+  the Room/Display/BookingSystem models and storage follow. As an extension,
+  the header uses nice4iot's public `app.extensions.render_user_menu()`;
+  standalone has no user session and omits the menu. See docs/simplified-ui.md,
+  which also notes one optional nice4iot improvement (deep-linkable sub-paths).
+- **Standalone link to the simplified UI.** The standalone app serves it as
+  a full page at `/ui/simplified`, linked from an "Open" card at the top of
+  the Global tab (`ui/standalone.py`).
+- **Rooms are wired in the simplified UI.** The Rooms section is a niceview
+  `DrillDownWrapper` over the rooms directory (`core/room.py`'s `RoomsAdapter`),
+  so the list, Add and Delete are niceview's; the module only supplies the row
+  and a three-tab detail (Occupancy, Settings — the `RoomModel` form,
+  autosaving through the adapter — and Displays, the devices bound to the room
+  from `devices_in_room`). Rooms are created with a fresh id and file; renaming
+  edits `room_name`/`room_number` only. Displays and Booking systems remain
+  scaffolding.
+- **Displays are wired in the simplified UI.** A niceview `EditGridWrapper`
+  (`ui/simplified_ui/displays_grid.py`) over `core/roomdisplay.py` lists the
+  e-paper displays, reused by the room's Displays tab (filtered to the room) and
+  the top-level Displays section (all). Each row joins a nice4iot device (name,
+  online from `last_seen_at`) with its binding (Screen, inline-editable) and its
+  bound room (building/floor/number); Remove unassigns a device, and in a room
+  Add assigns an existing one. RSSI/battery/alarm columns exist but stay empty —
+  nice4iot has no readable per-device source yet, tracked in
+  docs/nice4iot-extension-wishlist.md (also: sanctioned device listing, online
+  accessor). Device data is fetched via nice4iot's device backend in-process and
+  degrades to empty in standalone.
+- **Booking systems are wired in the simplified UI.** Settings › Booking
+  systems is a niceview `DrillDownWrapper` over `core/bookingsystem.py`'s
+  `BookingSystemsAdapter` (list, Add, Delete, and a `BookingSystemModel` form).
+  A booking system is the connection/type (`models/bookingsystem.py`: id, name,
+  type — iCal today — description), stored one JSON file per system in
+  `EpaperPaths.booking_dir` (`data/booking/`); type-specific settings and
+  Exchange follow behind the `type` switch. A room's **Booking system** field is
+  now a select of the configured systems (options from storage, keeping a
+  deleted system visible), referencing them by id. Displays remain scaffolding.
+- **Room model** (`models/room.py`, `RoomModel`): a room's identity and
+  booking source — number, name, building, floor, type (meeting, conference,
+  lecture, seminar, office, lab, other), capacity, photo, notes, booking
+  system, room-specific iCal URL — stored one JSON file per room in
+  `EpaperPaths.room_dir` (`data/rooms/`). A room has a stable surrogate `id`
+  (generated once, never changed, and the file name) so it can be renamed
+  freely without breaking the device bindings that reference it — no human
+  field is a safe key. The form's field metadata (labels, the room-type select,
+  hints) rides each field's `Annotated` niceview `FieldInfo`, so the UI supplies
+  only the layout. Presentation is deliberately *not* on the room — it stays in
+  the per-device screen; nor are the room's displays a field (that is the
+  device binding below).
+
+### Changed
+
+- **niceview 0.22.1** (the simplified UI's DrillDownWrapper/EditGridWrapper/
+  ModelForm and the model-level FieldInfo build on it).
+- **Device bindings replace `aliases.json`.** A nice4iot device's E-Paper
+  configuration is now a typed record — `DeviceBinding{room_id?, screen_id?}`
+  (`models/devicebinding.py`) — stored in `data/device_bindings.json`
+  (`dict[device_name, DeviceBinding]`), so a device carries both the screen it
+  renders *and* the room it hangs in, navigable from either side. An existing
+  `aliases.json` (the bare `{name: screen_id}` map) is migrated automatically
+  on first read. **API:** `core/screen.get_aliases()/set_alias()` are removed
+  and `_resolve_alias()` is renamed `core/devicebinding.resolve_screen_id()`;
+  the new module also exposes `get_device_binding()/set_device_binding()` and
+  the reverse lookup `devices_in_room()` — all **synchronous** (the store is a
+  tiny file, read like the editor's JsonAdapter), so `device_config_card` is
+  now sync too. The device settings card gains a **Room** field alongside the
+  existing Screen field. `EpaperPaths.alias_file`
+  is replaced by `EpaperPaths.device_bindings_file`; `EpaperPaths.room_dir` is
+  new. `examples/aliases.json` becomes `examples/device_bindings.json`.
+
 ## 0.16.0 — 2026-08-18
 
 ### Fixed

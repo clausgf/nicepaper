@@ -10,9 +10,15 @@ from nicegui import ui
 
 from extensions.epaper.config import save_global_config
 from extensions.epaper.paths import EpaperPaths
+from extensions.epaper.ui import simplified_ui
 from extensions.epaper.ui.global_settings import global_config_card
 from extensions.epaper.ui.schedule_editor import schedules_wrapper
 from extensions.epaper.ui.screen_editor import screens_wrapper
+
+# The simplified UI is a full page of its own (header, drawer, user menu),
+# not a tab in frame(): '/simplified' renders it directly, and the Global
+# tab links to it (see _simplified_ui_link / page_global below).
+SIMPLIFIED_ROUTE = '/simplified'
 
 # top-level navigation: tabs, each its own route (not client-side panel
 # switching), so /global, /screens and /schedules stay deep-linkable.
@@ -43,6 +49,22 @@ def frame(active_tab: str):
         yield
 
 
+def _simplified_ui_link() -> None:
+    """Link card to the simplified, room-focused UI, shown on the Global tab
+    above the settings card. The simplified UI is its own full page
+    (SIMPLIFIED_ROUTE), so this only navigates there."""
+    with ui.card().classes('w-full'):
+        with ui.row().classes('w-full items-center justify-between'):
+            with ui.row().classes('items-center gap-2'):
+                ui.icon('meeting_room').classes('text-2xl')
+                with ui.column().classes('gap-0'):
+                    ui.label('Simplified UI').classes('text-subtitle1')
+                    ui.label('Room-focused view: rooms, displays, booking systems') \
+                        .classes('text-caption text-grey')
+            ui.button('Open', icon='open_in_new',
+                      on_click=lambda: ui.navigate.to(SIMPLIFIED_ROUTE)).props('unelevated')
+
+
 def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
     """
     Register the standalone @ui.page routes. Call once, before ui.run_with().
@@ -57,7 +79,15 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
     @ui.page('/global')
     def page_global():
         with frame('Global'):
+            _simplified_ui_link()
             global_config_card(persist=lambda: save_global_config(paths.root / "global_config.json"))
+
+    @ui.page(SIMPLIFIED_ROUTE)
+    def page_simplified():
+        # Full-page chrome of its own -- deliberately not wrapped in frame().
+        # Standalone has no project concept, so it renders the single fixed
+        # root (passed in) under the name 'standalone'.
+        simplified_ui.render('standalone', paths=paths)
 
     @ui.page('/screens')
     def page_screens():

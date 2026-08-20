@@ -11,6 +11,7 @@ from extensions.epaper.catalog import get_color_model
 from extensions.epaper.config import ColorModel, app_config
 from extensions.epaper.util import logger
 from extensions.epaper.core import widgets
+from extensions.epaper.core.devicebinding import resolve_screen_id
 from extensions.epaper.core.drawingcontext import DrawingContext
 from extensions.epaper.core.imagecache import ImageCache, quantize
 from extensions.epaper.core.updateschedule import UpdateSchedule, get_schedule_by_id
@@ -223,52 +224,14 @@ def _schedule_changed(paths: EpaperPaths, screen: Screen) -> bool:
     return schedule_mtime != screen.update_schedule.config_mtime
 
 
-async def get_aliases(paths: EpaperPaths) -> dict[str, str]:
-    """
-    All entries in the alias file (name -> screen id), or {} if the file
-    doesn't exist or can't be parsed. Shared by _resolve_alias() below and
-    the device-config UI card (ui/cards.py's device_config_card), which
-    lets a nice4iot device be assigned a screen by writing an alias keyed
-    by the device's own name.
-    """
-    if not paths.alias_file.exists():
-        return {}
-    try:
-        async with aiofiles.open(paths.alias_file, 'r') as f:
-            return json.loads(await f.read())
-    except (OSError, ValueError) as e:
-        logger.warning(f"Error reading alias file {paths.alias_file}: {e}")
-        return {}
-
-
-async def set_alias(paths: EpaperPaths, name: str, screen_id: Optional[str]) -> None:
-    """Set (screen_id given) or remove (screen_id=None) a single alias entry."""
-    aliases = await get_aliases(paths)
-    if screen_id is None:
-        aliases.pop(name, None)
-    else:
-        aliases[name] = screen_id
-    async with aiofiles.open(paths.alias_file, 'w') as f:
-        await f.write(json.dumps(aliases, indent=2))
-
-
-async def _resolve_alias(paths: EpaperPaths, id: str) -> str:
-    """
-    Resolve a display alias to its target screen id, e.g. so a display
-    can be addressed as "hallway" instead of the screen file name. Falls
-    back to the given id unchanged if there is no matching entry.
-    """
-    aliases = await get_aliases(paths)
-    return aliases.get(id, id)
-
-
 async def get_screen_by_id(paths: EpaperPaths, id: str) -> Optional[Screen]:
     """
-    Get a screen instance by its id (or by an alias resolved via the
-    alias file), reusing a cached instance as long as neither the screen
-    file nor its schedule file changed.
+    Get a screen instance by its id (or by a device name resolved to its
+    bound screen, see core/devicebinding.resolve_screen_id), reusing a
+    cached instance as long as neither the screen file nor its schedule
+    file changed.
     """
-    id = await _resolve_alias(paths, id)
+    id = resolve_screen_id(paths, id)
     cache_key = (str(paths.root), id)
     screen_model_file = paths.screen_dir / f"{id}.json"
     config_mtime = _effective_mtime(paths, screen_model_file)

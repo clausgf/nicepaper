@@ -144,3 +144,137 @@ def test_global_config_card_renders_every_field():
 
     # every setting should have a widget; none may be skipped silently
     assert len([e for e in labels if e]) >= len(GlobalConfig.model_fields)
+
+
+def _element_type_names(client) -> list:
+    return [type(e).__name__ for e in client.elements.values()]
+
+
+def test_simplified_ui_nav_leaves_are_the_content_sections():
+    """The sidebar's leaves (the addressable views) are exactly the three
+    content sections; Settings is a group and never a view itself."""
+    from extensions.epaper.ui.simplified_ui import _nav
+    from extensions.epaper.ui.simplified_ui.layout import _flatten
+
+    nav = _nav()
+    assert list(_flatten(nav)) == ["rooms", "displays", "booking"]
+    settings = next(i for i in nav if i.id == "settings")
+    assert settings.render is None and [c.id for c in settings.children] == ["booking"]
+
+
+def _simplified_paths(tmp_path):
+    from extensions.epaper.paths import EpaperPaths
+    paths = EpaperPaths(root=tmp_path)
+    paths.ensure_dirs()
+    return paths
+
+
+def test_simplified_ui_frame_renders_header_and_drawer(tmp_path):
+    """The whole page frame builds: a header, a left drawer (the sidebar)
+    and the landing (Rooms) content. Renders for real -- the failure mode
+    this guards is build_page() raising while assembling the layout."""
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.ui.simplified_ui import render
+
+    with Client(page("/test-simplified-frame"), request=None) as client:
+        render("demo-project", paths=_simplified_paths(tmp_path))
+        names = _element_type_names(client)
+        labels = {e.text for e in client.elements.values()
+                  if type(e).__name__ in ("Label", "ItemLabel")}
+
+    assert "Header" in names and "LeftDrawer" in names
+    assert "E-Paper Rooms" in labels  # brand
+    # landing view is the rooms list (DrillDownWrapper), titled "Rooms"
+    assert "Rooms" in labels
+
+
+def test_simplified_ui_room_detail_lays_out_every_setting(tmp_path):
+    """The room detail lays out the full (English) field set -- number, name,
+    building, floor, type, capacity, photo, notes, booking system, iCal URL --
+    with labels/widgets taken from RoomModel's own FieldInfo, plus the three
+    tabs. Renders the detail body directly (the list wrapper starts on the list)."""
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.core.room import RoomsAdapter, create_room
+    from extensions.epaper.ui.simplified_ui import _nav
+    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+    from extensions.epaper.ui.simplified_ui.rooms import _render_detail
+
+    paths = _simplified_paths(tmp_path)
+    room = create_room(paths)
+    shell = Shell("demo-project", paths, _flatten(_nav()))
+    with Client(page("/test-simplified-room"), request=None) as client:
+        _render_detail(shell, RoomsAdapter(paths), room.id)
+        labels = {e._props.get("label") for e in client.elements.values()}
+        tab_labels = {e._props.get("label") for e in client.elements.values()
+                      if type(e).__name__ == "Tab"}
+
+    for field in ("Room number", "Room name", "Building", "Floor", "Room type",
+                  "Capacity", "Photo", "Notes", "Booking system", "iCal URL"):
+        assert field in labels, f"{field!r} missing from room settings"
+    assert {"Occupancy", "Settings", "Displays"} <= tab_labels
+
+
+def test_simplified_ui_booking_form_lays_out_fields():
+    """The BookingSystemModel form (rendered by the booking DrillDownWrapper's
+    default detail) exposes the system's fields."""
+    from nicegui.client import Client
+    from nicegui.page import page
+    from niceview import ModelForm
+
+    from extensions.epaper.models.bookingsystem import BookingSystemModel
+
+    with Client(page("/test-simplified-booking"), request=None) as client:
+        ModelForm.from_item(BookingSystemModel()).render()
+        labels = {e._props.get("label") for e in client.elements.values()}
+
+    for field in ("Name", "Type", "Url", "Description"):
+        assert field in labels, f"{field!r} missing from booking system form"
+
+
+def test_room_booking_select_lists_configured_systems(tmp_path):
+    """A room's booking_system_id is a select of the configured systems: its
+    options come from storage, not the model, and include each system by name."""
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.core.bookingsystem import BookingSystemsAdapter, create_booking_system
+    from extensions.epaper.core.room import RoomsAdapter, create_room
+    from extensions.epaper.ui.simplified_ui import _nav
+    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+    from extensions.epaper.ui.simplified_ui.rooms import _render_detail
+
+    paths = _simplified_paths(tmp_path)
+    system = create_booking_system(paths)
+    system.name = "iCal Uni"
+    BookingSystemsAdapter(paths).update(system)
+    room = create_room(paths)
+    shell = Shell("demo-project", paths, _flatten(_nav()))
+    with Client(page("/test-room-booking-select"), request=None) as client:
+        _render_detail(shell, RoomsAdapter(paths), room.id)
+        selects = [e for e in client.elements.values()
+                   if e._props.get("label") == "Booking system"]
+
+    assert selects, "no 'Booking system' select rendered"
+    option_labels = {o.get("label") for o in selects[0]._props.get("options", [])}
+    assert "iCal Uni" in option_labels
+
+
+def test_standalone_global_tab_links_to_the_simplified_ui():
+    """The Global tab shows the 'Open simplified UI' card (above the settings
+    card) that navigates to the standalone simplified-UI route."""
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.ui.standalone import SIMPLIFIED_ROUTE, _simplified_ui_link
+
+    with Client(page("/test-simplified-link"), request=None) as client:
+        _simplified_ui_link()
+        texts = {e.text for e in client.elements.values()
+                 if type(e).__name__ in ("Label", "Button")}
+
+    assert "Simplified UI" in texts and "Open" in texts
+    assert SIMPLIFIED_ROUTE == "/simplified"

@@ -319,3 +319,70 @@ def test_homeassistant_widget_round_trips_through_union():
     assert widget.entity_id == "sensor.living_room_temperature"
     assert (widget.display, widget.gauge_style) == ("gauge", "bar")
     assert (widget.min_value, widget.max_value, widget.decimals) == (-10.0, 40.0, 0)
+
+
+# --- RoomModel (simplified UI) ---------------------------------------------
+
+def test_room_model_defaults_are_valid_and_serialize_as_default_content():
+    from extensions.epaper.models.room import RoomModel
+    room = RoomModel()
+    # every field has a default, so a fresh room is valid and its JSON is the
+    # default_content a newly added room is created from
+    assert room.room_number and room.room_name and room.room_type == "meeting"
+    assert RoomModel.model_validate_json(room.model_dump_json()) == room
+
+
+def test_room_model_rejects_unknown_room_type():
+    from extensions.epaper.models.room import RoomModel
+    with pytest.raises(ValidationError):
+        RoomModel(room_type="broom-closet")
+
+
+@pytest.mark.parametrize("url", ["", "http://x/c.ics", "https://x/c.ics", "webcal://x/c.ics"])
+def test_room_model_accepts_empty_or_calendar_urls(url):
+    from extensions.epaper.models.room import RoomModel
+    assert RoomModel(booking_ical_url=url).booking_ical_url == url
+
+
+def test_room_model_rejects_non_calendar_ical_url():
+    from extensions.epaper.models.room import RoomModel
+    with pytest.raises(ValidationError):
+        RoomModel(booking_ical_url="ftp://host/cal.ics")
+
+
+def test_room_id_is_generated_unique_and_stable():
+    from extensions.epaper.models.room import RoomModel
+    a, b = RoomModel(), RoomModel()
+    assert a.id and b.id and a.id != b.id  # each room gets its own surrogate id
+    # an explicit id is preserved (round-trip), not regenerated
+    fixed = RoomModel(id="fixed-id-123")
+    assert RoomModel.model_validate_json(fixed.model_dump_json()).id == "fixed-id-123"
+    # renaming never touches the id
+    renamed = fixed.model_copy(update={"room_name": "New Name", "room_number": "Z-999"})
+    assert renamed.id == "fixed-id-123"
+
+
+def test_room_type_labels_cover_every_type_including_lecture_and_seminar():
+    import typing
+    from extensions.epaper.models.room import ROOM_TYPE_LABELS, RoomType
+    assert set(ROOM_TYPE_LABELS) == set(typing.get_args(RoomType))
+    assert {"lecture", "seminar"} <= set(ROOM_TYPE_LABELS)
+
+
+def test_room_capacity_is_optional_and_non_negative():
+    from extensions.epaper.models.room import RoomModel
+    assert RoomModel().capacity is None
+    assert RoomModel(capacity=0).capacity == 0
+    with pytest.raises(ValidationError):
+        RoomModel(capacity=-1)
+
+
+def test_room_fields_carry_niceview_field_info_for_the_form():
+    """The form metadata lives on the model: niceview's FieldInfo rides each
+    field's Annotated metadata (no Meta, no field_infos passed by the UI)."""
+    from niceview import FieldInfo
+    from extensions.epaper.models.room import RoomModel
+    for name in ("room_type", "capacity", "photo", "notes",
+                 "booking_system_id", "booking_ical_url"):
+        md = RoomModel.model_fields[name].metadata
+        assert any(isinstance(m, FieldInfo) for m in md), f"{name} has no niceview FieldInfo"

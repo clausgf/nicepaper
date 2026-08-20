@@ -2,7 +2,8 @@ import asyncio
 import json
 import uuid
 
-from extensions.epaper.core.screen import get_aliases, get_screen_by_id, set_alias
+from extensions.epaper.core.devicebinding import set_device_binding
+from extensions.epaper.core.screen import get_screen_by_id
 from extensions.epaper.paths import EpaperPaths
 
 
@@ -45,51 +46,34 @@ def test_screen_cache_reuses_and_invalidates(tmp_path):
     assert asyncio.run(get_screen_by_id(paths, screen_id)) is None
 
 
-def test_alias_resolves_to_target_screen(tmp_path):
+def test_device_binding_resolves_to_target_screen(tmp_path):
     paths = EpaperPaths(root=tmp_path)
     paths.ensure_dirs()
-    screen_id = f"aliastarget-{uuid.uuid4().hex[:8]}"
-    alias = f"alias-{uuid.uuid4().hex[:8]}"
-    screen_file = paths.screen_dir / f"{screen_id}.json"
-    _write_screen(screen_file)
-    paths.alias_file.write_text(json.dumps({alias: screen_id}))
+    screen_id = f"bindingtarget-{uuid.uuid4().hex[:8]}"
+    device = f"device-{uuid.uuid4().hex[:8]}"
+    _write_screen(paths.screen_dir / f"{screen_id}.json")
+    set_device_binding(paths, device, screen_id=screen_id)
 
-    by_alias = asyncio.run(get_screen_by_id(paths, alias))
+    by_device = asyncio.run(get_screen_by_id(paths, device))
     by_id = asyncio.run(get_screen_by_id(paths, screen_id))
-    assert by_alias is not None
-    assert by_alias is by_id, "alias and target id should share the same cached screen"
-    assert by_alias.id == screen_id
+    assert by_device is not None
+    assert by_device is by_id, "device name and target id should share the same cached screen"
+    assert by_device.id == screen_id
 
 
-def test_unknown_alias_file_is_ignored(tmp_path):
+def test_unknown_id_is_ignored(tmp_path):
     paths = EpaperPaths(root=tmp_path)
     paths.ensure_dirs()
     assert asyncio.run(get_screen_by_id(paths, "does-not-exist")) is None
 
 
-def test_set_alias_creates_and_removes_entry(tmp_path):
-    paths = EpaperPaths(root=tmp_path)
-    paths.ensure_dirs()
-
-    asyncio.run(set_alias(paths, "device-1", "hallway"))
-    assert asyncio.run(get_aliases(paths)) == {"device-1": "hallway"}
-
-    # a second alias must not clobber the first
-    asyncio.run(set_alias(paths, "device-2", "kitchen"))
-    assert asyncio.run(get_aliases(paths)) == {"device-1": "hallway", "device-2": "kitchen"}
-
-    # setting screen_id=None removes just that entry
-    asyncio.run(set_alias(paths, "device-1", None))
-    assert asyncio.run(get_aliases(paths)) == {"device-2": "kitchen"}
-
-
-def test_device_alias_resolves_through_get_screen_by_id(tmp_path):
+def test_device_binding_resolves_through_get_screen_by_id(tmp_path):
     paths = EpaperPaths(root=tmp_path)
     paths.ensure_dirs()
     screen_id = f"devicetarget-{uuid.uuid4().hex[:8]}"
     _write_screen(paths.screen_dir / f"{screen_id}.json")
 
-    asyncio.run(set_alias(paths, "my-device", screen_id))
+    set_device_binding(paths, "my-device", screen_id=screen_id)
     screen = asyncio.run(get_screen_by_id(paths, "my-device"))
     assert screen is not None
     assert screen.id == screen_id
