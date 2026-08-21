@@ -1,17 +1,12 @@
 """
 Booking system model: a calendar source a room's door sign draws from.
 
-A booking system is the *connection/type* (iCal today; Exchange and others
-later). The room-specific resource -- e.g. the room's own iCal URL -- lives on
+A booking system is the source of calendar data, e.g. an iCal server. The
+booking system model contains all info needed to fetch and parse the calendar 
+feed. The room-specific resource -- e.g. the room's own iCal URL -- lives on
 the RoomModel (booking_ical_url), so several rooms can share one system while
 each shows its own calendar; for Exchange later the split is the same (system =
 account/server, room = mailbox/resource).
-
-Same conventions as RoomModel (models/room.py): a stable surrogate `id` (never
-changed, the file name, referenced by RoomModel.booking_system_id) and niceview
-form metadata on each field's Annotated FieldInfo. Stored one JSON file per
-system in EpaperPaths.booking_dir. Type-specific settings will be added behind a
-`type` switch when a second type arrives.
 """
 import datetime
 from typing import Annotated, Literal
@@ -74,8 +69,15 @@ class BookingSystemModel(BaseModel):
             niceview.Field(widget_type='ui.textarea')
         ] = ""
 
+    def __str__(self) -> str:
+        # The label niceview shows for a booking system in a modelselect (e.g.
+        # the room grid/edit dialog's "Booking system" column) -- its name, not
+        # the default pydantic field dump.
+        return f"{self.name} ({self.id})"
+
     class Meta:
         title = "Booking system"
+        title_plural = "Booking systems"
         description = "A calendar source to determine a room's occupancy."
         layout = [
             ['name', 'type:shrink'], 

@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 
 from extensions.epaper.config import app_config
 from extensions.epaper.util import logger, clean_path_parameter
-from extensions.epaper.core.screen import get_screen_by_id
+from extensions.epaper.screen.backend import get_screen_by_id
 from extensions.epaper.paths import EpaperPaths
 
 _RESPONSES = {

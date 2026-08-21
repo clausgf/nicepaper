@@ -8,7 +8,7 @@ from extensions.epaper.core.datasources.weather import (
     WeatherStatus, convert_wind_speed, format_wind_speed, get_weather, metric_title,
     weather_icon_and_description, wind_direction_label, wind_labels,
 )
-from extensions.epaper.models.screenmodel import (
+from extensions.epaper.screen.models import (
     WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
 )
 from extensions.epaper.util import logger

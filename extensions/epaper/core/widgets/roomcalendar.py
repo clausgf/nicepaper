@@ -4,7 +4,7 @@ import datetime
 from babel.dates import format_datetime, get_timezone
 
 from extensions.epaper.config import app_config
-from extensions.epaper.models.screenmodel import RoomCalendarWidgetModel
+from extensions.epaper.screen.models import RoomCalendarWidgetModel
 from extensions.epaper.core.datasources.ical import get_from_ical
 from extensions.epaper.util import logger
 from ..drawingcontext import DrawingContext

@@ -69,7 +69,7 @@ def test_chart_metric_maps_cover_every_weather_metric():
     from typing import get_args
     from extensions.epaper.core.datasources.weather import _METRIC_TITLES
     from extensions.epaper.core.widgets.weather import _METRIC_FIELD, _METRIC_KIND
-    from extensions.epaper.models.screenmodel import WeatherMetric
+    from extensions.epaper.screen.models import WeatherMetric
     metrics = set(get_args(WeatherMetric))
     assert set(_METRIC_FIELD) == metrics
     assert set(_METRIC_KIND) == metrics

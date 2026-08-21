@@ -2,18 +2,20 @@
 Page assembly for standalone mode only: header/tabs-nav chrome and the
 @ui.page routes. Never imported by the nice4iot extension entry point
 (extensions/epaper/__init__.py) -- there, nice4iot owns the page chrome
-and only the content functions in ui/cards.py, ui/screen_editor.py and
-ui/schedule_editor.py are reused.
+and only the content functions in ui/cards.py, screen/ui.py and
+schedule/ui.py are reused.
 """
 from contextlib import contextmanager
 from nicegui import ui
 
 from extensions.epaper.config import save_global_config
 from extensions.epaper.paths import EpaperPaths
+from extensions.epaper.room.ui import rooms_wrapper
 from extensions.epaper.ui import simplified_ui
+from extensions.epaper.ui.cards import dashboard_card, device_config_card
 from extensions.epaper.ui.global_settings import global_config_card
-from extensions.epaper.ui.schedule_editor import schedules_wrapper
-from extensions.epaper.ui.screen_editor import screens_wrapper
+from extensions.epaper.schedule.ui import schedules_wrapper
+from extensions.epaper.screen.ui import screens_wrapper
 
 # The simplified UI is a full page of its own (header, drawer, user menu),
 # not a tab in frame(): '/simplified' renders it directly, and the Global
@@ -29,7 +31,7 @@ SIMPLIFIED_ROUTE = '/simplified'
 # DrillDownWrapper-based screens_wrapper()/schedules_wrapper() the nice4iot
 # extension does (see __init__.py) rather than its own /screens/{filename}
 # sub-route.
-TAB_ROUTES = {'Global': '/global', 'Screens': '/screens', 'Schedules': '/schedules'}
+TAB_ROUTES = {'Global': '/global', 'Project': '/project', 'Device': '/device', 'Rooms': '/rooms', 'Screens': '/screens', 'Schedules': '/schedules'}
 
 
 @contextmanager
@@ -43,6 +45,9 @@ def frame(active_tab: str):
         ui.label('Nicepaper').classes('font-bold')
         with ui.tabs(value=active_tab, on_change=on_tab_change).props('dense indicator-color=white').classes('text-white'):
             ui.tab('Global')
+            ui.tab('Project')
+            ui.tab('Device')
+            ui.tab('Rooms')
             ui.tab('Screens')
             ui.tab('Schedules')
     with ui.column().classes('w-full'):
@@ -88,6 +93,23 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
         # Standalone has no project concept, so it renders the single fixed
         # root (passed in) under the name 'standalone'.
         simplified_ui.render('standalone', paths=paths)
+
+    @ui.page('/project')
+    def page_project():
+        with frame('Project'):
+            dashboard_card(num_screens=len(list(paths.screen_dir.glob('*.json'))),
+                           num_schedules=len(list(paths.schedule_dir.glob('*.json'))),
+                           open_url=SIMPLIFIED_ROUTE)
+
+    @ui.page('/device')
+    def page_device():
+        with frame('Device'):
+            device_config_card(paths, device_name='standalone', image_base_url=image_base_url)
+
+    @ui.page('/rooms')
+    def page_rooms():
+        with frame('Rooms'):
+            rooms_wrapper(paths, project_name='standalone').render()
 
     @ui.page('/screens')
     def page_screens():

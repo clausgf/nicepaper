@@ -14,8 +14,8 @@ from extensions.epaper.core import widgets
 from extensions.epaper.core.devicebinding import resolve_screen_id
 from extensions.epaper.core.drawingcontext import DrawingContext
 from extensions.epaper.core.imagecache import ImageCache, quantize
-from extensions.epaper.core.updateschedule import UpdateSchedule, get_schedule_by_id
-from extensions.epaper.models.screenmodel import ImageMetadata, ScreenModel
+from extensions.epaper.schedule.backend import UpdateSchedule, get_schedule_by_id
+from extensions.epaper.screen.models import ImageMetadata, ScreenModel
 from extensions.epaper.paths import EpaperPaths
 
 

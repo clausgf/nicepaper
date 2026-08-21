@@ -14,7 +14,7 @@ Only the palettes matter at render time -- a screen stores the *values*
 a display preset gave it, not a reference to the preset, so editing
 `displays.json` never changes an existing screen's image. Editing
 `color_models.json` does, hence `color_models_mtime()` for the render
-cache (see core/screen.py).
+cache (see screen/backend.py).
 """
 import importlib.resources
 from pathlib import Path
@@ -127,6 +127,6 @@ def get_display(id: Optional[str], paths: Optional[EpaperPaths] = None) -> Optio
 
 def color_models_mtime(paths: EpaperPaths) -> Optional[float]:
     """mtime of this root's color_models.json, or None if it has none.
-    Part of the screen cache key (core/screen.py): a changed palette
+    Part of the screen cache key (screen/backend.py): a changed palette
     changes every quantized image rendered from it."""
     return _file_mtime(paths.color_model_file)

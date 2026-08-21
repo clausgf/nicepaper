@@ -1,5 +1,5 @@
 
-from extensions.epaper.models.screenmodel import TextWidgetModel
+from extensions.epaper.screen.models import TextWidgetModel
 from ..drawingcontext import DrawingContext
 from .base import Widget
 

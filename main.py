@@ -22,11 +22,6 @@ from extensions.epaper.ui.standalone import register_standalone_pages
 
 
 class _StandaloneSettings(BaseSettings):
-    """NiceGUI browser session storage secret -- standalone-only (nice4iot
-    owns its own ui.run_with() and its own storage secret when running as
-    an extension), so this deliberately stays out of GlobalConfig rather
-    than being a user-editable/persisted extension setting. Override via
-    the STORAGE_SECRET environment variable in production."""
     storage_secret: str = "geheim"
 
 

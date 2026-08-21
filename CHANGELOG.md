@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.17.1 — 2026-08-21
+
+### Added
+
+- **Rooms tab on nice4iot's project page.** A new "Rooms" project tab (before
+  Screens) and a standalone Rooms page expose the rooms editor outside the
+  simplified UI: a niceview `EditGridWrapper` over `rooms_adapter()`
+  (`room/ui.py`'s `rooms_wrapper`, the editor counterpart to
+  `screen/ui.py`/`schedule/ui.py`), rows edited in the grid's dialog. The
+  `RoomModel.booking_system_id` column is a niceview `modelselect` resolved
+  through the booking-systems repository, so it shows the system name
+  (`BookingSystemModel.__str__`) rather than the raw id. A device's room is
+  still assigned in its E-Paper device card (unchanged). The displays grid
+  (`render_displays_grid`) now takes `paths`/`project_name` instead of a
+  simplified-UI `Shell`, so both UIs share it.
+
+### Changed
+
+- **niceview 0.26.0 (was 0.22.1).** Track the version nice4iot pulls in.
+  Adapts to niceview 0.23.0's wrapper API: `DrillDownWrapper`'s `list_title` is
+  gone — the list title/description now come from each model's `Meta`
+  (`Meta.title_plural`/`Meta.description`), added to `RoomModel` and
+  `BookingSystemModel`; `directory_drilldown` passes `title=` instead. RoomModel's
+  `notes` field is renamed to `description` (old room files drop the old key on
+  next save). The `booking_ical_url`/room `Meta.layout` and booking-system fields
+  (username/password/header/update_interval/max_days_ahead) ride along.
+
+- **Rooms/booking-systems collection adapters use niceview's
+  `JsonDirectoryAdapter`.** The hand-written `RoomsAdapter`/`BookingSystemsAdapter`
+  classes are removed in favour of `room.backend.rooms_adapter()` /
+  `bookingsystem.backend.booking_systems_adapter()`, thin factories over
+  niceview 0.25.0's `JsonDirectoryAdapter` (one JSON per item in a directory,
+  keyed by the model's `id`). Behaviour is the same for the UIs; CRUD is now
+  strict (`create()` refuses an existing key, `update()` an absent one), which
+  the DrillDownWrapper/ModelForm add-then-autosave flow already satisfies.
+
+- **Feature-oriented module layout (screen, schedule, room, bookingsystem).**
+  Following nice4iot's `core/forwarding` pattern, each of these four features
+  now lives in its own package directly under `extensions/epaper/` with
+  `models.py`, `backend.py` and the fitting UI file (`ui.py` editor for
+  screen/schedule, `simplified_ui.py` section for room/bookingsystem) instead
+  of being split across `models/`, `core/` and `ui/`. Shared infrastructure
+  (rendering, datasources, widgets, `roomdisplay`, `devicebinding`, the
+  simplified-UI frame) stays in place for now. Internal import paths only — no
+  REST/public API or behavior change; the HTTP endpoints are unchanged.
+
 ## 0.17.0 — 2026-08-20
 
 ### Added

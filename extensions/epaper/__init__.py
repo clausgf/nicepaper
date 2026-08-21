@@ -32,10 +32,11 @@ def register(app: FastAPI) -> None:
     from extensions.epaper.core.datasources.homeassistant import read_all_entity_statuses
     from extensions.epaper.core.datasources.weather import read_all_weather_statuses
     from extensions.epaper.paths import EpaperPaths
+    from extensions.epaper.room.ui import rooms_wrapper
     from extensions.epaper.ui.cards import dashboard_card, device_config_card
     from extensions.epaper.ui.global_settings import global_config_fields
-    from extensions.epaper.ui.schedule_editor import schedules_wrapper
-    from extensions.epaper.ui.screen_editor import screens_wrapper
+    from extensions.epaper.schedule.ui import schedules_wrapper
+    from extensions.epaper.screen.ui import screens_wrapper
 
     def _paths_for_project(project_name: str) -> EpaperPaths:
         root = extension_project_dir(project_name, 'epaper')
@@ -87,11 +88,14 @@ def register(app: FastAPI) -> None:
     register_device_card('general', _device_card, title='E-Paper')
 
     # --- Project tabs --------------------------------------------------
-    # Two tabs on nice4iot's own project page (its tab bar, not ours),
-    # each rendering the same DirectoryAdapter-backed DrillDownWrapper
-    # standalone.py uses -- see screen_editor.screens_wrapper()/
-    # schedule_editor.schedules_wrapper() for the list<->editor chrome,
-    # state and slide animation. Nothing NiceGUI-specific left to own here.
+    # Tabs on nice4iot's own project page (its tab bar, not ours), each
+    # rendering the same DrillDownWrapper the standalone/simplified UIs use --
+    # see room.ui.rooms_wrapper(), screen.ui.screens_wrapper() and
+    # schedule.ui.schedules_wrapper() for the list<->editor chrome, state and
+    # slide animation. Registration order is tab order: Rooms comes first.
+    def _rooms_tab(project_name: str) -> None:
+        rooms_wrapper(_paths_for_project(project_name), project_name).render()
+
     def _screens_tab(project_name: str) -> None:
         paths = _paths_for_project(project_name)
         screens_wrapper(paths, f'/api/ext/epaper/{project_name}/screens').render()
@@ -99,5 +103,6 @@ def register(app: FastAPI) -> None:
     def _schedules_tab(project_name: str) -> None:
         schedules_wrapper(_paths_for_project(project_name)).render()
 
+    register_project_tab('Rooms', _rooms_tab)
     register_project_tab('Screens', _screens_tab)
     register_project_tab('Schedules', _schedules_tab)

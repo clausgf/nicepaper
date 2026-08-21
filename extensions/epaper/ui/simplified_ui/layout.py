@@ -101,6 +101,17 @@ def _user_menu() -> None:
     render_user_menu()
 
 
+def _nav_icon_label(item: NavItem, *, icon_active: bool) -> None:
+    """The icon + label pair shared by leaf rows and group headers. Shrink
+    Quasar's avatar section (default min-width 56px, padding-right 16px) so the
+    icon sits close to its label; inline style beats Quasar's class rule, a
+    small padding-right keeps a slight gap."""
+    with ui.item_section().props('avatar').style('min-width: 0; padding-right: 12px'):
+        ui.icon(item.icon).classes('' if icon_active else 'text-primary')
+    with ui.item_section():
+        ui.item_label(item.label)
+
+
 def _nav_row(shell: Shell, item: NavItem, *, inset: bool) -> None:
     active = shell.active == item.id
     row = ui.item(on_click=lambda: shell.navigate(item.id)).props('clickable dense') \
@@ -110,23 +121,27 @@ def _nav_row(shell: Shell, item: NavItem, *, inset: bool) -> None:
     if active:
         row.classes('bg-primary text-white')
     with row:
-        with ui.item_section().props('avatar'):
-            ui.icon(item.icon).classes('' if active else 'text-primary')
-        with ui.item_section():
-            ui.item_label(item.label)
+        _nav_icon_label(item, icon_active=active)
+
+
+def _group_header(item: NavItem) -> None:
+    """A group (an item with children) as a plain, non-clickable header row --
+    not a ui.expansion, so it never folds; its children render as slightly
+    indented rows below it (see render_sidebar)."""
+    with ui.item().props('dense').classes('rounded-borders'):
+        _nav_icon_label(item, icon_active=False)
 
 
 def render_sidebar(shell: Shell, nav: list[NavItem]) -> None:
-    """The two-level sidebar body: leaf sections are rows, groups are
-    expansions holding their (indented) child rows."""
+    """The two-level sidebar body: leaf sections are rows; a group is a plain
+    header row followed by its (slightly indented) child rows -- never an
+    expansion, so the tree is always fully visible."""
     with ui.list().props('padding').classes('w-full'):
         for item in nav:
             if item.children:
-                any_active = any(shell.active == c.id for c in item.children)
-                with ui.expansion(item.label, icon=item.icon, value=any_active) \
-                        .props('dense dense-toggle expand-separator').classes('w-full'):
-                    for child in item.children:
-                        _nav_row(shell, child, inset=True)
+                _group_header(item)
+                for child in item.children:
+                    _nav_row(shell, child, inset=True)
             else:
                 _nav_row(shell, item, inset=False)
 
@@ -155,7 +170,7 @@ def build_page(project_name: str, paths: EpaperPaths, nav: list[NavItem]) -> Non
         ui.space()
         _user_menu()
 
-    with ui.column().classes('w-full max-w-5xl mx-auto p-4 gap-4'):
+    with ui.column().classes('w-full p-4 gap-4'):
         @ui.refreshable
         def content() -> None:
             shell.render_active()

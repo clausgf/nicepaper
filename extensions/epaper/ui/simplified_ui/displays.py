@@ -12,4 +12,4 @@ from .layout import Shell
 
 
 def render_displays(shell: Shell) -> None:
-    render_displays_grid(shell, room_id=None)
+    render_displays_grid(shell.paths, shell.project_name, room_id=None)

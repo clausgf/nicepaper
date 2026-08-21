@@ -1,11 +1,11 @@
 import pytest
 from pydantic import ValidationError
 
-from extensions.epaper.core.bookingsystem import (
-    BookingSystemsAdapter, booking_system_path, create_booking_system,
+from extensions.epaper.bookingsystem.backend import (
+    booking_systems_adapter, booking_system_path, create_booking_system,
     delete_booking_system, list_booking_systems, read_booking_system,
 )
-from extensions.epaper.models.bookingsystem import BookingSystemModel
+from extensions.epaper.bookingsystem.models import BookingSystemModel
 from extensions.epaper.paths import EpaperPaths
 
 
@@ -56,7 +56,7 @@ def test_read_missing_is_none_without_writing(tmp_path):
 
 def test_list_sorted_by_name(tmp_path):
     paths = _paths(tmp_path)
-    adapter = BookingSystemsAdapter(paths)
+    adapter = booking_systems_adapter(paths)
 
     def _sys(name):
         s = create_booking_system(paths)
@@ -78,7 +78,7 @@ def test_delete_removes_file(tmp_path):
 
 def test_adapter_crud(tmp_path):
     paths = _paths(tmp_path)
-    adapter = BookingSystemsAdapter(paths)
+    adapter = booking_systems_adapter(paths)
 
     s = adapter.create(BookingSystemModel())
     assert adapter.key_from_item(s) == s.id

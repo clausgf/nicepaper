@@ -1,6 +1,6 @@
 
 from extensions.epaper.core.drawingcontext import DrawingContext
-from extensions.epaper.models.screenmodel import WidgetModel
+from extensions.epaper.screen.models import WidgetModel
 from extensions.epaper.util import logger
 
 

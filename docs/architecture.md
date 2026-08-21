@@ -14,25 +14,29 @@ nicepaper
 │   ├── config.py                # settings that are the same for every root
 │   ├── catalog.py               # display presets + palettes (package + per-root)
 │   ├── api/endpoints.py         # build_standalone_router() / build_extension_router()
-│   ├── ui                       # content-only rendering, reused by both modes
+│   ├── screen/                  # feature pkg: models.py, backend.py (render/cache), ui.py (editor)
+│   ├── schedule/                # feature pkg: models.py, backend.py (evaluation), ui.py (editor)
+│   ├── room/                    # feature pkg: models.py, backend.py (storage), ui.py (editor tab), simplified_ui.py
+│   ├── bookingsystem/           # feature pkg: models.py, backend.py (storage), simplified_ui.py
+│   ├── ui                       # shared content-only rendering, reused by both modes
 │   │   ├── forms.py             # form vocabulary: field styling, spacing, hints
 │   │   ├── drilldown.py         # file list <-> editor chrome, inline rename
-│   │   ├── screen_editor.py     # screen settings + widget list
 │   │   ├── widget_types.py      # per-widget-type table: icon, title, form
 │   │   ├── preview.py           # preview image, pixel ruler, toolbar
-│   │   ├── schedule_editor.py   # one card per weekly rule
 │   │   ├── global_settings.py   # the GlobalConfig form
 │   │   ├── cards.py             # nice4iot dashboard + device cards
-│   │   └── standalone.py        # @ui.page routes + chrome, standalone only
-│   ├── core
-│   │   ├── screen.py            # screen rendering, screen cache
+│   │   ├── standalone.py        # @ui.page routes + chrome, standalone only
+│   │   └── simplified_ui/       # room-focused page: shared frame (layout, displays_grid)
+│   ├── core                     # shared rendering infrastructure
 │   │   ├── imagecache.py        # image + metadata cache, palette quantization
 │   │   ├── drawingcontext.py    # drawing helpers (fonts, text, alignment)
-│   │   ├── updateschedule.py    # update schedule evaluation
 │   │   ├── charting.py          # hand-rolled bar/line charts (no plotting library)
+│   │   ├── devicebinding.py     # device -> screen/room bindings
+│   │   ├── roomdisplay.py       # device<->room<->screen join for the displays grid
+│   │   ├── gauge.py             # gauge rendering
 │   │   ├── widgets/             # Text, Date, RoomCalendar, Weather* widgets
 │   │   └── datasources/         # iCal and Open-Meteo weather loading/caching
-│   ├── models/                  # pydantic models for screens, schedules, displays
+│   ├── models/                  # shared pydantic models (displays, device bindings, global config)
 │   ├── wire/huffman_de.py       # fixed German Huffman codebook (LoRaWAN, WIP)
 │   └── resources/               # fonts/icons + display/palette catalogs (package data)
 ├── tests                       # pytest suite (unit + acceptance)

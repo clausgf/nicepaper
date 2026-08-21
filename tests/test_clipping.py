@@ -1,8 +1,8 @@
 import asyncio
 import datetime
 
-from extensions.epaper.core.screen import Screen
-from extensions.epaper.models.screenmodel import ScreenModel
+from extensions.epaper.screen.backend import Screen
+from extensions.epaper.screen.models import ScreenModel
 from extensions.epaper.paths import EpaperPaths
 
 # a small box with far too much text at a large font: guaranteed to

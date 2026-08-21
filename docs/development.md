@@ -66,7 +66,7 @@ uv run pytest
 A widget type is declared in exactly three places, all keyed by the same
 `widget_type` string:
 
-1. **`models/screenmodel.py`** — the model: a `WidgetModel` subclass with
+1. **`screen/models.py`** — the model: a `WidgetModel` subclass with
    `widget_type: Literal["Foo"] = "Foo"`, added to the `AnyWidget` union and to
    the `Literal[...]` on the base class.
 2. **`core/widgets/`** — the drawing class (a `Widget` subclass with

@@ -13,7 +13,7 @@ import aiofiles
 import aiohttp
 from PIL import Image
 
-from extensions.epaper.models.screenmodel import ImageWidgetModel
+from extensions.epaper.screen.models import ImageWidgetModel
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.util import logger
 

@@ -31,7 +31,7 @@ from niceview.util import confirm_dialog
 
 from extensions.epaper.catalog import get_color_models, get_display, get_displays
 from extensions.epaper.models.display import DisplayModel
-from extensions.epaper.models.screenmodel import ScreenModel, WidgetModel
+from extensions.epaper.screen.models import ScreenModel, WidgetModel
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.ui.drilldown import directory_drilldown, slide_class
 from extensions.epaper.ui.forms import COL, FORM_STYLE, ROW

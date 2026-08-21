@@ -5,36 +5,23 @@ from pydantic import BaseModel, Field
 class GlobalConfig(BaseModel):
     """
     Settings that are the same for every screen regardless of which
-    project/root it belongs to -- JSON-persisted and editable via a single
-    card (ui/global_settings.py), unlike the old env-var-based
-    pydantic-settings Config: nice4iot's register_global_card() and the
-    standalone "Global" tab both need something a user can actually edit
-    and save, not just override at process startup.
+    project/root it belongs to.
 
     font_path/icon_path (package resource locations) deliberately stay
     out of this model -- see config.py's _ResourcePaths -- since they are
-    installation-specific derived paths, not user settings, and persisting
-    a stale absolute path across an upgrade/redeploy would silently break
-    font/icon loading; they're also cached into separate objects at import
-    time in drawingcontext.py, so editing them here at runtime wouldn't
-    even take effect without further changes.
+    installation-specific derived paths, not user settings.
 
     position/size/font on WidgetModel taught the same lesson already:
     niceview can't render a Tuple field (falls back to a plain ui.input
-    bound to a raw string -- wrong type). `font` here is flattened into
-    font_name/font_size the same way. Colors are simpler: PIL accepts hex
-    color strings directly everywhere a fill/color is currently passed
-    (verified), so color_background/color_primary/color_accent are plain
-    hex strings rendered via niceview's native ui.color_input widget,
-    no tuple at all -- nicer than a 3-number-field flatten would have been.
+    bound to a raw string -- wrong type). `font` is flattened into
+    font_name/font_size. Colors as hex color string (ok with PIL and
+    ui.color_input.
 
     The palette catalog (epaper_color_models) used to live here too and
     has moved to a package resource -- see models/display.py: this file
     is copied over the model defaults on load, so anything catalog-shaped
     kept here freezes at whatever an installation wrote once and never
-    picks up entries added in a later release. An old config file that
-    still contains the field loads fine (pydantic ignores it) and drops
-    it on the next save.
+    picks up entries added in a later release.
 
     The three colors below stay: they are the *defaults*, applied where a
     screen (and, within a screen, a widget) doesn't set its own.

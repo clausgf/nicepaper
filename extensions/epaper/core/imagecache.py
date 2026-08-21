@@ -11,7 +11,7 @@ from typing import Optional
 import aiofiles
 
 from extensions.epaper.config import ColorModel
-from extensions.epaper.models.screenmodel import ImageMetadata
+from extensions.epaper.screen.models import ImageMetadata
 from extensions.epaper.util import logger
 
 
@@ -37,7 +37,7 @@ class ImageCache:
 
     The cache holds the rendered RGB image plus, when the screen has a
     color model, the same image quantized to that palette. Which of the
-    two a display gets is the screen's decision (see core/screen.py), not
+    two a display gets is the screen's decision (see screen/backend.py), not
     the request's -- the RGB copy is kept because it is what the editor
     preview shows next to the quantized one, and because re-quantizing it
     is cheaper than re-rendering the screen.

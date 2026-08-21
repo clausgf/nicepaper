@@ -56,7 +56,7 @@ def test_every_widget_type_renders_its_form(tmp_path):
     from nicegui.page import page
     from niceview import ListAdapter
 
-    from extensions.epaper.models.screenmodel import WidgetModel
+    from extensions.epaper.screen.models import WidgetModel
     from extensions.epaper.paths import EpaperPaths
     from extensions.epaper.ui.widget_types import WIDGET_TYPES, new_widget, render_widget_form
 
@@ -84,7 +84,7 @@ def test_widget_forms_follow_the_field_they_switch_on(tmp_path):
     from nicegui.page import page
     from niceview import ListAdapter
 
-    from extensions.epaper.models.screenmodel import WidgetModel
+    from extensions.epaper.screen.models import WidgetModel
     from extensions.epaper.paths import EpaperPaths
     from extensions.epaper.ui.widget_types import new_widget, render_widget_form
 
@@ -115,7 +115,7 @@ def test_widget_forms_follow_the_field_they_switch_on(tmp_path):
 def test_new_schedule_rule_has_a_starter_time():
     """Same reason as above: `times` is required, so a new weekly rule can't
     start out empty or its weekday/month fields wouldn't commit."""
-    from extensions.epaper.ui.schedule_editor import _default_rule
+    from extensions.epaper.schedule.ui import _default_rule
     rule = _default_rule()
     assert rule.times
     assert rule.by_weekdays and rule.by_months  # "every", not an empty restriction
@@ -198,24 +198,59 @@ def test_simplified_ui_room_detail_lays_out_every_setting(tmp_path):
     from nicegui.client import Client
     from nicegui.page import page
 
-    from extensions.epaper.core.room import RoomsAdapter, create_room
+    from extensions.epaper.room.backend import rooms_adapter, create_room
     from extensions.epaper.ui.simplified_ui import _nav
     from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
-    from extensions.epaper.ui.simplified_ui.rooms import _render_detail
+    from extensions.epaper.room.simplified_ui import _render_detail
 
     paths = _simplified_paths(tmp_path)
     room = create_room(paths)
     shell = Shell("demo-project", paths, _flatten(_nav()))
     with Client(page("/test-simplified-room"), request=None) as client:
-        _render_detail(shell, RoomsAdapter(paths), room.id)
+        _render_detail(shell, rooms_adapter(paths), room.id)
         labels = {e._props.get("label") for e in client.elements.values()}
         tab_labels = {e._props.get("label") for e in client.elements.values()
                       if type(e).__name__ == "Tab"}
 
     for field in ("Room number", "Room name", "Building", "Floor", "Room type",
-                  "Capacity", "Photo", "Notes", "Booking system", "iCal URL"):
+                  "Capacity", "Photo", "Description", "Booking system", "iCal URL"):
         assert field in labels, f"{field!r} missing from room settings"
     assert {"Occupancy", "Settings", "Displays"} <= tab_labels
+
+
+def test_rooms_project_tab_grid_resolves_booking_system_name(tmp_path):
+    """The unsimplified Rooms project tab (room/ui.py) is an EditGridWrapper over
+    the rooms directory. Its Booking system column is a modelselect resolved
+    through the booking-systems repository, so it shows the system's name
+    (BookingSystemModel.__str__), not the raw id. Guards the whole wiring:
+    the modelselect field on RoomModel, the wrapper's with_repositories, and
+    __str__."""
+    import json
+
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.bookingsystem.backend import booking_systems_adapter, create_booking_system
+    from extensions.epaper.room.backend import create_room, rooms_adapter
+    from extensions.epaper.room.ui import rooms_wrapper
+
+    paths = _simplified_paths(tmp_path)
+    system = create_booking_system(paths)
+    system.name = "iCal Uni"
+    booking_systems_adapter(paths).update(system)
+    room = create_room(paths)
+    room.booking_system_id = system.id
+    rooms_adapter(paths).update(room)
+
+    with Client(page("/test-rooms-grid"), request=None) as client:
+        rooms_wrapper(paths, "demo-project").render()
+        grids = [e for e in client.elements.values()
+                 if isinstance(getattr(e, "options", None), dict) and "columnDefs" in e.options]
+        assert grids, "rooms project tab did not render an ag-grid"
+        blob = json.dumps(grids[0].options, default=str)
+
+    assert "iCal Uni" in blob, \
+        "booking system name not resolved in the grid (modelselect/repository/__str__ wiring)"
 
 
 def test_simplified_ui_booking_form_lays_out_fields():
@@ -225,7 +260,7 @@ def test_simplified_ui_booking_form_lays_out_fields():
     from nicegui.page import page
     from niceview import ModelForm
 
-    from extensions.epaper.models.bookingsystem import BookingSystemModel
+    from extensions.epaper.bookingsystem.models import BookingSystemModel
 
     with Client(page("/test-simplified-booking"), request=None) as client:
         ModelForm.from_item(BookingSystemModel()).render()
@@ -241,20 +276,20 @@ def test_room_booking_select_lists_configured_systems(tmp_path):
     from nicegui.client import Client
     from nicegui.page import page
 
-    from extensions.epaper.core.bookingsystem import BookingSystemsAdapter, create_booking_system
-    from extensions.epaper.core.room import RoomsAdapter, create_room
+    from extensions.epaper.bookingsystem.backend import booking_systems_adapter, create_booking_system
+    from extensions.epaper.room.backend import rooms_adapter, create_room
     from extensions.epaper.ui.simplified_ui import _nav
     from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
-    from extensions.epaper.ui.simplified_ui.rooms import _render_detail
+    from extensions.epaper.room.simplified_ui import _render_detail
 
     paths = _simplified_paths(tmp_path)
     system = create_booking_system(paths)
     system.name = "iCal Uni"
-    BookingSystemsAdapter(paths).update(system)
+    booking_systems_adapter(paths).update(system)
     room = create_room(paths)
     shell = Shell("demo-project", paths, _flatten(_nav()))
     with Client(page("/test-room-booking-select"), request=None) as client:
-        _render_detail(shell, RoomsAdapter(paths), room.id)
+        _render_detail(shell, rooms_adapter(paths), room.id)
         selects = [e for e in client.elements.values()
                    if e._props.get("label") == "Booking system"]
 

@@ -17,8 +17,7 @@ from niceview import EditGridWrapper
 from extensions.epaper.core.devicebinding import set_device_binding
 from extensions.epaper.core.roomdisplay import RoomDisplaysAdapter, assignable_devices
 from extensions.epaper.models.roomdisplay import RoomDisplayRow
-
-from .layout import Shell
+from extensions.epaper.paths import EpaperPaths
 
 
 def _online_dot(value) -> str:
@@ -34,8 +33,9 @@ def _device_link(value) -> str:
             f'<i class="material-icons" style="font-size:18px;vertical-align:middle">open_in_new</i></a>')
 
 
-def render_displays_grid(shell: Shell, room_id: Optional[str] = None) -> None:
-    paths, project = shell.paths, shell.project_name
+def render_displays_grid(paths: EpaperPaths, project_name: str,
+                         room_id: Optional[str] = None) -> None:
+    project = project_name
     # '' is the "no screen" choice; the rest are the project's screens.
     screen_ids = [''] + sorted(p.stem for p in paths.screen_dir.glob('*.json'))
     adapter = RoomDisplaysAdapter(paths, project, room_id)
@@ -54,12 +54,13 @@ def render_displays_grid(shell: Shell, room_id: Optional[str] = None) -> None:
     # nice4iot, not created here) -- only meaningful inside a room.
     if room_id is not None:
         ui.button('Add display', icon='add',
-                  on_click=lambda: _assign_dialog(shell, room_id, wrapper)).props('unelevated')
+                  on_click=lambda: _assign_dialog(paths, project, room_id, wrapper)).props('unelevated')
     wrapper.render()
 
 
-def _assign_dialog(shell: Shell, room_id: str, wrapper: EditGridWrapper) -> None:
-    names = assignable_devices(shell.paths, shell.project_name, room_id)
+def _assign_dialog(paths: EpaperPaths, project_name: str, room_id: str,
+                   wrapper: EditGridWrapper) -> None:
+    names = assignable_devices(paths, project_name, room_id)
     with ui.dialog() as dialog, ui.card().classes('min-w-72 gap-2'):
         ui.label('Add display to this room').classes('text-subtitle1')
         if not names:
@@ -72,7 +73,7 @@ def _assign_dialog(shell: Shell, room_id: str, wrapper: EditGridWrapper) -> None
 
             def do_assign() -> None:
                 if select.value:
-                    set_device_binding(shell.paths, select.value, room_id=room_id)
+                    set_device_binding(paths, select.value, room_id=room_id)
                     wrapper.grid.update_rows()
                 dialog.close()
 

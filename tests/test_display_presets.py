@@ -16,11 +16,11 @@ from fastapi.testclient import TestClient
 from extensions.epaper import catalog
 from extensions.epaper.api.endpoints import build_standalone_router
 from extensions.epaper.config import app_config
-from extensions.epaper.core.screen import get_screen_by_id
-from extensions.epaper.models.screenmodel import ScreenModel
+from extensions.epaper.screen.backend import get_screen_by_id
+from extensions.epaper.screen.models import ScreenModel
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.ui.preview import ruler_ticks
-from extensions.epaper.ui.screen_editor import _apply_display
+from extensions.epaper.screen.ui import _apply_display
 
 
 def _write_screen(paths: EpaperPaths, screen_id: str, **fields) -> None:
@@ -134,7 +134,7 @@ def test_picking_a_display_applies_the_preset(tmp_path, monkeypatch):
     from nicegui.client import Client
     from nicegui.page import page
     from nicegui.events import GenericEventArguments, handle_event
-    from extensions.epaper.ui.screen_editor import screen_editor_content
+    from extensions.epaper.screen.ui import screen_editor_content
 
     paths = EpaperPaths(root=tmp_path)
     paths.ensure_dirs()

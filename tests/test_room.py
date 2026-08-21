@@ -1,4 +1,4 @@
-from extensions.epaper.core.room import (
+from extensions.epaper.room.backend import (
     create_room, delete_room, list_rooms, read_room, room_path,
 )
 from extensions.epaper.paths import EpaperPaths
@@ -39,7 +39,7 @@ def test_rename_keeps_id_and_file(tmp_path):
     # "renaming" edits the name and saves through the same id/file
     room.room_name = "Konferenz Nord"
     room.room_number = "A-101"
-    from extensions.epaper.core.room import room_adapter
+    from extensions.epaper.room.backend import room_adapter
     room_adapter(paths, room.id).save(room)
 
     reloaded = read_room(paths, room.id)
@@ -50,7 +50,7 @@ def test_rename_keeps_id_and_file(tmp_path):
 
 def test_list_rooms_sorted_by_name_then_number(tmp_path):
     paths = _paths(tmp_path)
-    from extensions.epaper.core.room import room_adapter
+    from extensions.epaper.room.backend import room_adapter
 
     def _room(name, number):
         r = create_room(paths)
@@ -73,10 +73,10 @@ def test_delete_room_removes_the_file(tmp_path):
 
 
 def test_rooms_adapter_crud(tmp_path):
-    from extensions.epaper.core.room import RoomsAdapter
-    from extensions.epaper.models.room import RoomModel
+    from extensions.epaper.room.backend import rooms_adapter
+    from extensions.epaper.room.models import RoomModel
     paths = _paths(tmp_path)
-    adapter = RoomsAdapter(paths)
+    adapter = rooms_adapter(paths)
 
     # DrillDownWrapper's default Add: create(RoomModel()) -> fresh id + file
     room = adapter.create(RoomModel())

@@ -29,3 +29,8 @@ class WeeklyScheduleModel(BaseModel):
         # sorted regardless of entry order or access path (chips autosave,
         # file load, raw API); zero-padded HH:MM sorts correctly as strings
         return sorted(value)
+
+    class Meta:
+        title = "Weekly schedule"
+        title_plural = "Weekly schedules"
+        description = "A weekly schedule, with optional month and weekday restrictions, and a list of times."

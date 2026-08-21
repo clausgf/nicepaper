@@ -3,7 +3,7 @@ import types
 
 import extensions.epaper.core.roomdisplay as rd
 from extensions.epaper.core.devicebinding import get_device_binding, set_device_binding
-from extensions.epaper.core.room import create_room, room_adapter
+from extensions.epaper.room.backend import create_room, room_adapter
 from extensions.epaper.paths import EpaperPaths
 
 NOW = datetime.datetime.now(datetime.timezone.utc)

@@ -8,7 +8,7 @@ import pydantic
 from dateutil.rrule import rrule, DAILY
 from extensions.epaper.config import app_config
 from extensions.epaper.util import logger
-from extensions.epaper.models.updateschedulemodel import ALL_WEEKDAYS, WeeklyScheduleModel
+from extensions.epaper.schedule.models import ALL_WEEKDAYS, WeeklyScheduleModel
 from extensions.epaper.paths import EpaperPaths
 
 _schedules_adapter = pydantic.TypeAdapter(List[WeeklyScheduleModel])

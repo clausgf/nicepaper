@@ -14,9 +14,11 @@ linked from the **Global** tab (an "Open" card above the settings card);
 `standalone.py` registers the route and renders the single fixed root under
 the name `standalone`.
 
-Code: `extensions/epaper/ui/simplified_ui/` — `layout.py` (frame + nav),
-`common.py` (view helpers), and one module per section (`rooms.py`,
-`displays.py`, `booking.py`); room storage is `core/room.py`.
+Code: `extensions/epaper/ui/simplified_ui/` holds the shared frame —
+`layout.py` (frame + nav), `common.py` (view helpers), `displays_grid.py`,
+and `displays.py`. Each feature ships its own section renderer in its package:
+`room/simplified_ui.py` and `bookingsystem/simplified_ui.py`; room storage is
+`room/backend.py`.
 `render(project_name, paths=None)` is the entry point — the extension derives
 `paths` from the project, standalone passes its fixed paths in.
 
@@ -49,10 +51,11 @@ Switching is **client-side state on the `Shell`**, not URL routing:
 `shell.navigate(id, **params)` sets the active view and refreshes the
 sidebar and content. It is *not* deep-linkable — see the note below.
 
-**Rooms** are wired to real storage: `core/room.py` keeps one JSON file per
-room (`RoomModel`, named by its stable surrogate id, see `models/room.py`).
-The section is a niceview `DrillDownWrapper` over `RoomsAdapter` — list, Add
-and Delete are niceview's; the module only supplies the row and a three-tab
+**Rooms** are wired to real storage: `room/backend.py` keeps one JSON file per
+room (`RoomModel`, named by its stable surrogate id, see `room/models.py`).
+The section is a niceview `DrillDownWrapper` over `rooms_adapter()` (a niceview
+`JsonDirectoryAdapter`) — list, Add and Delete are niceview's; the module only
+supplies the row and a three-tab
 detail (Occupancy, Settings, Displays). The Settings form autosaves through
 the adapter, its field labels/widgets/hints come from each `RoomModel` field's
 `Annotated` `FieldInfo` (the UI supplies only the layout), and the Displays tab
@@ -60,9 +63,9 @@ lists the devices bound to the room via `core/devicebinding.devices_in_room`
 (the assignment itself is made in a device's E-Paper card).
 
 **Booking systems** (Settings › Booking systems) are wired the same way:
-`core/bookingsystem.py` stores one JSON file per system
+`bookingsystem/backend.py` stores one JSON file per system
 (`BookingSystemModel` — id, name, type, description), a `DrillDownWrapper` over
-`BookingSystemsAdapter` is the UI, and a room's Booking system field is a
+`booking_systems_adapter()` (a niceview `JsonDirectoryAdapter`) is the UI, and a room's Booking system field is a
 select of the configured systems. A booking system is the connection/type
 (iCal today); the room supplies its own resource (the iCal URL).
 

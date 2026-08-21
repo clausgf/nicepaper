@@ -18,7 +18,7 @@ import datetime
 from typing import Iterator, Optional
 
 from extensions.epaper.core.devicebinding import get_device_bindings, set_device_binding
-from extensions.epaper.core.room import read_room
+from extensions.epaper.room.backend import read_room
 from extensions.epaper.models.roomdisplay import RoomDisplayRow
 from extensions.epaper.paths import EpaperPaths
 

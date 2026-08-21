@@ -2,7 +2,7 @@ from typing import Optional, Tuple
 
 from extensions.epaper.config import app_config
 from extensions.epaper.core.datasources.image import get_image
-from extensions.epaper.models.screenmodel import ImageWidgetModel
+from extensions.epaper.screen.models import ImageWidgetModel
 from ..drawingcontext import DrawingContext
 from .base import Widget
 

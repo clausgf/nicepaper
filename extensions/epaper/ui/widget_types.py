@@ -3,10 +3,10 @@ Everything the editor knows about a widget *type*, one entry per type.
 
 This used to be spread over three parallel dicts (models, icons, titles)
 and three if-chains (`_default_widget`, `_widget_label`, the per-type half
-of the detail form) in screen_editor.py, all keyed by the same eight
+of the detail form) in screen/ui.py, all keyed by the same eight
 strings -- so adding a widget type meant finding six places and matching
 their order. Now it is one WIDGET_TYPES entry, next to the two other
-places a type is declared: its model (models/screenmodel.py) and its
+places a type is declared: its model (screen/models.py) and its
 drawing class (core/widgets/__init__.py's WIDGET_CLASSES).
 
 A form is a niceview layout plus the field_infos that differ from the
@@ -25,7 +25,7 @@ from niceview import Field, ModelForm
 
 from extensions.epaper.config import app_config, resource_paths
 from extensions.epaper.core.datasources.image import clear_cache as clear_image_cache
-from extensions.epaper.models.screenmodel import (
+from extensions.epaper.screen.models import (
     DateWidgetModel, HomeAssistantWidgetModel, ImageWidgetModel, RoomCalendarWidgetModel,
     TextWidgetModel, WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
     WeatherWidgetModel, WidgetModel,

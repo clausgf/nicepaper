@@ -2,7 +2,7 @@ from babel.dates import format_date, get_timezone
 from datetime import datetime
 
 from extensions.epaper.config import app_config
-from extensions.epaper.models.screenmodel import DateWidgetModel
+from extensions.epaper.screen.models import DateWidgetModel
 from ..drawingcontext import DrawingContext
 from .base import Widget
 

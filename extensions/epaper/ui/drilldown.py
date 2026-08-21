@@ -3,8 +3,8 @@ The file-level chrome both editors sit in: a DrillDownWrapper over a
 directory of JSON files, with this project's list-row styling and the
 inline rename field.
 
-Screen- and schedule-specific behaviour stays in screen_editor.py /
-schedule_editor.py; this module knows only about files.
+Screen- and schedule-specific behaviour stays in screen/ui.py /
+schedule/ui.py; this module knows only about files.
 """
 from pathlib import Path
 from typing import Awaitable, Callable, Optional, Union
@@ -16,7 +16,7 @@ from niceview import DirectoryAdapter, DrillDownWrapper, FileEntry
 from extensions.epaper.config import app_config
 from extensions.epaper.util import check_filename
 
-# Slide-in-from-left/right for list<->detail switches: screen_editor.py's
+# Slide-in-from-left/right for list<->detail switches: screen/ui.py's
 # widget list<->detail, and niceview's own DrillDownWrapper uses an
 # equivalent mechanism internally. These switches are all @ui.refreshable
 # functions, which destroy and recreate their elements on every refresh
@@ -60,8 +60,8 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
                         confirm_add: Optional[Callable[[], Awaitable[bool]]] = None) -> DrillDownWrapper:
     """
     Shared DrillDownWrapper wiring for a directory of JSON files, used
-    identically by screen_editor.screens_wrapper() and
-    schedule_editor.schedules_wrapper(): the "no custom dialogs" Add/Rename
+    identically by screen.ui.screens_wrapper() and
+    schedule.ui.schedules_wrapper(): the "no custom dialogs" Add/Rename
     style from niceview's DirectoryAdapter example (examples/13_directory_
     drilldown.py) -- Add creates an "untitled-NN" file and opens it
     directly; Rename is an inline "Name" field, wired to
@@ -138,7 +138,7 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
 
     wrapper = DrillDownWrapper.from_adapter(
         FileEntry, directory,
-        list_title=title, item_title_field='name', item_subtitle_fields=[],
+        title=title, item_title_field='name', item_subtitle_fields=[],
         render_list_item=render_row,
         render_list_container=render_list_container,
         render_detail=render_detail,

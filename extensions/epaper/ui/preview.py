@@ -3,7 +3,7 @@ The screen preview: the rendered image, framed by a pixel ruler, with the
 toolbar below it (URL, outline toggle, auto-refresh, reload).
 
 Knows nothing about screens, files or the editor -- it takes a URL and a
-size. Split out of screen_editor.py, where it was the largest thing that
+size. Split out of screen/ui.py, where it was the largest thing that
 had nothing to do with editing.
 """
 import math

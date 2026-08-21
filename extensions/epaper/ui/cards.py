@@ -18,7 +18,7 @@ from extensions.epaper.config import app_config
 from extensions.epaper.core.datasources.homeassistant import EntityStatus
 from extensions.epaper.core.datasources.weather import WeatherStatus
 from extensions.epaper.core.devicebinding import get_device_binding, set_device_binding
-from extensions.epaper.core.room import list_rooms
+from extensions.epaper.room.backend import list_rooms
 from extensions.epaper.paths import EpaperPaths
 
 

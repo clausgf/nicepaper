@@ -3,15 +3,15 @@ Storage for booking systems: one JSON file per system in
 EpaperPaths.booking_dir, named by the system's stable surrogate id
 (BookingSystemModel.id), which is what RoomModel.booking_system_id references.
 
-Same shape as core/room.py: thin helpers over niceview's JsonAdapter plus a
-BookingSystemsAdapter (CollectionAdapter) so the UI is a plain
-DrillDownWrapper + ModelForm.
+Same shape as room/backend.py: thin helpers over niceview's JsonAdapter plus a
+booking_systems_adapter() -- niceview's JsonDirectoryAdapter over booking_dir,
+keyed by BookingSystemModel.id -- so the UI is a plain DrillDownWrapper + ModelForm.
 """
-from typing import Iterator, Optional
+from typing import Optional
 
-from niceview import JsonAdapter
+from niceview import JsonAdapter, JsonDirectoryAdapter
 
-from extensions.epaper.models.bookingsystem import BookingSystemModel
+from extensions.epaper.bookingsystem.models import BookingSystemModel
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.util import logger
 
@@ -59,36 +59,12 @@ def delete_booking_system(paths: EpaperPaths, system_id: str) -> None:
     booking_system_path(paths, system_id).unlink(missing_ok=True)
 
 
-class BookingSystemsAdapter:
-    """niceview CollectionAdapter[BookingSystemModel] over booking_dir, keyed by
-    id. Duck-typed (CollectionAdapter is a Protocol), like core/room.RoomsAdapter."""
-
-    def __init__(self, paths: EpaperPaths) -> None:
-        self._paths = paths
-
-    def __iter__(self) -> Iterator[BookingSystemModel]:
-        return iter(list_booking_systems(self._paths))
-
-    def key_from_item(self, item: BookingSystemModel) -> str:
-        return item.id
-
-    def read(self, key: str) -> BookingSystemModel:
-        system = read_booking_system(self._paths, key)
-        if system is None:
-            raise KeyError(key)
-        return system
-
-    def create(self, item: BookingSystemModel) -> BookingSystemModel:
-        booking_system_adapter(self._paths, item.id).save(item)
-        return item
-
-    def update(self, item: BookingSystemModel) -> BookingSystemModel:
-        booking_system_adapter(self._paths, item.id).save(item)
-        return item
-
-    def delete(self, key: str) -> None:
-        delete_booking_system(self._paths, key)
-
-    def items(self) -> Iterator[tuple[str, BookingSystemModel]]:
-        for system in list_booking_systems(self._paths):
-            yield system.id, system
+def booking_systems_adapter(paths: EpaperPaths) -> JsonDirectoryAdapter[BookingSystemModel]:
+    """The booking-systems collection as a niceview JsonDirectoryAdapter: a
+    directory of one JSON per system, keyed by BookingSystemModel.id (a fresh
+    uuid by default, so DrillDownWrapper's default Add yields a new id and file).
+    Gives the UI list/read/create/update/delete; sorted by name."""
+    return JsonDirectoryAdapter(
+        BookingSystemModel, paths.booking_dir,
+        sort_key=lambda s: s.name.lower(),
+    )

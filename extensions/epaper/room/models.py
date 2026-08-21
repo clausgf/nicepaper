@@ -17,6 +17,8 @@ from uuid import uuid4
 import niceview
 from pydantic import BaseModel, Field, field_validator
 
+from extensions.epaper.bookingsystem.models import BookingSystemModel
+
 RoomType = Literal["meeting", "conference", "lecture", "seminar", "office", "lab", "other"]
 
 # Labels for RoomType (stored as the ids above). Kept with the model so both
@@ -67,16 +69,21 @@ class RoomModel(BaseModel):
             Field(ge=0, description='Seating capacity (number of people).'),
             niceview.Field()
         ] = None
-
+    
     notes: Annotated[Optional[str],
-            Field(description='Free-text notes about the room.'),
-            niceview.Field(widget_type='ui.textarea')
+            Field(title="Notes (shown on displays)", description='Free-text notes to be shown on the sign.'),
+            niceview.Field(widget_type='ui.textarea', table_hidden=True)
+        ] = None
+
+    description: Annotated[Optional[str],
+            Field(description='Free-text description of the room.'),
+            niceview.Field(widget_type='ui.textarea', table_hidden=True)
         ] = None
 
     photo: Annotated[Optional[str],
             Field(description='Room photo: a file in the project directory (the same place the '
                               'Image widget reads from). Empty = no photo.'),
-            niceview.Field(hint='File in the project directory')
+            niceview.Field(hint='File in the project directory', table_hidden=True)
         ] = None
 
     # --- Booking source ---------------------------------------------------
@@ -84,7 +91,8 @@ class RoomModel(BaseModel):
             Field(title="Booking system",
                  description='Booking system (Settings > Booking systems) that feeds '
                              'this room. Empty = the room has no booking source yet.'),
-            niceview.Field(label='Booking system', hint="Booking system providing the calendar")
+            niceview.Field(widget_type='modelselect', item_type=BookingSystemModel, 
+                           hint="Booking system providing the calendar")
         ] = None
 
     booking_ical_url: Annotated[str,
@@ -106,12 +114,12 @@ class RoomModel(BaseModel):
 
     class Meta:
         title = "Room"
-        description = "A room's identity and its booking source."
+        title_plural = "Rooms"
         layout = [
             ['## Room',
                 ['room_number:w-1/4', 'room_name'],
                 ['building', 'floor:w-1/4'],
                 ['room_type', 'capacity:w-1/4'],
-                'photo', 'notes'],
+                'notes', 'description', 'photo'],
             ['## Booking system', ['booking_system_id:shrink', 'booking_ical_url']],
         ]

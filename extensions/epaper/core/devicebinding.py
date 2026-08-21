@@ -8,9 +8,9 @@ migrates that file on first read, so an existing installation keeps its
 screen assignments without any manual step.
 
 Synchronous: the store holds a handful of devices in a tiny file, so it is
-read/written directly (like the editor's JsonAdapter, ui/screen_editor.py),
+read/written directly (like the editor's JsonAdapter, screen/ui.py),
 not through aiofiles -- the one caller on the image-serving path
-(core/screen.resolve_screen_id) only does a small, infrequent read. There is
+(screen.backend.resolve_screen_id) only does a small, infrequent read. There is
 no cache; add a per-root cache dict if a profile ever shows it is needed.
 """
 import json

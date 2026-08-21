@@ -11,10 +11,11 @@ from typing import Optional
 
 from extensions.epaper.paths import EpaperPaths
 
-from .booking import render_booking_systems
+from extensions.epaper.bookingsystem.simplified_ui import render_booking_systems
+from extensions.epaper.room.simplified_ui import render_rooms
+
 from .displays import render_displays
 from .layout import NavItem, build_page
-from .rooms import render_rooms
 
 
 def _paths_for_project(project_name: str) -> EpaperPaths:

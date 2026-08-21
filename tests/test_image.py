@@ -5,7 +5,7 @@ from PIL import Image
 
 from extensions.epaper.core.datasources.image import _cache_path, clear_cache, get_image
 from extensions.epaper.core.widgets.image import target_size
-from extensions.epaper.models.screenmodel import ImageWidgetModel
+from extensions.epaper.screen.models import ImageWidgetModel
 from extensions.epaper.paths import EpaperPaths
 
 

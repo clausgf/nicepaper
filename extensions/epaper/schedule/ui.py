@@ -2,7 +2,7 @@
 Schedule editor: a DirectoryAdapter-backed DrillDownWrapper (schedules_wrapper)
 over paths.schedule_dir, plus the actual schedule content (one card per
 weekly rule) rendered inside its detail view. Kept separate from
-screen_editor.py since a schedule (List[WeeklyScheduleModel]) has nothing
+screen/ui.py since a schedule (List[WeeklyScheduleModel]) has nothing
 in its editing model in common with a screen's widget tree beyond the
 shared file-list/rename/delete plumbing in drilldown.py.
 """
@@ -12,7 +12,7 @@ from nicegui import ui
 from niceview import DrillDownWrapper, Field, JsonListAdapter, ModelForm
 from niceview.util import confirm_dialog
 
-from extensions.epaper.models.updateschedulemodel import WeeklyScheduleModel
+from extensions.epaper.schedule.models import WeeklyScheduleModel
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.ui.drilldown import directory_drilldown
 from extensions.epaper.ui.forms import FORM_STYLE
@@ -99,7 +99,7 @@ def schedules_wrapper(paths: EpaperPaths) -> DrillDownWrapper:
     """
     Directory-backed list<->editor drill-down for schedule files, shared
     verbatim by standalone.py and __init__.py -- see screens_wrapper()'s
-    docstring in screen_editor.py, same reasoning applies here. All the
+    docstring in screen/ui.py, same reasoning applies here. All the
     actual DrillDownWrapper/DirectoryAdapter wiring lives in drilldown.
     directory_drilldown(); this just binds it to schedule_dir and
     schedule_editor_content.

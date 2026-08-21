@@ -6,7 +6,7 @@ guess from the label alone.
 Field styling is set once per form via niceview's `base_props` /
 `default_classes` rather than per call site, so a form here is a layout
 plus the handful of field_infos that differ -- see the module docstrings
-of screen_editor.py, widget_types.py and global_settings.py.
+of screen/ui.py, widget_types.py and global_settings.py.
 """
 from typing import Any
 

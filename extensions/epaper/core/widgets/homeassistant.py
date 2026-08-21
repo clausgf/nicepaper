@@ -7,7 +7,7 @@ from extensions.epaper.core import gauge
 from extensions.epaper.core.datasources.homeassistant import (
     EntityStatus, entity_label, entity_unit, format_value, get_entity, numeric_value, raw_value,
 )
-from extensions.epaper.models.screenmodel import HomeAssistantWidgetModel
+from extensions.epaper.screen.models import HomeAssistantWidgetModel
 from extensions.epaper.util import logger
 from ..drawingcontext import DrawingContext
 from .base import Widget
