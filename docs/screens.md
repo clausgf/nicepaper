@@ -105,12 +105,12 @@ settings — not something a display asks for per request:
 | --- | --- |
 | `Name` | the screen's file name and its id in `/api/screen/<id>/…`; editing it renames the file (editor only, not a field of the screen JSON) |
 | `width`, `height` | canvas size in pixels |
-| `color_model` | id of the palette the image is quantized to before it is served (`bw`, `bwr`, `bwy`, `gs4`, `c7`, `e6`). Empty serves the unquantized RGB image. |
+| `palette_id` | id of the palette the image is quantized to before it is served (`bw`, `bwr`, `bwy`, `gs4`, `c7`, `e6`). Empty serves the unquantized RGB image. |
 | `color_background`, `color_primary`, `color_accent` | this screen's colors; each empty field falls back to the global default (see [Configuration](configuration.md)) |
-| `display_id` | which display preset was applied last, see below |
+| `panel_type_id` | which panel type was applied last, see below |
 
 `/api/screen/<id>/image.png` serves the image quantized to that screen's
-`color_model`, so the display needs no palette knowledge of its own and can't
+`palette_id`, so the display needs no palette knowledge of its own and can't
 ask for the wrong one — it is also exactly what the editor's preview
 shows. `?raw=true` returns the unquantized RGB render the quantization started
 from, for debugging a color that dithers; a display never needs it.
@@ -132,13 +132,13 @@ each aspect falling back to the screen's color independently — the same
 per-aspect override `font_name`/`font_size` use. These two fields are not in
 the editor form yet and are set in the screen JSON directly.
 
-### Display presets
+### Panel types
 
 Instead of typing size, palette and colors by hand, pick a panel from the
-**Display** list. It fills in all of the above — for a black/white panel it also
-sets the accent to black, since red could only quantize to black there anyway.
+**Panel type** list. It fills in all of the above — for a black/white panel it
+also sets the accent to black, since red could only quantize to black there anyway.
 
-Adding a screen offers the display list up front, since size and palette are
+Adding a screen offers the panel-type list up front, since size and palette are
 the first decisions about a screen and every widget position depends on them.
 The same list is in the screen's settings, so the panel can be picked or
 changed later just as well.
@@ -147,15 +147,25 @@ changed later just as well.
 isn't in the catalog, or when you'd rather set size, palette and colors
 yourself. A new screen then starts blank at 800×480 (no palette, so it is
 served as RGB, and the global colors apply); picking it for an existing screen
-only drops the `display_id` record and leaves its values untouched.
+only drops the `panel_type_id` record and leaves its values untouched.
 
 A preset is a **template, applied once**: after that the screen's own fields are
 what renders, they stay editable, and a preset that is later changed or removed
-never alters an existing screen. `display_id` only records which one was used.
+never alters an existing screen. `panel_type_id` only records which one was used
+— and stops recording it the moment you edit past it: editing width, height,
+palette or any of the three colors directly clears `panel_type_id` back to
+"No preset", since the screen no longer actually matches what that panel type
+describes.
 
-The catalog ships with the package (currently Waveshare 4.2"/7.5"/7.3" and the
-Seeed XIAO 7.5" panel) and is extended per data root by an optional
-`data/displays.json` (`<project>/.epaper/displays.json` in extension mode).
+`Screen.panel_label` (used wherever a screen needs a one-line description of
+its panel, e.g. a future screen list) reflects this: with a resolved
+`panel_type_id` it shows that panel's own name and GxEPD2 class; otherwise a
+plain `"{width}x{height} {palette_id} {n}-color"` summary of the screen's own
+fields.
+
+The catalog ships with the package (currently Waveshare 4.2"/7.5"/7.3" and two
+Seeed 7.3"/7.5" panels) and is extended per data root by an optional
+`data/panel_types.json` (`<project>/.epaper/panel_types.json` in extension mode).
 Entries are merged by `id`, the root file wins, so it can both add panels that
 aren't shipped and correct one that is:
 
@@ -163,7 +173,7 @@ aren't shipped and correct one that is:
 [
   {
     "id": "my-panel", "name": "My 5.83\" panel", "vendor": "Waveshare",
-    "width": 648, "height": 480, "color_model": "bw",
+    "width": 648, "height": 480, "palette_id": "bw",
     "color_background": "#ffffff", "color_primary": "#000000", "color_accent": "#000000",
     "gxepd2_class": "GxEPD2_583"
   }
@@ -171,11 +181,11 @@ aren't shipped and correct one that is:
 ```
 
 `gxepd2_class` is informational only — nicepaper renders a PNG and never talks
-to a panel driver. It is shown under the display list so a panel can be found
+to a panel driver. It is shown under the panel-type list so a panel can be found
 by the name its firmware knows it under.
 
-Palettes work the same way: an optional `data/color_models.json` adds to (or
-overrides) the shipped ones. Unlike `displays.json`, editing it changes what
+Palettes work the same way: an optional `data/palettes.json` adds to (or
+overrides) the shipped ones. Unlike `panel_types.json`, editing it changes what
 gets served — a screen references a palette by id rather than containing it —
 so a change there re-renders every screen using it.
 

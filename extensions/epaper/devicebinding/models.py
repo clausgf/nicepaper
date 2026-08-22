@@ -2,14 +2,6 @@
 The device binding: the epaper-specific configuration for one nice4iot
 device, keyed by the device's name.
 
-This replaces the old bare `aliases.json` (which mapped a device name
-straight to a screen id) with a typed record that also records which room
-the device hangs in. We do **not** model nice4iot devices themselves --
-they are owned by nice4iot and referenced only by name; there is no
-per-device file and no device directory. The whole binding store is one
-typed collection file, `device_bindings.json`
-(`dict[device_name, DeviceBinding]`) -- see core/devicebinding.py.
-
 Both relations live here, so it is the single source of truth for them:
   device -> screen  (screen_id, the former alias target; the render path
                      still resolves a device's image by its name via this)

@@ -1,6 +1,6 @@
 from typing import Optional, Tuple
 
-from extensions.epaper.config import app_config
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.core.datasources.image import get_image
 from extensions.epaper.screen.models import ImageWidgetModel
 from ..drawingcontext import DrawingContext

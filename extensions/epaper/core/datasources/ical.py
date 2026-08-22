@@ -9,7 +9,7 @@ import aiofiles
 import aiohttp
 from icalendar import Calendar
 import recurring_ical_events
-from extensions.epaper.config import app_config
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.util import logger
 
 

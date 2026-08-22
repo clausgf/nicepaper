@@ -1,8 +1,8 @@
 import datetime
 import types
 
-import extensions.epaper.core.roomdisplay as rd
-from extensions.epaper.core.devicebinding import get_device_binding, set_device_binding
+import extensions.epaper.display.backend as rd
+from extensions.epaper.devicebinding.backend import get_device_binding, set_device_binding
 from extensions.epaper.room.backend import create_room, room_adapter
 from extensions.epaper.paths import EpaperPaths
 
@@ -103,3 +103,56 @@ def test_adapter_delete_unassigns_from_room(tmp_path, monkeypatch):
     rd.RoomDisplaysAdapter(paths, "proj", room.id).delete("d")
     binding = get_device_binding(paths, "d")
     assert binding.room_id is None and binding.screen_id == "scr"  # device + screen kept
+
+
+def test_project_device_names_lists_every_device_unfiltered(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    set_device_binding(paths, "in-room", room_id=room.id)
+    monkeypatch.setattr(rd, "_project_devices",
+                        _fake_devices(_dev("in-room"), _dev("elsewhere"), _dev("unbound")))
+    # unlike assignable_devices(), a device already in *this* room is included too
+    assert rd.project_device_names("proj") == ["elsewhere", "in-room", "unbound"]
+
+
+def test_adapter_rename_moves_room_and_screen_to_the_new_device(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    set_device_binding(paths, "old", room_id=room.id, screen_id="scr")
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(_dev("old"), _dev("new")))
+
+    adapter = rd.RoomDisplaysAdapter(paths, "proj", room.id)
+    assert adapter.rename("old", "new") == "new"
+
+    new_binding = get_device_binding(paths, "new")
+    assert (new_binding.room_id, new_binding.screen_id) == (room.id, "scr")
+    old_binding = get_device_binding(paths, "old")
+    assert old_binding.room_id is None  # unbound from the room...
+    assert old_binding.screen_id == "scr"  # ...but its own screen is untouched
+
+
+def test_adapter_rename_to_the_same_device_is_a_noop(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    set_device_binding(paths, "d", room_id=room.id, screen_id="scr")
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(_dev("d")))
+
+    adapter = rd.RoomDisplaysAdapter(paths, "proj", room.id)
+    assert adapter.rename("d", "d") == "d"
+    binding = get_device_binding(paths, "d")
+    assert (binding.room_id, binding.screen_id) == (room.id, "scr")
+
+
+def test_adapter_rename_moves_a_device_from_another_room(tmp_path, monkeypatch):
+    """A device already in a different room is moved here, same as
+    assignable_devices()/create() already allow."""
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    set_device_binding(paths, "old", room_id=room.id, screen_id="scr")
+    set_device_binding(paths, "elsewhere", room_id="other-room")
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(_dev("old"), _dev("elsewhere")))
+
+    adapter = rd.RoomDisplaysAdapter(paths, "proj", room.id)
+    assert adapter.rename("old", "elsewhere") == "elsewhere"
+    moved = get_device_binding(paths, "elsewhere")
+    assert (moved.room_id, moved.screen_id) == (room.id, "scr")

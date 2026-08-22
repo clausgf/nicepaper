@@ -18,7 +18,7 @@ class GlobalConfig(BaseModel):
     ui.color_input.
 
     The palette catalog (epaper_color_models) used to live here too and
-    has moved to a package resource -- see models/display.py: this file
+    has moved to a package resource -- see catalog/models.py: this file
     is copied over the model defaults on load, so anything catalog-shaped
     kept here freezes at whatever an installation wrote once and never
     picks up entries added in a later release.

@@ -2,7 +2,7 @@ from typing import Optional, Tuple
 
 from babel.dates import format_datetime, get_timezone
 
-from extensions.epaper.config import app_config
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.core import gauge
 from extensions.epaper.core.datasources.homeassistant import (
     EntityStatus, entity_label, entity_unit, format_value, get_entity, numeric_value, raw_value,

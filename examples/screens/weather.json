@@ -1,8 +1,8 @@
 {
-  "display_id": "waveshare_7in5b_v2",
+  "panel_type_id": "waveshare_7in5b_v2",
   "width": 800,
   "height": 480,
-  "color_model": "bwr",
+  "palette_id": "bwr",
   "color_background": "#ffffff",
   "color_primary": "#000000",
   "color_accent": "#ff0000",

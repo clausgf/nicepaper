@@ -1,6 +1,6 @@
 from PIL import Image
 
-from extensions.epaper.config import app_config
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.core.drawingcontext import DrawingContext
 from extensions.epaper.core.gauge import draw_gauge, value_fraction
 

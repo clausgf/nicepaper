@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from pydantic import ValidationError
 
-from extensions.epaper.config import app_config
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.schedule.backend import UpdateSchedule, get_schedule_by_id
 from extensions.epaper.schedule.models import ALL_MONTHS, ALL_WEEKDAYS, WeeklyScheduleModel
 from extensions.epaper.paths import EpaperPaths

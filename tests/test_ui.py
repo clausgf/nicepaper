@@ -130,8 +130,8 @@ def test_global_config_card_renders_every_field():
     from nicegui.client import Client
     from nicegui.page import page
 
-    from extensions.epaper.models.global_config import GlobalConfig
-    from extensions.epaper.ui.global_settings import global_config_fields
+    from extensions.epaper.global_config.models import GlobalConfig
+    from extensions.epaper.global_config.ui import global_config_fields
 
     with Client(page("/test-global-config"), request=None) as client:
         global_config_fields(persist=lambda: None)
@@ -151,13 +151,14 @@ def _element_type_names(client) -> list:
 
 
 def test_simplified_ui_nav_leaves_are_the_content_sections():
-    """The sidebar's leaves (the addressable views) are exactly the three
-    content sections; Settings is a group and never a view itself."""
+    """The sidebar's leaves (the addressable views) are exactly the four
+    content sections, Templates right after Rooms; Settings is a group and
+    never a view itself."""
     from extensions.epaper.ui.simplified_ui import _nav
     from extensions.epaper.ui.simplified_ui.layout import _flatten
 
     nav = _nav()
-    assert list(_flatten(nav)) == ["rooms", "displays", "booking"]
+    assert list(_flatten(nav)) == ["rooms", "templates", "displays", "booking"]
     settings = next(i for i in nav if i.id == "settings")
     assert settings.render is None and [c.id for c in settings.children] == ["booking"]
 
@@ -216,6 +217,47 @@ def test_simplified_ui_room_detail_lays_out_every_setting(tmp_path):
                   "Capacity", "Photo", "Description", "Booking system", "iCal URL"):
         assert field in labels, f"{field!r} missing from room settings"
     assert {"Occupancy", "Settings", "Displays"} <= tab_labels
+
+
+def test_room_displays_panel_shows_summary_and_bound_devices(tmp_path, monkeypatch):
+    """The Displays tab leads with a room summary (room_label + type, then
+    building/floor) and lists every device bound to the room, titled by
+    device name with the screen as subtitle."""
+    import datetime
+    import types
+
+    import extensions.epaper.display.backend as display_backend
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.devicebinding.backend import set_device_binding
+    from extensions.epaper.room.backend import create_room
+    from extensions.epaper.room.simplified_ui import _displays_panel
+    from extensions.epaper.ui.simplified_ui import _nav
+    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+
+    paths = _simplified_paths(tmp_path)
+    room = create_room(paths)
+    room.room_number, room.room_name = "A-101", "North Conference"
+    room.building, room.floor = "Main", "2"
+    from extensions.epaper.room.backend import room_adapter
+    room_adapter(paths, room.id).save(room)
+    set_device_binding(paths, "sign-1", room_id=room.id, screen_id="weather")
+
+    monkeypatch.setattr(display_backend, "_project_devices", lambda project: [
+        types.SimpleNamespace(name="sign-1", last_seen_at=datetime.datetime.now(datetime.timezone.utc)),
+    ])
+
+    shell = Shell("demo-project", paths, _flatten(_nav()))
+    with Client(page("/test-room-displays"), request=None) as client:
+        _displays_panel(shell, room.id)
+        labels = {e.text for e in client.elements.values()
+                  if type(e).__name__ in ("Label", "ItemLabel")}
+
+    assert "A-101 (North Conference) · Meeting room" in labels
+    assert "Main, 2" in labels
+    assert "sign-1" in labels  # list row title (device_name)
+    assert "weather" in labels  # list row subtitle (screen_id)
 
 
 def test_rooms_project_tab_grid_resolves_booking_system_name(tmp_path):

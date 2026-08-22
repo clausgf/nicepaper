@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 import aiofiles
 import pydantic
 from dateutil.rrule import rrule, DAILY
-from extensions.epaper.config import app_config
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.util import logger
 from extensions.epaper.schedule.models import ALL_WEEKDAYS, WeeklyScheduleModel
 from extensions.epaper.paths import EpaperPaths

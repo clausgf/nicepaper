@@ -13,7 +13,7 @@ from nicegui import ui
 from babel.dates import format_datetime, get_timezone
 from niceview import DirectoryAdapter, DrillDownWrapper, FileEntry
 
-from extensions.epaper.config import app_config
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.util import check_filename
 
 # Slide-in-from-left/right for list<->detail switches: screen/ui.py's

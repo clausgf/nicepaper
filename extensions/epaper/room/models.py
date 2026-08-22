@@ -5,7 +5,7 @@ A room carries only its master data and which booking system feeds it.
 It deliberately does *not* carry any rendering settings. Nor does it 
 list the displays in the room -- that
 is a device->room relation stored in the device bindings
-(models/devicebinding.py), keyed by nice4iot device name, so a room never
+(devicebinding/models.py), keyed by nice4iot device name, so a room never
 holds a device id that a deleted device could leave dangling.
 
 **Identity & storage.** A room has a stable surrogate `id`, generated once at
@@ -111,6 +111,15 @@ class RoomModel(BaseModel):
         if v and not v.startswith(("http://", "https://", "webcal://")):
             raise ValueError("iCal URL must start with http://, https:// or webcal://")
         return v
+
+    @property
+    def room_label(self) -> str:
+        """Compact human label for this room: 'number (name)' when both are
+        set, else whichever one isn't empty. Used wherever a room needs a
+        single-line human-readable identifier (selects, list titles)."""
+        if self.room_number and self.room_name:
+            return f'{self.room_number} ({self.room_name})'
+        return self.room_number or self.room_name
 
     class Meta:
         title = "Room"

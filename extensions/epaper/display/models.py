@@ -2,8 +2,8 @@
 Row view-model for the displays grid (EditGridWrapper), one row per e-paper
 display (a nice4iot device). This is a *view* model, not stored as-is: only
 `screen_id` is editable and persisted (into the device binding,
-models/devicebinding.py); everything else is read-only and joined together
-by core/roomdisplay.py from the nice4iot device (name, online) and the room
+devicebinding/models.py); everything else is read-only and joined together
+by display/backend.py from the nice4iot device (name, online) and the room
 the device is bound to (building/floor/room number).
 
 RSSI, battery voltage and alarm count have no per-device source in nice4iot

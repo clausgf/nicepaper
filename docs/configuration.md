@@ -2,13 +2,14 @@
 
 [← Documentation](README.md)
 
-`GlobalConfig` (`extensions/epaper/models/global_config.py`) holds the settings
+`GlobalConfig` (`extensions/epaper/global_config/models.py`) holds the settings
 that are the same for every screen — defaults, locale, color models, the
 default font/colors, update intervals, ... It is a plain pydantic model that is
 **JSON-persisted** to `data/global_config.json` and edited through the global
 settings card in the UI, *not* an environment-variable/`BaseSettings` config.
-At startup `load_global_config()` loads that file in place (creating it with the
-defaults if missing).
+At startup `load_global_config()` (`global_config/backend.py`) loads that file
+into the shared `app_config` singleton in place (creating it with the defaults
+if missing).
 
 Edit these settings in the UI:
 
@@ -92,17 +93,17 @@ Optional:
 No Home Assistant *add-on* or custom component is needed on the HA side; the
 REST API is built in, and nicepaper only reads entity states.
 
-## Display and palette catalogs
+## Panel-type and palette catalogs
 
-The panel presets and the e-paper palettes are **not** in `global_config.json`.
-They ship with the package (`extensions/epaper/resources/displays.json`,
-`color_models.json`), so an entry added in a new nicepaper release actually
+The panel types and the e-paper palettes are **not** in `global_config.json`.
+They ship with the package (`extensions/epaper/resources/panel_types.json`,
+`palettes.json`), so an entry added in a new nicepaper release actually
 reaches an existing installation — a catalog persisted in the config file would
 freeze at whatever that file contained when it was first written. Each is
 extended per data root by an optional file of the same name in the root
-(`data/displays.json`, `data/color_models.json`), merged by `id` with the root
+(`data/panel_types.json`, `data/palettes.json`), merged by `id` with the root
 file winning. See
-[Screens, widgets & schedules](screens.md#display-presets) for the format.
+[Screens, widgets & schedules](screens.md#panel-types) for the format.
 
 The palettes used to live here as `epaper_color_models`. An old config file that
 still has that key loads fine — pydantic ignores it — and drops it on the next

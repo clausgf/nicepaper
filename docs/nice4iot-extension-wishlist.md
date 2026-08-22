@@ -16,7 +16,7 @@ each item below says what it currently does instead.
   the fields below), so extensions stop importing device internals.
 - **Online state / last seen.** The grid's "Online" column derives online from
   `Device.last_seen_at` + a threshold, computed in the extension
-  (`core/roomdisplay._is_online`). — *Wanted:* a documented online/last-seen
+  (`display/backend._is_online`). — *Wanted:* a documented online/last-seen
   accessor (or `is_device_online` promoted to the extension API).
 - **Latest device telemetry: RSSI and battery.** The grid has RSSI and Battery
   columns but **no data source**: `wifi_rssi`/`battery_V` are push-only

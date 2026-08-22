@@ -4,7 +4,7 @@ with up to two independent Y axes, drawn directly with PIL's ImageDraw
 (via DrawingContext) -- no charting library.
 
 Widgets always draw once onto one RGB canvas; quantization to the screen's
-color_model palette happens afterwards in imagecache.py
+palette happens afterwards in imagecache.py
 (Image.quantize(), dithered by default). Anti-aliased output (like a
 typical plotting library produces) would dither into visual noise once
 quantized down to a 2-3 color palette, so this helper snaps every

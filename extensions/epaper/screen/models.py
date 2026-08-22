@@ -273,29 +273,29 @@ class ScreenModel(BaseModel):
     One screen: its canvas, the palette it is served in, and its widgets.
 
     A screen is bound to one panel, so everything the panel decides lives
-    here rather than being negotiated per request. `display_id` records
-    which preset (see models/display.py) filled these fields in the
-    editor, but is never read back at render time -- the fields below are
-    the source of truth, and stay editable afterwards.
+    here rather than being negotiated per request. `panel_type_id` records
+    which panel type (see catalog/models.py's PanelTypeModel) filled these
+    fields in the editor, but is never read back at render time -- the fields
+    below are the source of truth, and stay editable afterwards.
     """
     # Tuple[int, int] -- see the same note on WidgetModel above.
     width: int = Field(description="Canvas width in pixels.")
     height: int = Field(description="Canvas height in pixels.")
-    display_id: Optional[str] = Field(
+    panel_type_id: Optional[str] = Field(
         default=None,
         description=(
-            "Id of the display preset last applied to this screen. A "
+            "Id of the panel type last applied to this screen. A "
             "reminder of which panel this screen is laid out for; picking "
             "one fills in the size, palette and colors below, which then "
             "stay editable and are what actually gets rendered."
         ),
     )
-    color_model: Optional[str] = Field(
+    palette_id: Optional[str] = Field(
         default=None,
         description=(
-            "Id of the palette the image is quantized to before it is "
-            "served, e.g. 'bwr'. Leave empty to serve the unquantized RGB "
-            "image (the display then has to quantize it itself)."
+            "Id of the palette the image is quantized to before "
+            "it is served, e.g. 'bwr'. Leave empty to serve the unquantized "
+            "RGB image (the display then has to quantize it itself)."
         ),
     )
     color_background: Optional[str] = Field(default=None, description="Background color of this screen. Leave empty to use the global default.")

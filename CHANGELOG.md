@@ -1,5 +1,125 @@
 # Changelog
 
+## 0.18.0 — 2026-08-22
+
+### Added
+
+- **Templates section in the simplified UI.** A new top-level "Templates"
+  nav item (right after Rooms) for screens — scaffolding only for now
+  (`screen/simplified_ui.py`'s `render_templates`); the actual editor content
+  follows later, in the same module.
+- **Room Displays tab redesigned as its own drill-down list.** The room's
+  Displays tab (`room/simplified_ui.py`) now leads with a compact room
+  summary (`room_label · room type`, and, smaller, building/floor) followed
+  by a niceview `DrillDownWrapper` list of the devices bound to the room
+  (Title device name, Subtitle screen) instead of the shared grid. Each row's
+  detail is editable and deletable: **Device** is a select over every project
+  device (`display.backend.project_device_names`, all devices regardless of
+  current room — unlike `assignable_devices()`), reassigning the row via the
+  new `RoomDisplaysAdapter.rename()` (moves the room/screen assignment to the
+  newly picked device, unbinding the old one) wired through niceview's
+  `set_key`, the same rename pattern the file editors already use for their
+  Name field; **Screen** is a select over the project's screen files. Add is
+  the wrapper's own standard button, driving a device picker
+  (`assignable_devices`) since there is nothing to type. The flat, top-level
+  Displays section (`display/simplified_ui.py`) is unchanged (still the
+  shared `render_displays_grid`).
+- **`RoomModel.room_label`.** `"{room_number} ({room_name})"` when both are
+  set, else whichever one isn't empty — a single compact human label,
+  replacing the ad-hoc `f'{room_name} ({room_number})'` the device card's
+  Room select used to build inline (and fixing its order to number-first).
+  Also now the Rooms list's `item_title_field` (dropping `room_number` from
+  the subtitle, redundant with the label).
+- **`Screen.panel_label`.** A compact human label for a screen's panel: the
+  applied panel type's own name + GxEPD2 class when `panel_type_id` is set
+  and still resolves in the catalog; otherwise a plain
+  `"{width}x{height} {palette_id} {n}-color"` summary of the screen's own
+  fields. `panel_type_id` is now automatically cleared back to `None` as soon
+  as a field the preset filled in (width, height, palette_id, or any of the
+  three colors) is edited directly, so a resolved panel type can always be
+  trusted to actually describe the screen's current fields
+  (`screen/ui.py`'s `on_field_change` / `_diverges_from_panel_type`).
+
+### Changed
+
+- **niceview 0.26.1 (was 0.22.1).** Track niceview's own latest release
+  (previously pinned to whatever nice4iot happened to pull in). 0.26.1 is
+  purely additive for us (`DrillDownWrapper` gains `title_field`/
+  `subtitle_fields` as aliases of `item_title_field`/`item_subtitle_fields`,
+  and `Meta.include`/`exclude` now also apply to grids/lists) — no code
+  changes needed. Adapts to niceview 0.23.0's wrapper API along the way:
+  `DrillDownWrapper`'s `list_title` is gone — the list title/description now
+  come from each model's `Meta` (`Meta.title_plural`/`Meta.description`),
+  added to `RoomModel` and `BookingSystemModel`; `directory_drilldown` passes
+  `title=` instead.
+- **Rooms/booking-systems collection adapters use niceview's
+  `JsonDirectoryAdapter`.** The hand-written `RoomsAdapter`/
+  `BookingSystemsAdapter` classes are removed in favour of
+  `room.backend.rooms_adapter()` / `bookingsystem.backend.booking_systems_
+  adapter()`, thin factories over niceview 0.25.0's `JsonDirectoryAdapter`
+  (one JSON per item in a directory, keyed by the model's `id`). CRUD is now
+  strict (`create()` refuses an existing key, `update()` an absent one),
+  which the DrillDownWrapper/ModelForm add-then-autosave flow already
+  satisfies.
+- **`display/`, `devicebinding/`, `global_config/`, `catalog/` feature
+  packages (internal), continuing the nice4iot-style split.**
+  - `display/`: `models/roomdisplay.py` → `display/models.py`,
+    `core/roomdisplay.py` → `display/backend.py`,
+    `ui/simplified_ui/{displays,displays_grid}.py` merge into
+    `display/simplified_ui.py`.
+  - `devicebinding/`: `models/devicebinding.py` → `devicebinding/models.py`,
+    `core/devicebinding.py` → `devicebinding/backend.py`; the per-device
+    settings card splits out of `ui/cards.py` into `devicebinding/ui.py`
+    (`device_config_card`) — the dashboard summary card stays in
+    `ui/cards.py`.
+  - `global_config/`: `models/global_config.py` → `global_config/models.py`;
+    the `app_config` singleton and `load_global_config`/`save_global_config`
+    move from `config.py` into `global_config/backend.py` (their natural
+    owner); `ui/global_settings.py` → `global_config/ui.py`. `config.py` now
+    holds only the installation-specific, non-user-editable resource paths
+    (`resource_paths`), matching nice4iot's own `app/config.py` shape.
+  - `catalog/`: `models/display.py` → `catalog/models.py` (`Palette`,
+    `PanelTypeModel`), `catalog.py` → `catalog/backend.py`. Bundled as one
+    package rather than split by model, since both are read-only reference
+    catalogs (no CRUD, no editor of their own — selection happens inside
+    `screen/ui.py`'s form) sharing the same package-resource-plus-per-root-
+    overlay loading mechanism; unlike the other feature packages there is no
+    `ui.py`.
+  - `models/` is now empty and removed. Import paths only, no behavior
+    change beyond what's called out separately below.
+- **Dead code removed from `display/simplified_ui.py`.** `render_displays_
+  grid`'s `room_id` parameter and the `_assign_dialog` it drove were only
+  ever reachable from the room's Displays tab, which now has its own
+  drill-down UI (see above) — the grid's only remaining caller
+  (`render_displays`) always passed `room_id=None`. The grid is now
+  unconditionally the flat, unfiltered, no-Add view it already was in
+  practice.
+
+### Changed (breaking: stored data)
+
+- **`DisplayModel` → `PanelTypeModel`, resource `displays.json` →
+  `panel_types.json`.** "Display" was overloaded (the panel hardware vs. a
+  device showing a screen in a room); the panel-hardware preset is now a
+  *panel type*. Catalog API: `get_displays`/`get_display` →
+  `get_panel_types`/`get_panel_type`; `EpaperPaths.display_file` →
+  `panel_types_file`. The per-root overlay file is now `panel_types.json`.
+- **`ColorModel` → `Palette`, resource `color_models.json` →
+  `palettes.json`.** Distinguishes the palette object from the id fields
+  referencing it (see below). Catalog API: `get_color_models`/
+  `get_color_model` → `get_palettes`/`get_palette`; `color_models_mtime` →
+  `palettes_mtime`; `EpaperPaths.color_model_file` → `palettes_file`. The
+  `Screen.color_model` property (the resolved object) is now `Screen.palette`.
+- **Id-reference fields renamed to distinguish the id from the object.**
+  `ScreenModel.color_model` → `palette_id`; `ScreenModel.display_id` →
+  `panel_type_id`; `PanelTypeModel.color_model` → `palette_id`.
+- **Hard rename (no aliases).** Existing screen JSON files and per-root
+  `displays.json`/`color_models.json`/overlays using the old keys/filenames
+  are **not** migrated: the old keys are ignored (fields fall back to their
+  defaults) and old overlay files are no longer read. Rename
+  `displays.json`/`color_models.json` to `panel_types.json`/`palettes.json`
+  and the keys `color_model`→`palette_id`, `display_id`→`panel_type_id` in
+  stored screens. Shipped `examples/` are already updated.
+
 ## 0.17.1 — 2026-08-21
 
 ### Added

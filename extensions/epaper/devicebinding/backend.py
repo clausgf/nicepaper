@@ -19,7 +19,7 @@ from typing import Optional
 
 from pydantic import TypeAdapter, ValidationError
 
-from extensions.epaper.models.devicebinding import DeviceBinding
+from extensions.epaper.devicebinding.models import DeviceBinding
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.util import logger
 
@@ -107,14 +107,14 @@ def set_device_binding(paths: EpaperPaths, device_name: str, *,
     _write_device_bindings(paths, bindings)
 
 
-def resolve_screen_id(paths: EpaperPaths, id: str) -> str:
+def resolve_screen_id(paths: EpaperPaths, device_name: str) -> str:
     """Resolve a display id to its target screen id: a device addressed by
     its own name resolves to the screen bound to it, so a display only ever
     needs to know its name. Falls back to the given id unchanged when there
     is no binding (or the binding has no screen), so a real screen id passes
     straight through. Renamed from the former _resolve_alias()."""
-    binding = get_device_bindings(paths).get(id)
-    return binding.screen_id if binding and binding.screen_id else id
+    binding = get_device_bindings(paths).get(device_name)
+    return binding.screen_id if binding and binding.screen_id else device_name
 
 
 def devices_in_room(paths: EpaperPaths, room_id: str) -> list[str]:

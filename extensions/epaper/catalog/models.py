@@ -1,22 +1,22 @@
 """
 Hardware descriptions: the palettes a rendered image can be quantized to
-(`ColorModel`) and the panel presets the screen editor offers
-(`DisplayModel`).
+(`Palette`) and the panel-type presets the screen editor offers
+(`PanelTypeModel`).
 
-`ColorModel` used to live in GlobalConfig, and deliberately no longer
+`Palette` used to live in GlobalConfig, and deliberately no longer
 does -- neither model belongs there. `load_global_config()` copies every
 persisted field over the model defaults, so a catalog kept in that file
 freezes at whatever it contained when it was first written: palettes or
 panels added in a later nicepaper release would never reach an existing
 installation, silently. Both catalogs are package resources instead
-(see `catalog.py`), versioned with the code, with an optional per-root
-file for hardware we don't ship.
+(see `catalog/backend.py`), versioned with the code, with an optional
+per-root file for hardware we don't ship.
 """
 from typing import List, Optional, Tuple
 from pydantic import BaseModel, Field
 
 
-class ColorModel(BaseModel):
+class Palette(BaseModel):
     """
     A palette an e-paper panel can display. The screen is always rendered
     in RGB first and quantized to this palette before it is served, so
@@ -29,22 +29,22 @@ class ColorModel(BaseModel):
     background_color_index: int = 1
 
 
-class DisplayModel(BaseModel):
+class PanelTypeModel(BaseModel):
     """
-    A panel preset: the values the screen editor writes into a screen when
-    that panel is picked.
+    A panel-type preset: the values the screen editor writes into a screen
+    when that panel type is picked.
 
     Purely a template. The screen's own fields stay the source of truth
     for rendering and nothing reads the preset again afterwards, so a
     preset that is edited, renamed or removed later never changes how an
-    existing screen renders. `ScreenModel.display_id` only records which
-    preset was applied last, for the editor.
+    existing screen renders. `ScreenModel.panel_type_id` only records which
+    panel type was applied last, for the editor.
     """
     id: str
-    name: str = Field(description="Name shown in the editor's display list.")
+    name: str = Field(description="Name shown in the editor's panel-type list.")
     width: int = Field(description="Panel width in pixels.")
     height: int = Field(description="Panel height in pixels.")
-    color_model: str = Field(default="bw", description="Id of the palette this panel can show (see color_models.json).")
+    palette_id: str = Field(default="bw", description="Id of the palette this panel can show (see palettes.json).")
 
     # a preset exists to give a combination that actually works on that
     # panel, so it carries colors rather than leaving them to the global

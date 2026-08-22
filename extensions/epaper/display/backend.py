@@ -17,9 +17,9 @@ delete the nice4iot device).
 import datetime
 from typing import Iterator, Optional
 
-from extensions.epaper.core.devicebinding import get_device_bindings, set_device_binding
+from extensions.epaper.devicebinding.backend import get_device_bindings, set_device_binding
 from extensions.epaper.room.backend import read_room
-from extensions.epaper.models.roomdisplay import RoomDisplayRow
+from extensions.epaper.display.models import RoomDisplayRow
 from extensions.epaper.paths import EpaperPaths
 
 # A device counts as online if it was seen within this window (its last_seen_at
@@ -89,6 +89,14 @@ def assignable_devices(paths: EpaperPaths, project_name: str, room_id: str) -> l
                   if (bindings.get(d.name).room_id if bindings.get(d.name) else None) != room_id)
 
 
+def project_device_names(project_name: str) -> list[str]:
+    """Every nice4iot device name in the project, sorted, regardless of room
+    assignment -- unlike assignable_devices(), for correcting which device an
+    existing display row means rather than adding a new one. [] outside
+    nice4iot (standalone/tests), same as _project_devices()."""
+    return sorted(d.name for d in _project_devices(project_name))
+
+
 class RoomDisplaysAdapter:
     """niceview CollectionAdapter[RoomDisplayRow], keyed by device name. Only
     screen_id is writable (into the device binding); delete unassigns the
@@ -122,6 +130,20 @@ class RoomDisplaysAdapter:
     def delete(self, key: str) -> None:
         # remove the display from its room (keeps the nice4iot device + its screen)
         set_device_binding(self._paths, key, room_id=None)
+
+    def rename(self, old_device_name: str, new_device_name: str) -> str:
+        """Move this row's room/screen assignment to a different device --
+        e.g. correcting which device was actually picked for it. Unbinds the
+        room from the old device and binds it (with the same screen) to the
+        new one; a device already in another room is moved here, same as
+        assignable_devices()/create() already allow. Returns the new key."""
+        if new_device_name == old_device_name:
+            return old_device_name
+        old = self.read(old_device_name)
+        set_device_binding(self._paths, new_device_name, room_id=self._room_id,
+                           screen_id=old.screen_id or None)
+        set_device_binding(self._paths, old_device_name, room_id=None)
+        return new_device_name
 
     def create(self, item: RoomDisplayRow) -> RoomDisplayRow:
         set_device_binding(self._paths, item.device_name, room_id=self._room_id,

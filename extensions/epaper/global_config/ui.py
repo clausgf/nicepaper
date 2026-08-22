@@ -13,7 +13,8 @@ from typing import Callable
 from nicegui import ui
 from niceview import Field, ModelForm
 
-from extensions.epaper.config import app_config, resource_paths
+from extensions.epaper.config import resource_paths
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.ui.forms import (
     COL, DATE_PATTERN_HINT, FORM_STYLE, ROW, SHORT_DATE_PATTERN_HINT, STALE_NOTICE_HINT,
     TIME_PATTERN_HINT, hints,
@@ -88,8 +89,8 @@ def global_config_fields(persist: Callable[[], None]) -> None:
     ModelForm.from_item binds directly to the shared GlobalConfig
     singleton, app_config -- not a fresh copy from an adapter -- so
     autosave edits mutate app_config's own attributes in place: every
-    module that already did `from extensions.epaper.config import
-    app_config` sees the changes without needing to change anything.
+    module that already did `from extensions.epaper.global_config.backend
+    import app_config` sees the changes without needing to change anything.
     `persist()` is the caller's job (write to the right JSON path for
     standalone vs. the nice4iot extension); this function doesn't know or
     care which.

@@ -5,7 +5,7 @@ nice4iot editors, rendered as the extension's standalone project page
 
 `render(project_name)` is the entry point nice4iot calls. It defines the
 sidebar navigation and hands off to layout.build_page(); every section's
-content lives in its own module (rooms, displays, booking).
+content lives in its own module (rooms, templates/screens, displays, booking).
 """
 from typing import Optional
 
@@ -13,8 +13,9 @@ from extensions.epaper.paths import EpaperPaths
 
 from extensions.epaper.bookingsystem.simplified_ui import render_booking_systems
 from extensions.epaper.room.simplified_ui import render_rooms
+from extensions.epaper.screen.simplified_ui import render_templates
 
-from .displays import render_displays
+from extensions.epaper.display.simplified_ui import render_displays
 from .layout import NavItem, build_page
 
 
@@ -33,13 +34,14 @@ def _paths_for_project(project_name: str) -> EpaperPaths:
 
 
 def _nav() -> list[NavItem]:
-    """Two-level sidebar: two leaf sections plus a Settings group.
+    """Two-level sidebar: leaf sections plus a Settings group.
 
     The first leaf (Rooms) is the landing view (Shell picks it). Extend a
     section by giving it a `render`; extend the tree by adding children.
     """
     return [
         NavItem('rooms', 'Rooms', 'meeting_room', render=render_rooms),
+        NavItem('templates', 'Templates', 'wallpaper', render=render_templates),
         NavItem('displays', 'Displays', 'tv', render=render_displays),
         NavItem('settings', 'Preferences', 'settings', children=(
             NavItem('booking', 'Booking systems', 'event', render=render_booking_systems),

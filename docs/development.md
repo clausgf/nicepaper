@@ -112,7 +112,7 @@ every widget type.
 
 ### Getting the GxEPD2 class to the firmware
 
-A display preset carries the matching GxEPD2 display class
+A panel type carries the matching GxEPD2 display class
 (`gxepd2_class`, e.g. `GxEPD2_750_T7`) purely as a hint in the UI. A device
 firmware still has to be built with the right class hard-coded. Open question
 whether nicepaper should expose it — e.g. on a per-device endpoint next to the

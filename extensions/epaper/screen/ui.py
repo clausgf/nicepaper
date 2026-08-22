@@ -29,8 +29,8 @@ from niceview.util import confirm_dialog
 # is created dynamically after the initial page load. Importing the module here at
 # setup registers the ESM eagerly so 'nicegui-sortable' is in every page's importmap.
 
-from extensions.epaper.catalog import get_color_models, get_display, get_displays
-from extensions.epaper.models.display import DisplayModel
+from extensions.epaper.catalog.backend import get_palettes, get_panel_type, get_panel_types
+from extensions.epaper.catalog.models import PanelTypeModel
 from extensions.epaper.screen.models import ScreenModel, WidgetModel
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.ui.drilldown import directory_drilldown, slide_class
@@ -42,7 +42,7 @@ from extensions.epaper.util import check_filename
 # "no preset" is a listed choice rather than only the select's clear button:
 # a screen for a panel that isn't in the catalog is a normal thing to want,
 # and clearing a field is not the same as picking an option
-_NO_DISPLAY_LABEL = 'No preset — set size, palette and colors yourself'
+_NO_PANEL_TYPE_LABEL = 'No preset — set size, palette and colors yourself'
 
 # The Screen Settings as a niceview layout: '## Title' is a section heading
 # without a card ('#' would draw one, which inside the Screen Settings
@@ -50,22 +50,22 @@ _NO_DISPLAY_LABEL = 'No preset — set size, palette and colors yourself'
 # fields are rendered -- so `widgets` needs no exclude=, and an unknown or
 # duplicated name raises ValueError naming its position.
 _SCREEN_LAYOUT = [
-    ['## Display', COL, 'display_id', [ROW, 'width', 'height'], 'color_model'],
+    ['## Panel', COL, 'panel_type_id', [ROW, 'width', 'height'], 'palette_id'],
     ['## Colors', COL, [ROW, 'color_background', 'color_primary', 'color_accent']],
     ['## Schedule', COL, 'update_schedule_id'],
 ]
 
 
-def _display_options(displays: dict) -> dict:
-    """{display_id: label} for a display select, "no preset" first."""
-    return {None: _NO_DISPLAY_LABEL, **{d.id: d.name for d in displays.values()}}
+def _panel_type_options(panel_types: dict) -> dict:
+    """{panel_type_id: label} for a panel-type select, "no preset" first."""
+    return {None: _NO_PANEL_TYPE_LABEL, **{p.id: p.name for p in panel_types.values()}}
 
 
 def _keep_current(options, current):
     """The options with `current` added if it isn't among them.
 
     Each of the three selects in the screen settings points at something
-    that can disappear behind the screen's back -- a display preset removed
+    that can disappear behind the screen's back -- a panel-type preset removed
     from the catalog, a deleted palette, a deleted schedule file. Keeping
     the stored value selectable means the select shows what the screen
     actually says instead of silently dropping it (the warning below the
@@ -77,30 +77,41 @@ def _keep_current(options, current):
     return [*options, current]
 
 
-def _apply_display(screen: ScreenModel, display: DisplayModel) -> None:
-    """Copy a display preset's values into a screen. One-way and one-off:
+# Fields a panel-type preset fills in on apply -- the same set that must all
+# still match it for panel_type_id to stay trustworthy afterward (see
+# _diverges_from_panel_type(), used by on_field_change() to clear it once
+# the screen has been edited past what the preset actually describes).
+_PANEL_TYPE_FIELDS = ('width', 'height', 'palette_id', 'color_background', 'color_primary', 'color_accent')
+
+
+def _apply_panel_type(screen: ScreenModel, panel_type: PanelTypeModel) -> None:
+    """Copy a panel-type preset's values into a screen. One-way and one-off:
     from here on the screen's own fields are what renders, so the preset
     can be edited over, and clearing the selection later leaves the values
     it filled in place rather than resetting anything.
 
-    Shared by the new-screen dialog and the display select in the screen
+    Shared by the new-screen dialog and the panel-type select in the screen
     settings, so both mean exactly the same thing by 'apply a preset'."""
-    screen.display_id = display.id
-    screen.width = display.width
-    screen.height = display.height
-    screen.color_model = display.color_model
-    screen.color_background = display.color_background
-    screen.color_primary = display.color_primary
-    screen.color_accent = display.color_accent
+    screen.panel_type_id = panel_type.id
+    for field in _PANEL_TYPE_FIELDS:
+        setattr(screen, field, getattr(panel_type, field))
 
 
-def _display_hint(display: Optional[DisplayModel]) -> Optional[str]:
-    """Hint under the display select: the panel's GxEPD2 class, for
+def _diverges_from_panel_type(screen: ScreenModel, panel_type: PanelTypeModel) -> bool:
+    """True once any field the preset filled in no longer matches it -- the
+    screen has since been edited past what panel_type_id describes, so
+    on_field_change() clears it rather than let it keep naming a preset the
+    screen no longer actually is."""
+    return any(getattr(screen, field) != getattr(panel_type, field) for field in _PANEL_TYPE_FIELDS)
+
+
+def _panel_type_hint(panel_type: Optional[PanelTypeModel]) -> Optional[str]:
+    """Hint under the panel-type select: the panel's GxEPD2 class, for
     recognising a panel by the name the firmware knows it under. Purely
     informational -- nicepaper serves a PNG and never drives the panel."""
-    if display is None or not display.gxepd2_class:
+    if panel_type is None or not panel_type.gxepd2_class:
         return None
-    return f'GxEPD2 class: {display.gxepd2_class}'
+    return f'GxEPD2 class: {panel_type.gxepd2_class}'
 
 
 def _missing_schedule_message(paths: EpaperPaths, update_schedule_id: Optional[str]) -> Optional[str]:
@@ -185,18 +196,18 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
             preview_size['value'] = (screen.width, screen.height)
             image_preview.refresh()
 
-    def _select_display(display_id: Optional[str]) -> None:
-        """Handle the display select changing: applying a preset overwrites
+    def _select_panel_type(panel_type_id: Optional[str]) -> None:
+        """Handle the panel-type select changing: applying a preset overwrites
         the fields below it, picking "no preset" only drops the record and
         leaves the size, palette and colors exactly as they are (the form
-        persists display_id itself)."""
-        display = get_display(display_id, paths)
-        if display is None:
+        persists panel_type_id itself)."""
+        panel_type = get_panel_type(panel_type_id, paths)
+        if panel_type is None:
             return
-        _apply_display(screen, display)
+        _apply_panel_type(screen, panel_type)
         persist_screen()
         sync_preview()
-        ui.notify(f'Applied {display.name}', type='positive')
+        ui.notify(f'Applied {panel_type.name}', type='positive')
 
     @ui.refreshable
     def _screen_settings() -> None:
@@ -208,21 +219,33 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
             independent of listener order -- and of the fact that an .on()
             handler is passed GenericEventArguments, which has no .value
             (the mistake that made picking a preset do nothing in 0.15.0)."""
+            cleared_panel_type = False
+            if e.field_name in _PANEL_TYPE_FIELDS and screen.panel_type_id:
+                # a direct edit to one of the fields the preset filled in --
+                # not _select_panel_type() applying a new one, which sets
+                # them all at once and never trips this -- means the screen
+                # no longer matches the preset it still names
+                panel_type = get_panel_type(screen.panel_type_id, paths)
+                if panel_type is not None and _diverges_from_panel_type(screen, panel_type):
+                    screen.panel_type_id = None
+                    cleared_panel_type = True
             persist_screen()
             sync_preview()
-            if e.field_name == 'display_id':
-                _select_display(e.value)
+            if e.field_name == 'panel_type_id':
+                _select_panel_type(e.value)
                 _screen_settings.refresh()
             elif e.field_name == 'update_schedule_id':
                 schedule_warning.refresh()
+            elif cleared_panel_type:
+                _screen_settings.refresh()
 
         # read fresh on every render of this refreshable, so a preset added
         # to the catalog or a schedule file created meanwhile shows up
-        displays = get_displays(paths)
+        panel_types = get_panel_types(paths)
         # {id: label} rather than a plain list, so the searchable select
         # matches on the panel name the user knows while still storing the id
-        display_options = _keep_current(_display_options(displays), screen.display_id)
-        color_model_options = _keep_current(list(get_color_models(paths)), screen.color_model)
+        panel_type_options = _keep_current(_panel_type_options(panel_types), screen.panel_type_id)
+        palette_options = _keep_current(list(get_palettes(paths)), screen.palette_id)
         schedule_options = _keep_current(
             sorted(p.stem for p in paths.schedule_dir.glob('*.json')), screen.update_schedule_id)
 
@@ -237,9 +260,9 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
             # to grow past what fits in a scroll list. hint=None is simply
             # "no hint", so the GxEPD2 line appears only for a preset that
             # names a class.
-            'display_id': Field(label='Display', widget_type='ui.select', options=display_options,
-                                with_input=True, hint=_display_hint(displays.get(screen.display_id))),
-            'color_model': Field(widget_type='ui.select', options=color_model_options, clearable=True),
+            'panel_type_id': Field(label='Panel type', widget_type='ui.select', options=panel_type_options,
+                                   with_input=True, hint=_panel_type_hint(panel_types.get(screen.panel_type_id))),
+            'palette_id': Field(label='Palette', widget_type='ui.select', options=palette_options, clearable=True),
             # all three colors clearable: an empty field falls back to the
             # global setting, the same per-aspect override the fonts use
             'color_background': Field(widget_type='ui.color_input', clearable=True),
@@ -363,23 +386,23 @@ def screens_wrapper(paths: EpaperPaths, image_base_url: str) -> DrillDownWrapper
     DrillDownWrapper/DirectoryAdapter wiring lives in drilldown.
     directory_drilldown(); this just binds it to screen_dir and
     screen_editor_content, plus the one thing screens need that schedules
-    don't: Add asks which display the new screen is for, since size and
+    don't: Add asks which panel type the new screen is for, since size and
     palette are the first decisions about a screen and every widget
     position depends on them.
     """
-    display_options = _display_options(get_displays(paths))
+    panel_type_options = _panel_type_options(get_panel_types(paths))
 
     # what the dialog last confirmed, read by new_screen_content() below when
     # DirectoryAdapter.create() actually writes the file. Defaults to no
     # preset: picking a panel is a deliberate choice, and a preselected one
     # would be silently applied by anyone who just clicks Create.
-    chosen: dict[str, Optional[str]] = {'display_id': None}
+    chosen: dict[str, Optional[str]] = {'panel_type_id': None}
 
     def new_screen_content() -> str:
         screen = ScreenModel(width=800, height=480)
-        display = get_display(chosen['display_id'], paths)
-        if display is not None:
-            _apply_display(screen, display)
+        panel_type = get_panel_type(chosen['panel_type_id'], paths)
+        if panel_type is not None:
+            _apply_panel_type(screen, panel_type)
         return screen.model_dump_json(indent=2)
 
     with ui.dialog() as add_dialog, ui.card().style('width: 340px'):
@@ -387,21 +410,21 @@ def screens_wrapper(paths: EpaperPaths, image_base_url: str) -> DrillDownWrapper
         ui.label('Optionally pick the panel this screen is for — it fills in size, '
                  'palette and colors, all editable afterwards. Without a preset the '
                  'screen starts blank at 800x480.').classes('text-caption')
-        display_select = ui.select(display_options, value=None, label='Display',
-                                   with_input=True).classes('w-full').props('outlined dense')
+        panel_type_select = ui.select(panel_type_options, value=None, label='Panel type',
+                                       with_input=True).classes('w-full').props('outlined dense')
         with ui.row().classes('w-full place-content-end'):
             ui.space()
             ui.button('Cancel', on_click=lambda: add_dialog.submit(False)).props('flat')
             ui.button('Create', on_click=lambda: add_dialog.submit(True)).props('color=primary')
 
     async def confirm_add() -> bool:
-        """Ask which display the new screen is for; False cancels the Add.
+        """Ask which panel type the new screen is for; False cancels the Add.
         Awaited inside the Add click (niceview 0.15.0), the same shape as
         the Add-widget dialog above -- dismissing the dialog is a falsy
         result, so clicking outside it cancels too."""
         if not await add_dialog:
             return False
-        chosen['display_id'] = display_select.value
+        chosen['panel_type_id'] = panel_type_select.value
         return True
 
     return directory_drilldown(

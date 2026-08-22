@@ -28,13 +28,14 @@ def register(app: FastAPI) -> None:
     from app.routes import project_extension_url
 
     from extensions.epaper.api.endpoints import build_extension_router
-    from extensions.epaper.config import load_global_config, save_global_config
     from extensions.epaper.core.datasources.homeassistant import read_all_entity_statuses
     from extensions.epaper.core.datasources.weather import read_all_weather_statuses
+    from extensions.epaper.global_config.backend import load_global_config, save_global_config
+    from extensions.epaper.global_config.ui import global_config_fields
     from extensions.epaper.paths import EpaperPaths
     from extensions.epaper.room.ui import rooms_wrapper
-    from extensions.epaper.ui.cards import dashboard_card, device_config_card
-    from extensions.epaper.ui.global_settings import global_config_fields
+    from extensions.epaper.devicebinding.ui import device_config_card
+    from extensions.epaper.ui.cards import dashboard_card
     from extensions.epaper.schedule.ui import schedules_wrapper
     from extensions.epaper.screen.ui import screens_wrapper
 

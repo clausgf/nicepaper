@@ -11,32 +11,31 @@ nicepaper
 ├── extensions/epaper           # the installable package (extensions.epaper)
 │   ├── __init__.py              # register(app) -- nice4iot extension entry point
 │   ├── paths.py                 # EpaperPaths: per-root file locations
-│   ├── config.py                # settings that are the same for every root
-│   ├── catalog.py               # display presets + palettes (package + per-root)
+│   ├── config.py                # package-resource paths (fonts/icons), not user-editable
 │   ├── api/endpoints.py         # build_standalone_router() / build_extension_router()
-│   ├── screen/                  # feature pkg: models.py, backend.py (render/cache), ui.py (editor)
+│   ├── catalog/                 # models.py (Palette, PanelTypeModel), backend.py (package + per-root catalog, no ui.py -- read-only reference data, selected inside screen/ui.py)
+│   ├── screen/                  # feature pkg: models.py, backend.py (render/cache), ui.py (editor), simplified_ui.py (Templates, scaffolding)
 │   ├── schedule/                # feature pkg: models.py, backend.py (evaluation), ui.py (editor)
 │   ├── room/                    # feature pkg: models.py, backend.py (storage), ui.py (editor tab), simplified_ui.py
 │   ├── bookingsystem/           # feature pkg: models.py, backend.py (storage), simplified_ui.py
+│   ├── display/                 # feature pkg: models.py (row), backend.py (device<->room<->screen join), simplified_ui.py (grid)
+│   ├── devicebinding/           # feature pkg: models.py, backend.py (device->screen/room store), ui.py (device card)
+│   ├── global_config/           # feature pkg: models.py (GlobalConfig), backend.py (app_config singleton + persist), ui.py (form)
 │   ├── ui                       # shared content-only rendering, reused by both modes
 │   │   ├── forms.py             # form vocabulary: field styling, spacing, hints
 │   │   ├── drilldown.py         # file list <-> editor chrome, inline rename
 │   │   ├── widget_types.py      # per-widget-type table: icon, title, form
 │   │   ├── preview.py           # preview image, pixel ruler, toolbar
-│   │   ├── global_settings.py   # the GlobalConfig form
-│   │   ├── cards.py             # nice4iot dashboard + device cards
+│   │   ├── cards.py             # nice4iot dashboard summary card
 │   │   ├── standalone.py        # @ui.page routes + chrome, standalone only
-│   │   └── simplified_ui/       # room-focused page: shared frame (layout, displays_grid)
+│   │   └── simplified_ui/       # room-focused page: shared frame (layout, common)
 │   ├── core                     # shared rendering infrastructure
 │   │   ├── imagecache.py        # image + metadata cache, palette quantization
 │   │   ├── drawingcontext.py    # drawing helpers (fonts, text, alignment)
 │   │   ├── charting.py          # hand-rolled bar/line charts (no plotting library)
-│   │   ├── devicebinding.py     # device -> screen/room bindings
-│   │   ├── roomdisplay.py       # device<->room<->screen join for the displays grid
 │   │   ├── gauge.py             # gauge rendering
 │   │   ├── widgets/             # Text, Date, RoomCalendar, Weather* widgets
 │   │   └── datasources/         # iCal and Open-Meteo weather loading/caching
-│   ├── models/                  # shared pydantic models (displays, device bindings, global config)
 │   ├── wire/huffman_de.py       # fixed German Huffman codebook (LoRaWAN, WIP)
 │   └── resources/               # fonts/icons + display/palette catalogs (package data)
 ├── tests                       # pytest suite (unit + acceptance)

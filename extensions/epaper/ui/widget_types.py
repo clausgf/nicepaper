@@ -23,8 +23,9 @@ from typing import Any, Callable, Optional, Union
 from nicegui import ui
 from niceview import Field, ModelForm
 
-from extensions.epaper.config import app_config, resource_paths
+from extensions.epaper.config import resource_paths
 from extensions.epaper.core.datasources.image import clear_cache as clear_image_cache
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.screen.models import (
     DateWidgetModel, HomeAssistantWidgetModel, ImageWidgetModel, RoomCalendarWidgetModel,
     TextWidgetModel, WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,

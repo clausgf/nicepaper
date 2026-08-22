@@ -3,7 +3,7 @@ import datetime
 import json
 from zoneinfo import ZoneInfo
 
-from extensions.epaper.config import app_config
+from extensions.epaper.global_config.backend import app_config
 import pytest
 
 from extensions.epaper.core.datasources.weather import (

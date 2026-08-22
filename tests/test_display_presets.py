@@ -1,5 +1,5 @@
 """
-What a display preset ends up doing at render time: the screen's palette
+What a panel-type preset ends up doing at render time: the screen's palette
 decides what the image endpoint serves, and the screen's/widget's colors
 decide what gets drawn.
 """
@@ -13,14 +13,14 @@ from PIL import Image
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from extensions.epaper import catalog
+from extensions.epaper.catalog import backend as catalog
 from extensions.epaper.api.endpoints import build_standalone_router
-from extensions.epaper.config import app_config
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.screen.backend import get_screen_by_id
 from extensions.epaper.screen.models import ScreenModel
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.ui.preview import ruler_ticks
-from extensions.epaper.screen.ui import _apply_display
+from extensions.epaper.screen.ui import _apply_panel_type
 
 
 def _write_screen(paths: EpaperPaths, screen_id: str, **fields) -> None:
@@ -97,13 +97,13 @@ def test_screen_background_color_is_actually_drawn(paths):
 # --- applying a preset ----------------------------------------------------
 
 def test_applying_a_preset_fills_every_field_it_owns():
-    display = catalog.get_display("waveshare_7in5b_v2")
+    display = catalog.get_panel_type("waveshare_7in5b_v2")
     screen = ScreenModel(width=1, height=1)
-    _apply_display(screen, display)
+    _apply_panel_type(screen, display)
 
     assert (screen.width, screen.height) == (display.width, display.height)
-    assert screen.display_id == display.id
-    assert screen.color_model == display.color_model
+    assert screen.panel_type_id == display.id
+    assert screen.palette_id == display.palette_id
     assert screen.resolved_colors("x", "y", "z") == (
         display.color_background, display.color_primary, display.color_accent)
 
@@ -111,9 +111,48 @@ def test_applying_a_preset_fills_every_field_it_owns():
 def test_black_and_white_presets_do_not_ask_for_a_red_accent():
     """Red would only quantize to black on a bw panel, so those presets say
     black rather than letting it happen by accident."""
-    for display in catalog.get_displays().values():
-        if display.color_model == "bw" and display.color_accent:
+    for display in catalog.get_panel_types().values():
+        if display.palette_id == "bw" and display.color_accent:
             assert display.color_accent == display.color_primary, display.id
+
+
+def test_diverges_from_panel_type_only_after_a_preset_field_actually_changes():
+    from extensions.epaper.screen.ui import _apply_panel_type, _diverges_from_panel_type
+
+    panel_type = catalog.get_panel_type("waveshare_4in2")
+    screen = ScreenModel(width=1, height=1)
+    _apply_panel_type(screen, panel_type)
+    assert not _diverges_from_panel_type(screen, panel_type), \
+        "freshly applied -- must match the preset it was just applied from"
+
+    screen.width += 1
+    assert _diverges_from_panel_type(screen, panel_type)
+
+
+# --- panel_label ------------------------------------------------------------
+
+def test_panel_label_uses_the_resolved_panel_type_name_and_class(paths):
+    panel_type = catalog.get_panel_type("waveshare_4in2")
+    _write_screen(paths, "p", panel_type_id=panel_type.id,
+                 palette_id=panel_type.palette_id, width=panel_type.width, height=panel_type.height)
+    screen = asyncio.run(get_screen_by_id(paths, "p"))
+    assert screen.panel_label == f"{panel_type.name} {panel_type.gxepd2_class}"
+
+
+def test_panel_label_falls_back_to_size_and_palette_without_a_preset(paths):
+    _write_screen(paths, "p", width=800, height=480, palette_id="bwr")
+    screen = asyncio.run(get_screen_by_id(paths, "p"))
+    palette = catalog.get_palette("bwr")
+    assert screen.panel_label == f"800x480 bwr {len(palette.palette)}-color"
+
+
+def test_panel_label_falls_back_when_panel_type_id_is_dangling(paths):
+    """A screen that outlives its preset (removed from the catalog) still
+    gets a usable label -- the same 'unknown id degrades gracefully'
+    treatment get_panel_type() itself already gives it."""
+    _write_screen(paths, "p", panel_type_id="no-such-panel", width=800, height=480, palette_id=None)
+    screen = asyncio.run(get_screen_by_id(paths, "p"))
+    assert screen.panel_label == "800x480"
 
 
 # --- the editor's display select ------------------------------------------
@@ -127,7 +166,7 @@ def test_picking_a_display_applies_the_preset(tmp_path, monkeypatch):
     """Regression: the select's handler used to read `e.value` off the
     GenericEventArguments an .on() handler receives, which has no such
     attribute -- so picking a preset raised in the server log and changed
-    nothing. _apply_display() was green throughout; only the wiring was
+    nothing. _apply_panel_type() was green throughout; only the wiring was
     broken, which is why this test drives the actual element.
     """
     from nicegui import ui
@@ -146,7 +185,7 @@ def test_picking_a_display_applies_the_preset(tmp_path, monkeypatch):
     with Client(page("/test-display-select"), request=None) as client:
         screen_editor_content(paths, "s.json", "/api/screen")
         select = next(e for e in client.elements.values()
-                      if type(e).__name__ == "Select" and e._props.get("label") == "Display")
+                      if type(e).__name__ == "Select" and e._props.get("label") == "Panel type")
         option = next(o for o in select._props["options"] if o["label"].startswith("Waveshare 4.2"))
         # dispatch the way NiceGUI does: every listener for the event, through
         # handle_event (which is what adapts the handler's signature)
@@ -156,11 +195,55 @@ def test_picking_a_display_applies_the_preset(tmp_path, monkeypatch):
                     sender=select, client=client, args=option))
 
     written = json.loads((paths.screen_dir / "s.json").read_text())
-    display = catalog.get_display("waveshare_4in2")
-    assert written["display_id"] == display.id
+    display = catalog.get_panel_type("waveshare_4in2")
+    assert written["panel_type_id"] == display.id
     assert (written["width"], written["height"]) == (display.width, display.height)
-    assert written["color_model"] == display.color_model
+    assert written["palette_id"] == display.palette_id
     assert written["color_accent"] == display.color_accent
+
+
+@pytest.mark.filterwarnings(
+    "ignore:coroutine 'AwaitableResponse._fire' was never awaited:RuntimeWarning")
+def test_editing_a_preset_field_clears_panel_type_id(tmp_path, monkeypatch):
+    """Once a screen is edited past what its applied preset describes,
+    panel_type_id must stop claiming it -- driven through the actual Width
+    field so the on_field_change wiring is what's under test, not just
+    _diverges_from_panel_type() in isolation. A number field validates on
+    update:modelValue but only commits on blur (niceview's ModelForm._wire_
+    text_input), so both have to be dispatched, in that order."""
+    from nicegui import ui
+    from nicegui.client import Client
+    from nicegui.page import page
+    from nicegui.events import GenericEventArguments, handle_event
+    from extensions.epaper.screen.ui import screen_editor_content
+
+    paths = EpaperPaths(root=tmp_path)
+    paths.ensure_dirs()
+    panel_type = catalog.get_panel_type("waveshare_4in2")
+    # update_schedule_id="default" (matching ScreenModel's own field default,
+    # unlike _write_screen()'s None): with no schedule files in this tmp_path,
+    # an unset current would leave the Update schedule select with zero
+    # options, which niceview rejects -- unrelated to what this test covers.
+    _write_screen(paths, "s", panel_type_id=panel_type.id, palette_id=panel_type.palette_id,
+                 width=panel_type.width, height=panel_type.height, update_schedule_id="default")
+    monkeypatch.setattr(ui, "notify", lambda *a, **kw: None)
+
+    with Client(page("/test-panel-type-clear"), request=None) as client:
+        screen_editor_content(paths, "s.json", "/api/screen")
+        width_field = next(e for e in client.elements.values()
+                           if type(e).__name__ == "Number" and e._props.get("label") == "Width *")
+        for listener in width_field._event_listeners.values():
+            if listener.type == "update:modelValue":
+                handle_event(listener.handler, GenericEventArguments(
+                    sender=width_field, client=client, args=panel_type.width + 1))
+        for listener in width_field._event_listeners.values():
+            if listener.type == "blur":
+                handle_event(listener.handler, GenericEventArguments(
+                    sender=width_field, client=client, args=None))
+
+    written = json.loads((paths.screen_dir / "s.json").read_text())
+    assert written["width"] == panel_type.width + 1
+    assert written["panel_type_id"] is None
 
 
 # --- preview ruler --------------------------------------------------------
@@ -187,7 +270,7 @@ def test_ruler_ticks_survive_a_degenerate_screen():
 # --- palette / endpoint ---------------------------------------------------
 
 def test_screen_palette_decides_what_the_endpoint_serves(client, paths):
-    _write_screen(paths, "panel", color_model="bwr")
+    _write_screen(paths, "panel", palette_id="bwr")
     r = client.get("/api/screen/panel/image.png")
     assert r.status_code == 200
     assert Image.open(io.BytesIO(r.content)).mode == "P", "a screen with a palette is served quantized"
@@ -201,14 +284,14 @@ def test_screen_without_a_palette_is_served_unquantized(client, paths):
 
 def test_unknown_palette_falls_back_to_rgb(client, paths):
     """A screen that outlives the palette it names still has to render."""
-    _write_screen(paths, "dangling", color_model="no-such-palette")
+    _write_screen(paths, "dangling", palette_id="no-such-palette")
     r = client.get("/api/screen/dangling/image.png")
     assert r.status_code == 200
     assert Image.open(io.BytesIO(r.content)).mode == "RGB"
 
 
 def test_raw_returns_the_rgb_render_with_its_own_etag(client, paths):
-    _write_screen(paths, "panel", color_model="bwr")
+    _write_screen(paths, "panel", palette_id="bwr")
     served = client.get("/api/screen/panel/image.png")
     raw = client.get("/api/screen/panel/image.png", params={"raw": "true"})
 
@@ -220,7 +303,7 @@ def test_raw_returns_the_rgb_render_with_its_own_etag(client, paths):
 def test_boxes_outlines_every_widget_without_touching_the_cache(client, paths):
     """The outline view is an editor thing: it must never end up in the
     image a display fetches, nor in the cached files behind it."""
-    _write_screen(paths, "panel", color_model="bwr", widgets=[
+    _write_screen(paths, "panel", palette_id="bwr", widgets=[
         {"widget_type": "Text", "position_x": 5, "position_y": 5, "text": "a",
          "size_width": 100, "size_height": 40},
     ])
@@ -240,7 +323,7 @@ def test_boxes_outlines_every_widget_without_touching_the_cache(client, paths):
 
 
 def test_boxes_respects_the_screen_palette_and_raw(client, paths):
-    _write_screen(paths, "panel", color_model="bwr")
+    _write_screen(paths, "panel", palette_id="bwr")
     boxed = client.get("/api/screen/panel/image.png", params={"boxes": "true"})
     assert Image.open(io.BytesIO(boxed.content)).mode == "P"
 
@@ -249,26 +332,26 @@ def test_boxes_respects_the_screen_palette_and_raw(client, paths):
 
 
 def test_poll_cycle_uses_the_quantized_etag(client, paths):
-    _write_screen(paths, "panel", color_model="bwr")
+    _write_screen(paths, "panel", palette_id="bwr")
     etag = client.get("/api/screen/panel/image.png").headers["etag"]
     again = client.get("/api/screen/panel/image.png", headers={"If-None-Match": etag})
     assert again.status_code == 304
 
 
 def test_editing_the_root_palette_re_renders_and_changes_the_etag(client, paths):
-    """color_models.json is the one thing a screen references rather than
+    """palettes.json is the one thing a screen references rather than
     contains, so editing it has to invalidate the rendered image."""
-    paths.color_model_file.write_text(json.dumps([
+    paths.palettes_file.write_text(json.dumps([
         {"id": "duo", "name": "Black on white", "palette": [[0, 0, 0], [255, 255, 255]]},
     ]))
-    _write_screen(paths, "panel", color_model="duo")
+    _write_screen(paths, "panel", palette_id="duo")
     first = client.get("/api/screen/panel/image.png").headers["etag"]
 
-    paths.color_model_file.write_text(json.dumps([
+    paths.palettes_file.write_text(json.dumps([
         {"id": "duo", "name": "Black on red", "palette": [[0, 0, 0], [255, 0, 0]]},
     ]))
-    stat = paths.color_model_file.stat()
-    os.utime(paths.color_model_file, (stat.st_atime, stat.st_mtime + 10))
+    stat = paths.palettes_file.stat()
+    os.utime(paths.palettes_file, (stat.st_atime, stat.st_mtime + 10))
 
     second = client.get("/api/screen/panel/image.png")
     assert second.headers["etag"] != first

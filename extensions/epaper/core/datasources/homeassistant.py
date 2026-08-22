@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo
 import aiofiles
 import aiohttp
 
-from extensions.epaper.config import app_config
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.util import logger
 
 # fixed timeout for one states request, in seconds

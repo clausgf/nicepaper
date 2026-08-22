@@ -1,8 +1,8 @@
 {
-  "display_id": "waveshare_4in2",
+  "panel_type_id": "waveshare_4in2",
   "width": 400,
   "height": 300,
-  "color_model": "bw",
+  "palette_id": "bw",
   "color_background": "#ffffff",
   "color_primary": "#000000",
   "color_accent": "#000000",

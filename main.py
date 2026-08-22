@@ -16,7 +16,7 @@ import niceview
 from pydantic_settings import BaseSettings
 
 from extensions.epaper.api.endpoints import build_standalone_router
-from extensions.epaper.config import load_global_config
+from extensions.epaper.global_config.backend import load_global_config
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.ui.standalone import register_standalone_pages
 

@@ -29,7 +29,7 @@ def screen_id():
         json.dump({
             "width": 400,
             "height": 300,
-            "color_model": "bw",
+            "palette_id": "bw",
             "widgets": [
                 {"widget_type": "Text", "position_x": 10, "position_y": 10, "size_width": 380, "size_height": 30, "text": "Acceptance"},
                 {"widget_type": "Date", "position_x": 10, "position_y": 50, "size_width": 380, "size_height": 30},

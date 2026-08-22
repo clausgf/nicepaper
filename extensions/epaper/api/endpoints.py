@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Header, Path as PathParam, Query, 
 from typing import Optional
 from fastapi.responses import FileResponse
 
-from extensions.epaper.config import app_config
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.util import logger, clean_path_parameter
 from extensions.epaper.screen.backend import get_screen_by_id
 from extensions.epaper.paths import EpaperPaths

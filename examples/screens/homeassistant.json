@@ -1,8 +1,8 @@
 {
-  "display_id": "waveshare_7in3e",
+  "panel_type_id": "waveshare_spectra6_7in3e",
   "width": 800,
   "height": 480,
-  "color_model": "e6",
+  "palette_id": "e6",
   "color_background": "#ffffff",
   "color_primary": "#000000",
   "color_accent": "#ff0000",

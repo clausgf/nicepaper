@@ -2,7 +2,7 @@ import asyncio
 import json
 import uuid
 
-from extensions.epaper.core.devicebinding import set_device_binding
+from extensions.epaper.devicebinding.backend import set_device_binding
 from extensions.epaper.screen.backend import get_screen_by_id
 from extensions.epaper.paths import EpaperPaths
 

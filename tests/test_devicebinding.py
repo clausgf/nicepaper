@@ -1,10 +1,10 @@
 import json
 
-from extensions.epaper.core.devicebinding import (
+from extensions.epaper.devicebinding.backend import (
     devices_in_room, get_device_binding, get_device_bindings, resolve_screen_id,
     set_device_binding,
 )
-from extensions.epaper.models.devicebinding import DeviceBinding
+from extensions.epaper.devicebinding.models import DeviceBinding
 from extensions.epaper.paths import EpaperPaths
 
 

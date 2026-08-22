@@ -1,19 +1,19 @@
 """
-The panel and palette catalogs.
+The panel-type and palette catalogs.
 
-Both ship as package resources (`resources/displays.json`,
-`resources/color_models.json`) so they are versioned with the code and a
+Both ship as package resources (`resources/panel_types.json`,
+`resources/palettes.json`) so they are versioned with the code and a
 new nicepaper release actually reaches existing installations -- see
-`models/display.py` for why neither belongs in GlobalConfig. Each can be
+`catalog/models.py` for why neither belongs in GlobalConfig. Each can be
 extended per data root by a file of the same name in `paths.root`
-(`data/displays.json` standalone, `<project>/.epaper/displays.json` as a
+(`data/panel_types.json` standalone, `<project>/.epaper/panel_types.json` as a
 nice4iot extension): entries are merged by id, the root file wins, so a
 root file can both add hardware we don't ship and correct an entry we do.
 
 Only the palettes matter at render time -- a screen stores the *values*
-a display preset gave it, not a reference to the preset, so editing
-`displays.json` never changes an existing screen's image. Editing
-`color_models.json` does, hence `color_models_mtime()` for the render
+a panel-type preset gave it, not a reference to the preset, so editing
+`panel_types.json` never changes an existing screen's image. Editing
+`palettes.json` does, hence `palettes_mtime()` for the render
 cache (see screen/backend.py).
 """
 import importlib.resources
@@ -22,20 +22,20 @@ from typing import Dict, List, Optional, Tuple
 
 from pydantic import TypeAdapter
 
-from extensions.epaper.models.display import ColorModel, DisplayModel
+from extensions.epaper.catalog.models import Palette, PanelTypeModel
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.util import logger
 
 __all__ = [
-    "get_color_models", "get_color_model", "get_displays", "get_display",
-    "color_models_mtime",
+    "get_palettes", "get_palette", "get_panel_types", "get_panel_type",
+    "palettes_mtime",
 ]
 
-_COLOR_MODELS_RESOURCE = "color_models.json"
-_DISPLAYS_RESOURCE = "displays.json"
+_PALETTES_RESOURCE = "palettes.json"
+_PANEL_TYPES_RESOURCE = "panel_types.json"
 
-_color_models_adapter = TypeAdapter(List[ColorModel])
-_displays_adapter = TypeAdapter(List[DisplayModel])
+_palettes_adapter = TypeAdapter(List[Palette])
+_panel_types_adapter = TypeAdapter(List[PanelTypeModel])
 
 # parsed package resources, read once per process (they can't change
 # without a redeploy)
@@ -49,7 +49,9 @@ _overlay_cache: Dict[str, Tuple[Optional[float], list]] = {}
 def _builtin(resource: str, adapter: TypeAdapter) -> list:
     cached = _builtin_cache.get(resource)
     if cached is None:
-        text = (importlib.resources.files(__package__) / "resources" / resource).read_text(encoding="utf-8")
+        # explicit "extensions.epaper", not __package__: this module now lives
+        # in the catalog sub-package, but resources/ is shared, one level up
+        text = (importlib.resources.files("extensions.epaper") / "resources" / resource).read_text(encoding="utf-8")
         cached = adapter.validate_json(text)
         _builtin_cache[resource] = cached
     return cached
@@ -89,44 +91,44 @@ def _merged(builtin: list, overlay: list) -> dict:
     return {item.id: item for item in (*builtin, *overlay)}
 
 
-def get_color_models(paths: Optional[EpaperPaths] = None) -> Dict[str, ColorModel]:
+def get_palettes(paths: Optional[EpaperPaths] = None) -> Dict[str, Palette]:
     """All known palettes by id. `paths` adds/overrides them from that
-    root's color_models.json; omit it where no root is in scope."""
-    builtin = _builtin(_COLOR_MODELS_RESOURCE, _color_models_adapter)
-    overlay = _overlay(paths.color_model_file, _color_models_adapter) if paths else []
+    root's palettes.json; omit it where no root is in scope."""
+    builtin = _builtin(_PALETTES_RESOURCE, _palettes_adapter)
+    overlay = _overlay(paths.palettes_file, _palettes_adapter) if paths else []
     return _merged(builtin, overlay)
 
 
-def get_color_model(id: Optional[str], paths: Optional[EpaperPaths] = None) -> Optional[ColorModel]:
+def get_palette(id: Optional[str], paths: Optional[EpaperPaths] = None) -> Optional[Palette]:
     """The palette with this id, or None for an empty/unknown id -- which
     callers treat as 'don't quantize', i.e. serve the RGB image."""
     if not id:
         return None
-    color_model = get_color_models(paths).get(id)
-    if color_model is None:
-        logger.warning(f"Unknown color model {id!r}, serving the unquantized image instead")
-    return color_model
+    palette = get_palettes(paths).get(id)
+    if palette is None:
+        logger.warning(f"Unknown palette {id!r}, serving the unquantized image instead")
+    return palette
 
 
-def get_displays(paths: Optional[EpaperPaths] = None) -> Dict[str, DisplayModel]:
-    """All known panel presets by id, root entries merged in as above."""
-    builtin = _builtin(_DISPLAYS_RESOURCE, _displays_adapter)
-    overlay = _overlay(paths.display_file, _displays_adapter) if paths else []
+def get_panel_types(paths: Optional[EpaperPaths] = None) -> Dict[str, PanelTypeModel]:
+    """All known panel-type presets by id, root entries merged in as above."""
+    builtin = _builtin(_PANEL_TYPES_RESOURCE, _panel_types_adapter)
+    overlay = _overlay(paths.panel_types_file, _panel_types_adapter) if paths else []
     return _merged(builtin, overlay)
 
 
-def get_display(id: Optional[str], paths: Optional[EpaperPaths] = None) -> Optional[DisplayModel]:
-    """The panel preset with this id, or None if it is empty/unknown. An
+def get_panel_type(id: Optional[str], paths: Optional[EpaperPaths] = None) -> Optional[PanelTypeModel]:
+    """The panel-type preset with this id, or None if it is empty/unknown. An
     unknown id is not an error: presets are only a template, and a screen
     that references one that has since been removed still renders from
     its own fields."""
     if not id:
         return None
-    return get_displays(paths).get(id)
+    return get_panel_types(paths).get(id)
 
 
-def color_models_mtime(paths: EpaperPaths) -> Optional[float]:
-    """mtime of this root's color_models.json, or None if it has none.
+def palettes_mtime(paths: EpaperPaths) -> Optional[float]:
+    """mtime of this root's palettes.json, or None if it has none.
     Part of the screen cache key (screen/backend.py): a changed palette
     changes every quantized image rendered from it."""
-    return _file_mtime(paths.color_model_file)
+    return _file_mtime(paths.palettes_file)

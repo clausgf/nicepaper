@@ -76,19 +76,19 @@ class EpaperPaths:
     def device_bindings_file(self) -> Path:
         """Typed collection file mapping a nice4iot device name to its
         DeviceBinding (room + screen). Replaces the old aliases.json, which
-        core/devicebinding.py migrates from on first read."""
+        devicebinding/backend.py migrates from on first read."""
         return self.root / "device_bindings.json"
 
     @property
-    def display_file(self) -> Path:
-        """Optional per-root panel presets, merged over the ones shipped
-        with the package (see catalog.py). Absent by default."""
-        return self.root / "displays.json"
+    def panel_types_file(self) -> Path:
+        """Optional per-root panel-type presets, merged over the ones shipped
+        with the package (see catalog/backend.py). Absent by default."""
+        return self.root / "panel_types.json"
 
     @property
-    def color_model_file(self) -> Path:
-        """Optional per-root palettes, merged the same way as display_file."""
-        return self.root / "color_models.json"
+    def palettes_file(self) -> Path:
+        """Optional per-root palettes, merged the same way as panel_types_file."""
+        return self.root / "palettes.json"
 
     @property
     def organizer_names_file(self) -> Path:

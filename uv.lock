@@ -772,7 +772,7 @@ wheels = [
 
 [[package]]
 name = "nicepaper"
-version = "0.17.1"
+version = "0.18.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -823,8 +823,8 @@ dev = [
 
 [[package]]
 name = "niceview"
-version = "0.26.0"
-source = { git = "https://github.com/clausgf/niceview.git#09a04468fb6a200b2a596d586badecfdd676dbae" }
+version = "0.26.1"
+source = { git = "https://github.com/clausgf/niceview.git#eccc196fe0d7f0b5b0e68c444639f8e2be61cff4" }
 dependencies = [
     { name = "annotated-types" },
     { name = "nicegui" },

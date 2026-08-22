@@ -7,13 +7,14 @@ from PIL import Image
 from typing import Optional
 import aiofiles
 
-from extensions.epaper.catalog import get_color_model
-from extensions.epaper.config import ColorModel, app_config
+from extensions.epaper.catalog.backend import get_palette, get_panel_type
 from extensions.epaper.util import logger
 from extensions.epaper.core import widgets
-from extensions.epaper.core.devicebinding import resolve_screen_id
+from extensions.epaper.devicebinding.backend import resolve_screen_id
 from extensions.epaper.core.drawingcontext import DrawingContext
 from extensions.epaper.core.imagecache import ImageCache, quantize
+from extensions.epaper.global_config.backend import app_config
+from extensions.epaper.catalog.models import Palette
 from extensions.epaper.schedule.backend import UpdateSchedule, get_schedule_by_id
 from extensions.epaper.screen.models import ImageMetadata, ScreenModel
 from extensions.epaper.paths import EpaperPaths
@@ -60,14 +61,14 @@ class Screen:
         it next to the quantized image, so a color that dithers can be
         compared against what was actually drawn.
         """
-        return await self.image_cache.get_image_path(None if raw else self.color_model)
+        return await self.image_cache.get_image_path(None if raw else self.palette)
 
 
     async def get_image(self, raw: bool = False) -> Optional[Image.Image]:
         """
         The image to serve, see get_image_path().
         """
-        return await self.image_cache.get_image(None if raw else self.color_model)
+        return await self.image_cache.get_image(None if raw else self.palette)
 
 
     async def get_metadata(self) -> Optional[ImageMetadata]:
@@ -104,7 +105,7 @@ class Screen:
         # the version/ETag is the hash of what actually gets served, which
         # the cache computes since it owns that decision (see ImageCache)
         await self.image_cache.put_data(rgb_image, last_update_at=now, expires_at=expires_at,
-                                        color_model=self.color_model)
+                                        palette=self.palette)
 
 
     @property
@@ -115,12 +116,33 @@ class Screen:
             app_config.color_background, app_config.color_primary, app_config.color_accent)
 
     @property
-    def color_model(self) -> Optional[ColorModel]:
+    def palette(self) -> Optional[Palette]:
         """The palette this screen is served in, or None to serve it
         unquantized. An unknown id resolves to None (logged in
-        catalog.get_color_model()) rather than failing the render: a
+        catalog.backend.get_palette()) rather than failing the render: a
         screen that outlives a palette still has to produce an image."""
-        return get_color_model(self.config.color_model, self.paths)
+        return get_palette(self.config.palette_id, self.paths)
+
+    @property
+    def panel_label(self) -> str:
+        """Compact human label for this screen's panel: the applied panel
+        type's own name + GxEPD2 class when panel_type_id is set and still
+        resolves in the catalog; otherwise (no preset, or a dangling id) a
+        plain summary of the screen's own size and palette -- the screen
+        itself carries no GxEPD2 class, only a panel-type preset does, so
+        the fallback has none either. The editor is responsible for
+        clearing panel_type_id once the screen's fields no longer match the
+        preset it names (see screen/ui.py's on_field_change), so a resolved
+        panel type here can be trusted to describe this screen."""
+        panel_type = get_panel_type(self.config.panel_type_id, self.paths)
+        if panel_type is not None:
+            return f'{panel_type.name} {panel_type.gxepd2_class or ""}'.strip()
+        parts = [f'{self.config.width}x{self.config.height}']
+        if self.config.palette_id:
+            palette = self.palette
+            parts.append(f'{self.config.palette_id} {len(palette.palette)}-color'
+                        if palette is not None else self.config.palette_id)
+        return ' '.join(parts)
 
     async def render_preview(self, boxes: bool = False, raw: bool = False) -> Image.Image:
         """Render this screen fresh for the editor preview, bypassing the
@@ -133,10 +155,10 @@ class Screen:
         ten milliseconds, so re-rendering per preview refresh is cheaper
         than the bookkeeping a third cached variant would need."""
         _, image = await self._create_image(force_bounding_box=boxes)
-        color_model = None if raw else self.color_model
-        if color_model is None:
+        palette = None if raw else self.palette
+        if palette is None:
             return image
-        return await asyncio.to_thread(quantize, image, color_model)
+        return await asyncio.to_thread(quantize, image, palette)
 
 
     async def _create_image(self, force_bounding_box: bool = False):
@@ -199,7 +221,7 @@ def _effective_mtime(paths: EpaperPaths, screen_model_file) -> Optional[datetime
 
     Everything a screen renders with lives in the screen file itself --
     except the palette, which the screen only references by id. Folding
-    color_models.json's mtime in here means an edited palette invalidates
+    palettes.json's mtime in here means an edited palette invalidates
     the screen cache *and* makes update_if_needed() re-render, through
     the mechanism that already exists for an edited screen, with no
     second staleness check anywhere. The palettes shipped in the package
@@ -209,7 +231,7 @@ def _effective_mtime(paths: EpaperPaths, screen_model_file) -> Optional[datetime
     config_mtime = _file_mtime(screen_model_file)
     if config_mtime is None:
         return None
-    palette_mtime = _file_mtime(paths.color_model_file)
+    palette_mtime = _file_mtime(paths.palettes_file)
     if palette_mtime is not None and palette_mtime > config_mtime:
         return palette_mtime
     return config_mtime
@@ -227,7 +249,7 @@ def _schedule_changed(paths: EpaperPaths, screen: Screen) -> bool:
 async def get_screen_by_id(paths: EpaperPaths, id: str) -> Optional[Screen]:
     """
     Get a screen instance by its id (or by a device name resolved to its
-    bound screen, see core/devicebinding.resolve_screen_id), reusing a
+    bound screen, see devicebinding.backend.resolve_screen_id), reusing a
     cached instance as long as neither the screen file nor its schedule
     file changed.
     """

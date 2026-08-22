@@ -2,18 +2,19 @@
 Page assembly for standalone mode only: header/tabs-nav chrome and the
 @ui.page routes. Never imported by the nice4iot extension entry point
 (extensions/epaper/__init__.py) -- there, nice4iot owns the page chrome
-and only the content functions in ui/cards.py, screen/ui.py and
-schedule/ui.py are reused.
+and only the content functions (ui/cards.py, devicebinding/ui.py,
+global_config/ui.py, screen/ui.py, schedule/ui.py) are reused.
 """
 from contextlib import contextmanager
 from nicegui import ui
 
-from extensions.epaper.config import save_global_config
+from extensions.epaper.devicebinding.ui import device_config_card
+from extensions.epaper.global_config.backend import save_global_config
+from extensions.epaper.global_config.ui import global_config_card
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.room.ui import rooms_wrapper
 from extensions.epaper.ui import simplified_ui
-from extensions.epaper.ui.cards import dashboard_card, device_config_card
-from extensions.epaper.ui.global_settings import global_config_card
+from extensions.epaper.ui.cards import dashboard_card
 from extensions.epaper.schedule.ui import schedules_wrapper
 from extensions.epaper.screen.ui import screens_wrapper
 

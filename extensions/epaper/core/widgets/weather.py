@@ -2,7 +2,7 @@ from typing import Optional, Union
 
 from babel.dates import format_datetime, get_timezone
 
-from extensions.epaper.config import app_config
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.core import charting
 from extensions.epaper.core.datasources.weather import (
     WeatherStatus, convert_wind_speed, format_wind_speed, get_weather, metric_title,

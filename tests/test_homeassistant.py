@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from extensions.epaper.config import app_config
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.core.datasources.homeassistant import (
     EntityStatus, _cache_filename, entity_label, entity_unit, format_value, get_entity,
     numeric_value, raw_value, read_all_entity_statuses,
