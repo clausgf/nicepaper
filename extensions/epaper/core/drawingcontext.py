@@ -1,6 +1,6 @@
 import os
 import math
-from typing import Optional
+from typing import Any, Optional
 from PIL import Image, ImageFont, ImageDraw
 
 from extensions.epaper.util import logger
@@ -8,7 +8,7 @@ from extensions.epaper.config import resource_paths
 
 
 class FontResourceManager:
-    cache = {}
+    cache: dict[tuple[str, int], Any] = {}
 
     def __init__(self, base_path):
         self.base_path = base_path
@@ -40,7 +40,7 @@ font_resource_manager = FontResourceManager(resource_paths.font_path)
 
 
 class IconResourceManager:
-    cache = {}
+    cache: dict[str, Image.Image] = {}
 
     def __init__(self, base_path):
         self.base_path = base_path
@@ -159,7 +159,7 @@ class DrawingContext:
 
     def draw_text(self, position, size, text, 
                   alignment='lt', font=None, color=None, 
-                  multiline: bool = False, ellipsis: str = None):
+                  multiline: bool = False, ellipsis: Optional[str] = None):
         """
         Draw the text into the context's coordinate system.
 

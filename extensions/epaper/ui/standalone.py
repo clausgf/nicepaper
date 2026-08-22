@@ -44,7 +44,10 @@ def frame(active_tab: str):
 
     with ui.header(elevated=True).style('background-color: #3874c8').classes('items-center justify-between'):
         ui.label('Nicepaper').classes('font-bold')
-        with ui.tabs(value=active_tab, on_change=on_tab_change).props('dense indicator-color=white').classes('text-white'):
+        # nicegui's own Tabs(value=...) stub only allows a Tab/TabPanel object,
+        # but Quasar's QTabs (and nicegui's own on_change event value type)
+        # genuinely accept selecting by the tab's name string -- this works.
+        with ui.tabs(value=active_tab, on_change=on_tab_change).props('dense indicator-color=white').classes('text-white'):  # type: ignore[arg-type]
             ui.tab('Global')
             ui.tab('Project')
             ui.tab('Device')

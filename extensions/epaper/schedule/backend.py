@@ -1,7 +1,7 @@
 import datetime
 import json
 import os
-from typing import List
+from typing import List, Optional
 from zoneinfo import ZoneInfo
 import aiofiles
 import pydantic
@@ -21,9 +21,10 @@ class UpdateSchedule:
         self.config_mtime = config_mtime
 
 
-    def get_next_update(self, future_days=7) -> datetime.datetime:
+    def get_next_update(self, future_days=7) -> Optional[datetime.datetime]:
         """
-        Get the next update time for this schedule within the next future_days days.
+        Get the next update time for this schedule within the next future_days days,
+        or None if none of its rules fire in that window.
         """
         now = datetime.datetime.now(ZoneInfo(app_config.timezone))
         next_update = None
@@ -44,7 +45,7 @@ class UpdateSchedule:
         return next_update
 
 
-async def get_schedule_by_id(paths: EpaperPaths, schedule_id: str) -> UpdateSchedule:
+async def get_schedule_by_id(paths: EpaperPaths, schedule_id: Optional[str]) -> Optional[UpdateSchedule]:
     """
     Get a schedule instance by its id, or None. The schedule file is a plain
     JSON list of weekly schedule rules (List[WeeklyScheduleModel]).

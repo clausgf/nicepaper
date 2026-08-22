@@ -47,7 +47,10 @@ def read_booking_system(paths: EpaperPaths, system_id: str) -> Optional[BookingS
 
 def create_booking_system(paths: EpaperPaths) -> BookingSystemModel:
     """Create a new booking system with a fresh id and default fields."""
-    system = BookingSystemModel()
+    # id has a default_factory (uuid4().hex), but it sits in Annotated[...,
+    # Field(...), niceview.Field(...)], a combination the pydantic mypy plugin
+    # doesn't recognize as making the field optional.
+    system = BookingSystemModel()  # type: ignore[call-arg]
     booking_system_adapter(paths, system.id).save(system)
     return system
 

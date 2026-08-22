@@ -252,6 +252,7 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
             _draw_polyline(ctx, points, fill=color, width=2 if is_primary else 1, dashed=not is_primary)
 
     for i in x_indices:
+        assert labels is not None  # x_indices is only ever non-empty when labels is set (see above)
         px = slot_center_x(i)
         ctx.draw_text((int(px - 20), int(plot_y0 + plot_h + 2)), size=(40, label_h), text=labels[i],
                       alignment='ct', font=label_font)

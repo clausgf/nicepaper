@@ -86,7 +86,7 @@ def assignable_devices(paths: EpaperPaths, project_name: str, room_id: str) -> l
     already in it (assigning one that is in another room moves it here)."""
     bindings = get_device_bindings(paths)
     return sorted(d.name for d in _project_devices(project_name)
-                  if (bindings.get(d.name).room_id if bindings.get(d.name) else None) != room_id)
+                  if (b := bindings.get(d.name)) is None or b.room_id != room_id)
 
 
 def project_device_names(project_name: str) -> list[str]:

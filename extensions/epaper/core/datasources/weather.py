@@ -312,12 +312,15 @@ async def get_weather(weather_dir: Path, latitude: float, longitude: float) -> W
         return status
 
     logger.info(f"Weather {latitude},{longitude} updating from {_BASE_URL}")
+    # all values as str: they're query params either way (serialized as
+    # strings over the wire), and a mixed-type dict literal would otherwise
+    # infer as dict[str, object], which aiohttp's params= doesn't accept
     params = {
-        "latitude": latitude,
-        "longitude": longitude,
+        "latitude": str(latitude),
+        "longitude": str(longitude),
         "current": "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,is_day,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure",
         "hourly": "temperature_2m,precipitation,relative_humidity_2m,surface_pressure,wind_speed_10m,weather_code,is_day",
-        "forecast_days": 2,
+        "forecast_days": str(2),
         "timezone": app_config.timezone,
     }
     try:

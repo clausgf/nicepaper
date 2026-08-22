@@ -1,11 +1,14 @@
 from typing import Annotated, List, Literal
 from pydantic import BaseModel, Field, field_validator
 
-ALL_MONTHS = list(range(1, 13))
+Month = Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+Weekday = Literal["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+ALL_MONTHS: List[Month] = list(range(1, 13))  # type: ignore[arg-type]  # 1..12, all Month
 # Monday-first, matching dateutil.rrule's byweekday numbering (MO=0) and
 # datetime.date.weekday() -- ALL_WEEKDAYS.index(wd) in updateschedule.py
 # relies on this order, not on the label text itself
-ALL_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+ALL_WEEKDAYS: List[Weekday] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 TIME_PATTERN = r'^([01]\d|2[0-3]):[0-5]\d$'
 
 
@@ -13,8 +16,8 @@ class WeeklyScheduleModel(BaseModel):
     # not Optional: a UI multiselect can only show "empty" or "populated",
     # not a separate "unset" state, so "no restriction" is expressed as
     # every value being selected by default rather than as None
-    by_months: List[Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]] = Field(default_factory=lambda: list(ALL_MONTHS))
-    by_weekdays: List[Literal["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]] = Field(default_factory=lambda: list(ALL_WEEKDAYS))
+    by_months: List[Month] = Field(default_factory=lambda: list(ALL_MONTHS))
+    by_weekdays: List[Weekday] = Field(default_factory=lambda: list(ALL_WEEKDAYS))
     # plain list[str] with a per-item pattern constraint, not a wrapper model:
     # renders as ui.input_chips (list[str]'s default niceview widget), with the
     # HH:MM pattern still enforced by pydantic on each chip

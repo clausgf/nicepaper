@@ -14,7 +14,7 @@ deep-linkable per-file route, since niceview's DrillDownWrapper doesn't own
 routes of its own and standalone mode doesn't need one (see standalone.py).
 """
 import os
-from typing import Callable, Optional
+from typing import Callable, Literal, Optional, TypedDict, cast
 
 import nicegui.elements.sortable  # noqa: F401  (see below)
 from nicegui import ui
@@ -43,6 +43,15 @@ from extensions.epaper.util import check_filename
 # a screen for a panel that isn't in the catalog is a normal thing to want,
 # and clearing a field is not the same as picking an option
 _NO_PANEL_TYPE_LABEL = 'No preset — set size, palette and colors yourself'
+
+
+class _EditorState(TypedDict):
+    """The widget list<->detail navigation state (screen_editor_content()'s
+    `state`): which view is shown, the open widget's key (list view only,
+    None), and the slide-in direction for the next switch."""
+    view: Literal['list', 'detail']
+    key: Optional[str]
+    direction: Literal['left', 'right']
 
 # The Screen Settings as a niceview layout: '## Title' is a section heading
 # without a card ('#' would draw one, which inside the Screen Settings
@@ -170,10 +179,13 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
     def persist_screen() -> None:
         screen_adapter.save(screen)
 
-    widgets_adapter = ListAdapter(WidgetModel, screen.widgets)
+    # cast: screen.widgets is List[AnyWidget] (a discriminated Union of
+    # WidgetModel subclasses), each member genuinely a WidgetModel -- but
+    # list is invariant, so List[Union[...]] isn't List[WidgetModel] to mypy.
+    widgets_adapter: ListAdapter[WidgetModel] = ListAdapter(WidgetModel, cast(list, screen.widgets))
     widgets_adapter.on_change(persist_screen)
 
-    state = {'view': 'list', 'key': None, 'direction': 'right'}
+    state: _EditorState = {'view': 'list', 'key': None, 'direction': 'right'}
     screen_id = os.path.splitext(filename)[0]
     # the geometry the preview's ruler was built for, so an edited
     # width/height (or an applied display preset) rebuilds it -- a ruler
@@ -255,13 +267,20 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
             if message:
                 ui.label(message).classes('text-caption text-negative')
 
+        # with_input makes the select searchable -- the catalog is meant to
+        # grow past what fits in a scroll list. hint is omitted rather than
+        # passed as None: niceview's Field(hint=...) kwarg is typed as plain
+        # str, unlike the FieldInfo it builds -- so the GxEPD2 line appears
+        # only for a preset that actually names a class.
+        panel_type_hint = _panel_type_hint(
+            panel_types.get(screen.panel_type_id) if screen.panel_type_id else None)
+        panel_type_field_kwargs = {'label': 'Panel type', 'widget_type': 'ui.select',
+                                   'options': panel_type_options, 'with_input': True}
+        if panel_type_hint is not None:
+            panel_type_field_kwargs['hint'] = panel_type_hint
+
         field_infos = {
-            # with_input makes the select searchable -- the catalog is meant
-            # to grow past what fits in a scroll list. hint=None is simply
-            # "no hint", so the GxEPD2 line appears only for a preset that
-            # names a class.
-            'panel_type_id': Field(label='Panel type', widget_type='ui.select', options=panel_type_options,
-                                   with_input=True, hint=_panel_type_hint(panel_types.get(screen.panel_type_id))),
+            'panel_type_id': Field(**panel_type_field_kwargs),
             'palette_id': Field(label='Palette', widget_type='ui.select', options=palette_options, clearable=True),
             # all three colors clearable: an empty field falls back to the
             # global setting, the same per-aspect override the fonts use
@@ -314,6 +333,14 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
                                 ui.label(entry.summary(widget)).classes('text-grey-8')
             widget_list_container.make_sortable(handle='.drag-handle', on_end=_handle_reorder)
 
+    def _refresh_editor_area() -> None:
+        # render_widget_form's refresh param is a plain Callable[[], None];
+        # ui.refreshable's own .refresh() is typed far more loosely
+        # (*args/**kwargs -> AwaitableResponse) since it's meant to accept
+        # a refreshable function's own parameters -- editor_area takes none,
+        # so this just narrows the call down to what's actually used.
+        editor_area.refresh()
+
     def _widget_detail(key: str) -> None:
         try:
             widget = widgets_adapter.read(key)
@@ -332,14 +359,14 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
                     .on_click(lambda: _delete_widget(key))
 
             render_widget_form(widget, widgets_adapter, key, paths,
-                               persist_screen, editor_area.refresh)
+                               persist_screen, _refresh_editor_area)
 
     def _open_detail(key: str) -> None:
-        state.update(view='detail', key=key, direction='right')
+        state.update({'view': 'detail', 'key': key, 'direction': 'right'})
         editor_area.refresh()
 
     def _back_to_list() -> None:
-        state.update(view='list', key=None, direction='left')
+        state.update({'view': 'list', 'key': None, 'direction': 'left'})
         editor_area.refresh()
 
     def _handle_reorder(e: SortableEventArguments) -> None:
@@ -349,11 +376,11 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
 
     async def _delete_widget(key: str) -> None:
         if not await confirm_dialog('Delete widget', 'Delete this widget? This cannot be undone.',
-                                     ok_label='Delete', ok_color='negative'):
+                                     ok_label='Delete', ok_role='delete'):
             return
         widgets_adapter.delete(key)
         if state['key'] == key:
-            state.update(view='list', key=None, direction='left')
+            state.update({'view': 'list', 'key': None, 'direction': 'left'})
         editor_area.refresh()
         ui.notify('Widget deleted', type='positive')
 
@@ -371,7 +398,7 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
             return
         widget = new_widget(widget_type)
         widgets_adapter.create(widget)
-        state.update(view='detail', key=widgets_adapter.key_from_item(widget), direction='right')
+        state.update({'view': 'detail', 'key': widgets_adapter.key_from_item(widget), 'direction': 'right'})
         editor_area.refresh()
 
     image_preview()

@@ -9,8 +9,10 @@ devices bound to the room, see _displays_panel()).
 The form's field metadata (labels/widgets/hints) lives on RoomModel itself
 (its fields' Annotated FieldInfo); only the visual layout is here.
 """
+from typing import cast
+
 from nicegui import ui
-from niceview import DrillDownWrapper, JsonDirectoryAdapter, ModelForm
+from niceview import CollectionAdapter, DrillDownWrapper, ModelForm
 import niceview
 
 from extensions.epaper.bookingsystem.backend import list_booking_systems
@@ -34,7 +36,7 @@ def render_rooms(shell: Shell) -> None:
     ).render()
 
 
-def _render_detail(shell: Shell, adapter: JsonDirectoryAdapter[RoomModel], key: str) -> None:
+def _render_detail(shell: Shell, adapter: CollectionAdapter[RoomModel], key: str) -> None:
     room = adapter.read(key)
     with ui.tabs().classes('w-full') as tabs:
         ui.tab('occupancy', label='Occupancy', icon='event_available')
@@ -82,6 +84,9 @@ def _displays_panel(shell: Shell, room_id: str) -> None:
     wrapper's standard Add button drives a device picker instead of an
     empty new item."""
     room = read_room(shell.paths, room_id)
+    if room is None:
+        ui.label('Room not found.').classes('text-negative')
+        return
     _room_summary(room)
 
     adapter = RoomDisplaysAdapter(shell.paths, shell.project_name, room_id)
@@ -109,7 +114,13 @@ def _displays_panel(shell: Shell, room_id: str) -> None:
         item_title_field='device_name',
         item_subtitle_fields=['screen_id'],
         on_add=handle_add,
-        render_detail=lambda a, key, set_key: _display_detail(shell, a, key, set_key),
+        # cast: DrillDownWrapper's render_detail is typed over the generic
+        # CollectionAdapter protocol, but it always calls back with the exact
+        # adapter instance given to the constructor above -- a RoomDisplaysAdapter,
+        # whose rename() (used below for the Device select) isn't part of that
+        # protocol.
+        render_detail=lambda a, key, set_key: _display_detail(
+            shell, cast(RoomDisplaysAdapter, a), key, set_key),
     )
     wrapper.render()
 

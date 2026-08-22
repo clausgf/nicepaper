@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.18.1 — 2026-08-22
+
+### Fixed
+
+- **`confirm_dialog(ok_color=...)` → `ok_role=...`.** niceview's confirm
+  dialog renamed this parameter a while ago; the two call sites still using
+  the old name (schedule/ui.py's "Delete rule", screen/ui.py's "Delete
+  widget") would have raised `TypeError` the moment either was clicked —
+  found by introducing mypy (below), not by manual testing.
+- **A cleared global accent color with no screen/widget override could reach
+  the renderer as `None`.** `GlobalConfig.color_accent` is optional
+  (clearable in Settings); `Screen.colors` now falls back to the global
+  primary color in that case, same as any other "nothing configured"
+  fallback, instead of only when *some* level is set.
+- A screen's Displays-tab-less `_room_summary` no longer assumes `read_room()`
+  found a room — it can return `None` if the room was deleted meanwhile; the
+  tab now shows "Room not found" instead of crashing.
+
+### Added
+
+- **mypy, added to the toolchain.** `uv run mypy extensions` joins `ruff
+  check`/`pytest` in CI and the commit workflow (see `CLAUDE.md`). Configured
+  with the `pydantic.mypy` plugin (pydantic v2's own mypy plugin, without
+  it most `Field(default_factory=...)`/discriminated-union usage reads as
+  errors) and one narrow override: `core/widgets/*` disables
+  `attr-defined`/`misc`/`index`/`arg-type`, since every widget's `draw()`
+  deliberately accesses `self.config` as its own concrete subclass while it's
+  statically typed as the `WidgetModel` base — `widget_type` already
+  guarantees the real type at construction, so this is a load-bearing
+  pattern, not sloppiness a type checker should flag. Fixing the ~90 findings
+  outside that pattern turned up the two real bugs above, plus assorted
+  narrower return-type/Optional-propagation corrections (`schedule/backend.py`'s
+  `get_next_update`/`get_schedule_by_id`, `core/imagecache.py`'s `metadata`
+  attribute, `core/drawingcontext.py`'s font/icon caches, a few others) and
+  three call sites where niceview's/nicegui's own type stubs are narrower
+  than what they actually accept (documented inline with `# type: ignore`).
+
 ## 0.18.0 — 2026-08-22
 
 ### Added

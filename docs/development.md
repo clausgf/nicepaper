@@ -54,12 +54,21 @@ a display name bound to a screen in `data/device_bindings.json`.
 
 All tests live in `tests/`; acceptance tests that exercise the HTTP API
 end-to-end are in `tests/test_acceptance.py`, the rest are unit tests. CI runs
-the same two commands:
+the same three commands:
 
 ```bash
 uv run ruff check
+uv run mypy extensions
 uv run pytest
 ```
+
+mypy is configured in `pyproject.toml`'s `[tool.mypy]` (the `pydantic.mypy`
+plugin, plus a narrow `core/widgets/*` override for the one load-bearing
+pattern it can't see through — each widget's `draw()` accessing `self.config`
+as its own concrete subclass while it's statically typed as the `WidgetModel`
+base; `widget_type` already guarantees the real type at construction). Only
+`extensions/` is checked, matching niceview's own CI, since ordinary Python
+type inference plus the test suite itself already covers `tests/`.
 
 ## Adding a widget type
 

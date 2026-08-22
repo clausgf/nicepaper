@@ -7,7 +7,7 @@ Screen- and schedule-specific behaviour stays in screen/ui.py /
 schedule/ui.py; this module knows only about files.
 """
 from pathlib import Path
-from typing import Awaitable, Callable, Optional, Union
+from typing import Any, Awaitable, Callable, Optional, Union, cast
 
 from nicegui import ui
 from babel.dates import format_datetime, get_timezone
@@ -112,8 +112,8 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
                 with ui.item_section().props('side'):
                     ui.icon('warning', color='warning').tooltip(warning)
 
-    def render_detail(adapter: DirectoryAdapter, key: str, set_key) -> None:
-        def render_name_field() -> ui.input:
+    def render_detail(adapter: DirectoryAdapter, key: str, set_key: Callable[[str], None]) -> None:
+        def render_name_field() -> None:
             def do_rename() -> None:
                 new_name = name_input.value
                 if not check_filename(f'{new_name}.json'):
@@ -126,7 +126,6 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
 
             name_input = ui.input('Name', value=key).classes('w-full').props('outlined dense')
             name_input.on('blur', do_rename)
-            return name_input
 
         render_content(f'{key}.json', render_name_field)
 
@@ -141,7 +140,10 @@ def directory_drilldown(dir_path: Path, default_content: Union[str, Callable[[],
         title=title, item_title_field='name', item_subtitle_fields=[],
         render_list_item=render_row,
         render_list_container=render_list_container,
-        render_detail=render_detail,
+        # cast: render_detail's own adapter param is the concrete DirectoryAdapter
+        # (it calls adapter.rename(), not part of the generic CollectionAdapter
+        # protocol) -- from_adapter always calls back with this exact `directory`.
+        render_detail=cast(Callable[[Any, str, Callable[[str], None]], None], render_detail),
         on_add=handle_add,
     )
     return wrapper

@@ -1,6 +1,7 @@
 import hashlib
 from zoneinfo import ZoneInfo
 import datetime
+from typing import Optional
 from babel.dates import format_datetime, get_timezone
 
 from extensions.epaper.global_config.backend import app_config
@@ -54,7 +55,7 @@ class RoomCalendarWidget(Widget):
         ctx.origin = (0,0)
 
 
-    async def draw(self, ctx: DrawingContext) -> datetime.datetime:
+    async def draw(self, ctx: DrawingContext) -> Optional[datetime.datetime]:
         await super().draw(ctx)
         now = datetime.datetime.now(ZoneInfo(app_config.timezone))
         next_change = None

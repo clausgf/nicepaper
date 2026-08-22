@@ -23,6 +23,9 @@ jobs:
       - name: Lint with ruff
         run: uv run ruff check
 
+      - name: Type-check with mypy
+        run: uv run mypy extensions
+
       - name: Create required data directories
         run: mkdir -p data/screens data/schedules data/images data/ical
 

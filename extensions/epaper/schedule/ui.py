@@ -81,7 +81,7 @@ def schedule_editor_content(paths: EpaperPaths, filename: str,
 
     async def delete_rule(key: str):
         if not await confirm_dialog('Delete rule', 'Delete this weekly rule? This cannot be undone.',
-                                     ok_label='Delete', ok_color='negative'):
+                                     ok_label='Delete', ok_role='delete'):
             return
         adapter.delete(key)
         rule_cards.refresh()

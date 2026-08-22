@@ -52,7 +52,10 @@ def read_room(paths: EpaperPaths, room_id: str) -> Optional[RoomModel]:
 def create_room(paths: EpaperPaths) -> RoomModel:
     """Create a new room with a fresh id and default fields, and return it.
     The file is named by the generated id, so it matches RoomModel.id."""
-    room = RoomModel()
+    # id has a default_factory (uuid4().hex), but it sits in Annotated[...,
+    # Field(...), niceview.Field(...)], a combination the pydantic mypy plugin
+    # doesn't recognize as making the field optional.
+    room = RoomModel()  # type: ignore[call-arg]
     room_adapter(paths, room.id).save(room)
     return room
 

@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 import io
-from typing import Callable
+from typing import Any, Callable
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Header, Path as PathParam, Query, Response, status
 from typing import Optional
@@ -12,7 +12,7 @@ from extensions.epaper.util import logger, clean_path_parameter
 from extensions.epaper.screen.backend import get_screen_by_id
 from extensions.epaper.paths import EpaperPaths
 
-_RESPONSES = {
+_RESPONSES: dict[int | str, dict[str, Any]] = {
     200: {
         "content": {"image/png": {}},
         "description": (
@@ -96,6 +96,11 @@ async def _render_screen_image(paths: EpaperPaths, id: str, if_none_match: Optio
         return Response("", status.HTTP_304_NOT_MODIFIED, headers=headers)
 
     filename = await screen.get_image_path(raw=raw)
+    if filename is None:
+        # unreachable in practice: get_metadata() above already returned (not
+        # raised), which only happens once the screen has an rgb.png -- the
+        # one thing that makes get_image_path() return None
+        raise HTTPException(status_code=500, detail="Error getting image")
     return FileResponse(path=filename, media_type="image/png", headers=headers)
 
 

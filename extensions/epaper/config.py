@@ -4,17 +4,18 @@ settings. See extensions/epaper/global_config/ for the persisted,
 user-editable settings (GlobalConfig, app_config).
 """
 import importlib.resources
+from pathlib import Path
 from pydantic import DirectoryPath, Field
 from pydantic_settings import BaseSettings
 
 __all__ = ["resource_paths"]
 
 
-def _resource_dir(name: str) -> str:
+def _resource_dir(name: str) -> Path:
     # bundled inside the extensions.epaper package (see pyproject.toml package-data),
     # so this resolves correctly whether nicepaper runs standalone (cwd = repo root)
     # or is installed as a dependency inside another process (e.g. nice4iot)
-    return str(importlib.resources.files(__package__) / "resources" / name)
+    return Path(str(importlib.resources.files(__package__) / "resources" / name))
 
 
 class _ResourcePaths(BaseSettings):

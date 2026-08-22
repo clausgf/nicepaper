@@ -44,13 +44,13 @@ class Screen:
         self.image_cache = ImageCache(paths.image_dir, self.id)
 
         logger.info(f"Creating screen id={self.id}")
-        for id, widget_config in enumerate(self.config.widgets):
+        for widget_id, widget_config in enumerate(self.config.widgets):
             logger.debug(f"creating widget from {widget_config}")
             widget_class = widgets.WIDGET_CLASSES.get(widget_config.widget_type)
             if widget_class is None:
                 logger.error(f"Error creating widget: no drawing class for {widget_config.widget_type!r}")
                 continue
-            self.widgets.append(widget_class(id, widget_config))
+            self.widgets.append(widget_class(str(widget_id), widget_config))
 
 
     async def get_image_path(self, raw: bool = False) -> Optional[str]:
@@ -111,9 +111,13 @@ class Screen:
     @property
     def colors(self) -> tuple[str, str, str]:
         """This screen's (background, primary, accent) color: its own
-        fields where set, the global defaults otherwise."""
+        fields where set, the global defaults otherwise. The global accent
+        is itself optional (clearable in the settings), so a screen/widget
+        that also doesn't set one falls back to the global primary -- some
+        concrete color has to reach the renderer either way."""
         return self.config.resolved_colors(
-            app_config.color_background, app_config.color_primary, app_config.color_accent)
+            app_config.color_background, app_config.color_primary,
+            app_config.color_accent or app_config.color_primary)
 
     @property
     def palette(self) -> Optional[Palette]:

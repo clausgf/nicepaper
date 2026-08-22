@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nicepaper"
-version = "0.18.0"
+version = "0.18.1"
 description = "Renders screens (e.g. door signs with room calendars) as PNG images for e-paper displays; FastAPI backend with a NiceGUI management UI, installable as a nice4iot extension (extensions.epaper) or run standalone"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -41,6 +41,7 @@ dev = [
     "pytest",
     "httpx",
     "ruff>=0.6",
+    "mypy>=2.1.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -102,3 +103,20 @@ select = ["E9", "F"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+explicit_package_bases = true
+
+# Widget draw() methods deliberately access self.config as its concrete
+# per-widget-type subclass fields (e.g. TextWidgetModel.text), and pass it to
+# type-specific helpers (e.g. get_image()), while it is statically typed as
+# the WidgetModel base (a discriminated union) -- widget_type already
+# guarantees the real type at construction (see core/widgets/base.py), so
+# this is a load-bearing pattern, not sloppiness.
+# Narrowing it statically would need a generic Widget[T] per widget type
+# for no real safety gain; scoped out here instead of one ignore per access.
+[[tool.mypy.overrides]]
+module = "extensions.epaper.core.widgets.*"
+disable_error_code = ["attr-defined", "misc", "index", "arg-type"]

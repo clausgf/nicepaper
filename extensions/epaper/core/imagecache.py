@@ -53,7 +53,7 @@ class ImageCache:
     def __init__(self, base_image_dir: Path, screen_id: str):
         self.screen_id = screen_id
         self.image_dir = os.path.join(base_image_dir, screen_id)
-        self.metadata = None
+        self.metadata: Optional[ImageMetadata] = None
         self.dither = False
         os.makedirs(self.image_dir, exist_ok=True)
 
@@ -147,6 +147,6 @@ class ImageCache:
             if not os.path.exists(metadata_filename):
                 return None
             async with aiofiles.open(metadata_filename, 'r') as f:
-                self.metadata = json.loads(await f.read())
-            self.metadata = ImageMetadata(**self.metadata)
+                raw = json.loads(await f.read())
+            self.metadata = ImageMetadata(**raw)
         return self.metadata

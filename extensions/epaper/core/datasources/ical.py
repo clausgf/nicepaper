@@ -88,7 +88,7 @@ def _extract_events(ical_text: str, start_date: datetime.datetime, end_date: dat
             "categories": categories.strip(),
         })
 
-    result.sort(key=lambda e: datetime.datetime.fromisoformat(e.get("dtstart")))
+    result.sort(key=lambda e: datetime.datetime.fromisoformat(e["dtstart"]))
     return result
 
 
