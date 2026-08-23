@@ -2,27 +2,33 @@
 Rooms section: a niceview DrillDownWrapper over the rooms directory
 (rooms_adapter, a JsonDirectoryAdapter), so the list, Add and Delete are
 niceview's; this module only supplies the row and the detail body -- three
-tabs: Occupancy, Settings (the RoomModel form, autosaving through the
-adapter), and Displays (a room summary plus its own drill-down list of the
-devices bound to the room, see _displays_panel()).
+tabs: Occupancy (free/occupied status, next meeting, upcoming events -- from
+the room's booking system, see _occupancy_panel()), Settings (the RoomModel
+form, autosaving through the adapter), and Displays (a room summary plus its
+own drill-down list of the devices bound to the room, see _displays_panel()).
 
 The form's field metadata (labels/widgets/hints) lives on RoomModel itself
 (its fields' Annotated FieldInfo); only the visual layout is here.
 """
-from typing import cast
+import datetime
+from typing import Any, cast
+from zoneinfo import ZoneInfo
 
-from nicegui import ui
+from babel.dates import format_datetime
+from nicegui import background_tasks, core, ui
 from niceview import CollectionAdapter, DrillDownWrapper, ModelForm
 import niceview
 
 from extensions.epaper.bookingsystem.backend import list_booking_systems
-from extensions.epaper.display.backend import RoomDisplaysAdapter, assignable_devices, project_device_names
+from extensions.epaper.display.backend import (
+    RoomDisplaysAdapter, assignable_devices, available_screen_ids, project_device_names,
+)
 from extensions.epaper.display.models import RoomDisplayRow
+from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.paths import EpaperPaths
-from extensions.epaper.room.backend import read_room, rooms_adapter
+from extensions.epaper.room.backend import get_room_events, read_room, rooms_adapter
 from extensions.epaper.room.models import ROOM_TYPE_LABELS, RoomModel
 
-from extensions.epaper.ui.simplified_ui.common import scaffold_note
 from extensions.epaper.ui.simplified_ui.layout import Shell
 
 
@@ -44,7 +50,7 @@ def _render_detail(shell: Shell, adapter: CollectionAdapter[RoomModel], key: str
         ui.tab('displays', label='Displays', icon='tv')
     with ui.tab_panels(tabs, value='settings').classes('w-full'):
         with ui.tab_panel('occupancy'):
-            _occupancy_panel(room)
+            _occupancy_panel(shell, room)
         with ui.tab_panel('settings'):
             # field_infos come from RoomModel's Annotated FieldInfo; only the
             # layout and the runtime-dependent booking-system options are
@@ -57,12 +63,96 @@ def _render_detail(shell: Shell, adapter: CollectionAdapter[RoomModel], key: str
             _displays_panel(shell, key)
 
 
-def _occupancy_panel(room: RoomModel) -> None:
-    with ui.card().classes('w-full items-center gap-2 p-6'):
-        ui.icon('meeting_room').classes('text-6xl text-primary')
-        ui.label(room.room_name).classes('text-h4')
-        ui.label(room.room_number).classes('text-subtitle1 text-grey')
-    scaffold_note('Live occupancy will come from the room’s booking system.')
+def _occupancy_panel(shell: Shell, room: RoomModel) -> None:
+    """Live occupancy: a free/occupied-until status card, then a list of
+    every upcoming event -- both from the room's booking system (see
+    RoomModel.booking_system_id, room/backend.py's get_room_events()). The
+    fetch is async (a network call), so this renders a loading state first
+    and refreshes once it lands; background_tasks.create (not a bare
+    asyncio.create_task) keeps the task bound to this page's client so the
+    refresh actually reaches the browser."""
+    state: dict[str, Any] = {'events': None, 'error': None}
+
+    @ui.refreshable
+    def body() -> None:
+        if state['error'] is not None:
+            with ui.row().classes('items-center gap-2 text-grey'):
+                ui.icon('info').props('size=xs')
+                ui.label(state['error'])
+            return
+        if state['events'] is None:
+            with ui.row().classes('items-center gap-2'):
+                ui.spinner()
+                ui.label('Loading calendar…')
+            return
+        _occupancy_status(state['events'])
+        _occupancy_upcoming(state['events'])
+
+    async def load() -> None:
+        try:
+            state['events'] = await get_room_events(shell.paths, room)
+        except Exception as exc:
+            state['error'] = str(exc)
+        body.refresh()
+
+    body()
+    if core.loop is not None:  # no running nicegui app -- e.g. a render test building the tree only
+        background_tasks.create(load(), name=f'occupancy-{room.id}')
+
+
+def _event_time(iso: str) -> datetime.datetime:
+    return datetime.datetime.fromisoformat(iso)
+
+
+def _fmt_time(iso: str) -> str:
+    return format_datetime(_event_time(iso), format=app_config.roomcalendar_time_format,
+                           tzinfo=ZoneInfo(app_config.timezone), locale=app_config.locale)
+
+
+def _fmt_date(iso: str) -> str:
+    return format_datetime(_event_time(iso), format=app_config.roomcalendar_date_format_short,
+                           tzinfo=ZoneInfo(app_config.timezone), locale=app_config.locale)
+
+
+def _occupancy_status(events: list) -> None:
+    """Free, or occupied until the current event ends; below that, when the
+    next meeting today starts (the current one's own end, if occupied)."""
+    now = datetime.datetime.now(ZoneInfo(app_config.timezone))
+    current = next((e for e in events if _event_time(e['dtstart']) <= now < _event_time(e['dtend'])), None)
+    today_ahead = [e for e in events if _event_time(e['dtstart']) > now
+                  and _event_time(e['dtstart']).date() == now.date()]
+
+    with ui.card().classes('w-full items-center gap-1 p-6'):
+        if current is not None:
+            ui.icon('event_busy').classes('text-6xl text-negative')
+            ui.label('Occupied').classes('text-h5')
+            ui.label(f"Until {_fmt_time(current['dtend'])}").classes('text-subtitle1 text-grey')
+        else:
+            ui.icon('event_available').classes('text-6xl text-positive')
+            ui.label('Free').classes('text-h5')
+        if today_ahead:
+            nxt = today_ahead[0]
+            label = 'Next' if current is None else 'Then'
+            ui.label(f"{label}: {_fmt_time(nxt['dtstart'])}–{_fmt_time(nxt['dtend'])} {nxt['summary']}") \
+                .classes('text-caption text-grey')
+        elif current is None:
+            ui.label('No more meetings today').classes('text-caption text-grey')
+
+
+def _occupancy_upcoming(events: list) -> None:
+    ui.label('Upcoming').classes('text-subtitle1 q-mt-md')
+    if not events:
+        ui.label('No upcoming appointments.').classes('italic text-grey')
+        return
+    with ui.list().props('bordered separator').classes('w-full'):
+        for e in events:
+            with ui.item():
+                with ui.item_section():
+                    ui.item_label(e['summary'])
+                    subtitle = f"{_fmt_date(e['dtstart'])} {_fmt_time(e['dtstart'])}–{_fmt_time(e['dtend'])}"
+                    if e['organizer']:
+                        subtitle += f" · {e['organizer']}"
+                    ui.item_label(subtitle).props('caption')
 
 
 def _room_summary(room: RoomModel) -> None:
@@ -142,7 +232,6 @@ def _display_detail(shell: Shell, adapter: RoomDisplaysAdapter, key: str, set_ke
     against the new key once the rename actually lands.
     """
     paths, project_name = shell.paths, shell.project_name
-    screen_ids = sorted(p.stem for p in paths.screen_dir.glob('*.json'))
 
     @ui.refreshable
     def body(current_key: str) -> None:
@@ -163,10 +252,17 @@ def _display_detail(shell: Shell, adapter: RoomDisplaysAdapter, key: str, set_ke
         ui.select(device_names, value=row.device_name, label='Device',
                  on_change=on_device_change).classes('w-full').props('outlined dense')
 
+        # filtered to the device's own panel type if it has one set
+        # (devicebinding/ui.py) -- see display.backend.available_screen_ids().
+        # an empty options list crashes the select widget, so fall back to a
+        # plain hinted field rather than passing one -- same rule as
+        # booking_system_field_infos() below.
+        screen_ids = available_screen_ids(paths, current_key)
+        screen_field = (niceview.Field(widget_type='ui.select', options=screen_ids, clearable=True)
+                       if screen_ids else niceview.Field(hint='No screens yet — add one in Templates'))
         ModelForm.from_adapter(RoomDisplayRow, adapter, current_key, autosave=True,
                                include=['screen_id'],
-                               field_infos={'screen_id': niceview.Field(
-                                   widget_type='ui.select', options=screen_ids, clearable=True)},
+                               field_infos={'screen_id': screen_field},
                                ).render()
 
     body(key)

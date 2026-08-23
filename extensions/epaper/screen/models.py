@@ -139,13 +139,19 @@ class DateWidgetModel(WidgetModel):
 
 
 class RoomCalendarWidgetModel(WidgetModel):
+    """Shows the room the rendering device is bound to (number, name, notes,
+    booking-system calendar) -- see room/backend.py's get_room_events() and
+    RoomModel. Room data used to be typed directly into the widget
+    (room_number/room_name/ical_url); dropped in favor of the device's own
+    room binding, so one screen can serve every room's door sign instead of
+    needing one hand-configured screen file per room."""
     widget_type: Literal["RoomCalendar"] = "RoomCalendar"
     date_format_long: _DateFormatField
     date_format: _DateFormatField
     time_format: _TimeFormatField
-    room_number: str
-    room_name: str
-    ical_url: str
+    # pre-0.20 typed room_number/room_name/ical_url directly into the widget;
+    # no explicit migration needed to load an old screen file -- pydantic's
+    # default extra='ignore' already drops unknown fields silently.
 
 
 class WeatherWidgetModel(WidgetModel):

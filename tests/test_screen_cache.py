@@ -2,8 +2,12 @@ import asyncio
 import json
 import uuid
 
+from extensions.epaper.catalog.backend import get_panel_type
 from extensions.epaper.devicebinding.backend import set_device_binding
-from extensions.epaper.screen.backend import get_screen_by_id
+from extensions.epaper.room.backend import create_room
+from extensions.epaper.screen.backend import (
+    get_screen_by_id, screens_matching_panel_type, synthetic_roomcalendar_screens,
+)
 from extensions.epaper.paths import EpaperPaths
 
 
@@ -97,3 +101,57 @@ def test_screen_cache_distinguishes_same_id_under_different_roots(tmp_path):
     assert screen_a is not screen_b
     assert screen_a.paths.root == paths_a.root
     assert screen_b.paths.root == paths_b.root
+
+
+def test_screen_cache_separates_by_room(tmp_path):
+    """Two devices bound to the same screen but different rooms must not
+    share a cached Screen instance (or its rendered image) -- needed for a
+    screen shared across rooms (e.g. an auto-generated RoomCalendar
+    template) to render each device's own room."""
+    paths = EpaperPaths(root=tmp_path)
+    paths.ensure_dirs()
+    screen_id = f"roomaware-{uuid.uuid4().hex[:8]}"
+    _write_screen(paths.screen_dir / f"{screen_id}.json")
+    room_a = create_room(paths)
+    room_b = create_room(paths)
+    set_device_binding(paths, "device-a", screen_id=screen_id, room_id=room_a.id)
+    set_device_binding(paths, "device-b", screen_id=screen_id, room_id=room_b.id)
+
+    screen_a = asyncio.run(get_screen_by_id(paths, "device-a"))
+    screen_b = asyncio.run(get_screen_by_id(paths, "device-b"))
+    assert screen_a is not None and screen_b is not None
+    assert screen_a is not screen_b
+    assert screen_a.id == screen_b.id == screen_id
+    assert screen_a.room.id == room_a.id
+    assert screen_b.room.id == room_b.id
+    assert screen_a.image_cache.image_dir != screen_b.image_cache.image_dir
+
+
+def test_synthetic_roomcalendar_template_renders(tmp_path):
+    """An auto-generated 'Room Calendar WxH palette' id resolves to a real
+    Screen built from the panel-type catalog, not a file on disk."""
+    paths = EpaperPaths(root=tmp_path)
+    paths.ensure_dirs()
+    templates = synthetic_roomcalendar_screens(paths)
+    assert templates, "the built-in panel catalog should yield at least one template"
+    template_id = next(iter(templates))
+    assert not (paths.screen_dir / f"{template_id}.json").exists()
+
+    screen = asyncio.run(get_screen_by_id(paths, template_id))
+    assert screen is not None
+    assert screen.id == template_id
+    assert screen.config.widgets[0].widget_type == "RoomCalendar"
+
+    cached = asyncio.run(get_screen_by_id(paths, template_id))
+    assert cached is screen, "unchanged catalog should be served from cache"
+
+
+def test_screens_matching_panel_type_includes_the_synthetic_template(tmp_path):
+    paths = EpaperPaths(root=tmp_path)
+    paths.ensure_dirs()
+    panel_type = get_panel_type("waveshare_7in5_v2", paths)  # 800x480 bw
+    assert panel_type is not None
+
+    matches = screens_matching_panel_type(paths, panel_type)
+    template_id = f"__roomcalendar_{panel_type.width}x{panel_type.height}_{panel_type.palette_id}"
+    assert template_id in matches

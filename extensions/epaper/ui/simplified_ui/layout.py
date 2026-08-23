@@ -46,9 +46,14 @@ class Shell:
     the Shell so they can read `project_name`/`paths`/`params` and navigate onward.
     """
 
-    def __init__(self, project_name: str, paths: EpaperPaths, leaves: dict[str, NavItem]):
+    def __init__(self, project_name: str, paths: EpaperPaths, leaves: dict[str, NavItem],
+                 image_base_url: str = ''):
         self.project_name = project_name
         self.paths = paths
+        # the display API's screen-image prefix (e.g. '/api/ext/epaper/<project>/screens'
+        # as an extension, '/../api/screen' standalone) -- append '/<id>/image.png'.
+        # Needed by Templates (screen previews); other sections don't render images.
+        self.image_base_url = image_base_url
         self._leaves = leaves
         self.active: str = next(iter(leaves))  # first leaf is the landing view
         self.params: dict = {}
@@ -146,14 +151,15 @@ def render_sidebar(shell: Shell, nav: list[NavItem]) -> None:
                 _nav_row(shell, item, inset=False)
 
 
-def build_page(project_name: str, paths: EpaperPaths, nav: list[NavItem]) -> None:
+def build_page(project_name: str, paths: EpaperPaths, nav: list[NavItem],
+               image_base_url: str = '') -> None:
     """Assemble the header, drawer/sidebar and content area for one page.
 
     Header and drawer are top-level layout elements, so this must be called
     at the page top level (it is: the extension render_fn runs directly
     under nice4iot's @ui.page, with no wrapping element).
     """
-    shell = Shell(project_name, paths, _flatten(nav))
+    shell = Shell(project_name, paths, _flatten(nav), image_base_url)
 
     with ui.left_drawer(bordered=True).props(f'breakpoint={DRAWER_BREAKPOINT}') as drawer:
         @ui.refreshable

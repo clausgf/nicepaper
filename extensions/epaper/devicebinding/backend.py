@@ -10,8 +10,9 @@ screen assignments without any manual step.
 Synchronous: the store holds a handful of devices in a tiny file, so it is
 read/written directly (like the editor's JsonAdapter, screen/ui.py),
 not through aiofiles -- the one caller on the image-serving path
-(screen.backend.resolve_screen_id) only does a small, infrequent read. There is
-no cache; add a per-root cache dict if a profile ever shows it is needed.
+(screen.backend.get_screen_by_id, via resolve_screen_and_room) only does a
+small, infrequent read. There is no cache; add a per-root cache dict if a
+profile ever shows it is needed.
 """
 import json
 from pathlib import Path
@@ -89,18 +90,21 @@ def get_device_binding(paths: EpaperPaths, device_name: str) -> DeviceBinding:
 
 
 def set_device_binding(paths: EpaperPaths, device_name: str, *,
-                       room_id: object = _UNSET, screen_id: object = _UNSET) -> None:
-    """Update one device's binding. Each of room_id/screen_id is left
-    unchanged when not passed, and cleared when passed None. The entry is
-    dropped once both are empty, so an unassigned device leaves no row
-    behind (the empty-file equivalent of removing an alias)."""
+                       room_id: object = _UNSET, screen_id: object = _UNSET,
+                       panel_type_id: object = _UNSET) -> None:
+    """Update one device's binding. Each of room_id/screen_id/panel_type_id
+    is left unchanged when not passed, and cleared when passed None. The
+    entry is dropped once all three are empty, so an unassigned device
+    leaves no row behind (the empty-file equivalent of removing an alias)."""
     bindings = get_device_bindings(paths)
     binding = bindings.get(device_name, DeviceBinding())
     if room_id is not _UNSET:
         binding.room_id = room_id  # type: ignore[assignment]
     if screen_id is not _UNSET:
         binding.screen_id = screen_id  # type: ignore[assignment]
-    if binding.room_id is None and binding.screen_id is None:
+    if panel_type_id is not _UNSET:
+        binding.panel_type_id = panel_type_id  # type: ignore[assignment]
+    if binding.room_id is None and binding.screen_id is None and binding.panel_type_id is None:
         bindings.pop(device_name, None)
     else:
         bindings[device_name] = binding
@@ -115,6 +119,21 @@ def resolve_screen_id(paths: EpaperPaths, device_name: str) -> str:
     straight through. Renamed from the former _resolve_alias()."""
     binding = get_device_bindings(paths).get(device_name)
     return binding.screen_id if binding and binding.screen_id else device_name
+
+
+def resolve_screen_and_room(paths: EpaperPaths, device_name: str) -> tuple[str, Optional[str]]:
+    """Like resolve_screen_id(), but also returns the room the device is
+    bound to (None if there is no binding, or it has no room_id -- e.g. id is
+    a literal screen id, not a device name). One binding lookup instead of
+    two, so screen.backend.get_screen_by_id() can use this in place of
+    resolve_screen_id() without an extra read.
+
+    Needed so a screen shared by many rooms (an auto-generated RoomCalendar
+    template) renders each requesting device's own room."""
+    binding = get_device_bindings(paths).get(device_name)
+    if binding is None:
+        return device_name, None
+    return (binding.screen_id if binding.screen_id else device_name), binding.room_id
 
 
 def devices_in_room(paths: EpaperPaths, room_id: str) -> list[str]:

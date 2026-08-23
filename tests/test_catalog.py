@@ -5,6 +5,7 @@ per-root file extends it.
 import json
 
 from extensions.epaper.catalog import backend as catalog
+from extensions.epaper.catalog.models import Palette
 from extensions.epaper.paths import EpaperPaths
 
 
@@ -88,3 +89,28 @@ def test_root_file_is_reread_after_it_changes(tmp_path):
     os.utime(paths.panel_types_file, (stat.st_atime, stat.st_mtime + 10))
 
     assert catalog.get_panel_types(paths)["my-panel"].width == 999
+
+
+_BWR = Palette(id="bwr", name="test", palette=[(0, 0, 0), (255, 255, 255), (255, 0, 0)])
+
+
+def test_nearest_palette_color_snaps_to_closest_member():
+    assert catalog.nearest_palette_color((10, 10, 10), _BWR) == (0, 0, 0)
+    assert catalog.nearest_palette_color((250, 20, 20), _BWR) == (255, 0, 0)
+
+
+def test_nearest_palette_color_excludes_white_by_default():
+    # closer to white than to black, but white is excluded -> falls back to
+    # whichever non-white member is actually nearest
+    assert catalog.nearest_palette_color((240, 240, 240), _BWR) == (255, 0, 0) \
+        or catalog.nearest_palette_color((240, 240, 240), _BWR) == (0, 0, 0)
+    assert catalog.nearest_palette_color((240, 240, 240), _BWR) != (255, 255, 255)
+
+
+def test_nearest_palette_color_can_include_white():
+    assert catalog.nearest_palette_color((240, 240, 240), _BWR, exclude_white=False) == (255, 255, 255)
+
+
+def test_nearest_palette_color_falls_back_to_white_if_thats_all_there_is():
+    white_only = Palette(id="w", name="test", palette=[(255, 255, 255)])
+    assert catalog.nearest_palette_color((0, 0, 0), white_only) == (255, 255, 255)

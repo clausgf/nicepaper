@@ -29,7 +29,7 @@ def _get_session() -> aiohttp.ClientSession:
 
 
 def _extract_events(ical_text: str, start_date: datetime.datetime, end_date: datetime.datetime,
-                    organizer_names: list, extract_organizer_from_summary: bool) -> list:
+                    organizer_names: list, extract_organizer_from_summary: bool, max_days: int) -> list:
     """
     Parse an iCal feed and extract the events between start_date and end_date
     as serializable dicts, sorted by start time. CPU bound, intended to run
@@ -72,7 +72,7 @@ def _extract_events(ical_text: str, start_date: datetime.datetime, end_date: dat
 
         if dtend < start_date:
             continue
-        if app_config.ical_max_days > 0 and dtstart > end_date:
+        if max_days > 0 and dtstart > end_date:
             continue
         if organizer is None and extract_organizer_from_summary and len(organizer_names) > 0:
             contained = [name for name in organizer_names if summary.startswith(name)]
@@ -93,7 +93,20 @@ def _extract_events(ical_text: str, start_date: datetime.datetime, end_date: dat
 
 
 async def get_from_ical(ical_dir: Path, organizer_names_file: Optional[Path], id: str, url: str,
-                         extract_organizer_from_summary: bool = True):
+                        update_interval_s: int, max_days: int,
+                        username: str = "", password: str = "", headers: Optional[dict] = None,
+                        extract_organizer_from_summary: bool = True) -> list:
+    """
+    Fetch and cache events from an iCal feed, `id` naming the cache file.
+
+    update_interval_s/max_days are the caller's own config, not read from
+    anywhere here: the raw-URL RoomCalendar widget passes the global
+    ical_update_interval_s/ical_max_days settings (core/widgets/roomcalendar.py),
+    the room Occupancy panel passes its BookingSystemModel's update_interval/
+    max_days_ahead (room/backend.py's get_room_events). username/password (HTTP
+    Basic Auth) and headers are optional, both from a BookingSystemModel when
+    the feed needs them.
+    """
     # load data from cache
     data = None
     cache_filename = os.path.join(ical_dir, f"{id}.json")
@@ -105,18 +118,21 @@ async def get_from_ical(ical_dir: Path, organizer_names_file: Optional[Path], id
         last_update = datetime.datetime.fromisoformat(data['last_update'])
         now = datetime.datetime.now(ZoneInfo(app_config.timezone))
         timedelta = now - last_update
-        if timedelta.total_seconds() < app_config.ical_update_interval_s:
+        if timedelta.total_seconds() < update_interval_s:
             logger.info(f"Ical {id} skipping update, last update was {timedelta.total_seconds()} seconds ago")
             return data['events']
 
     # refresh data from ical feed
     logger.info(f"Ical {id} updating from {url}")
-    async with _get_session().get(url) as response:
+    request_headers = dict(headers) if headers else {}
+    if username:
+        request_headers['Authorization'] = aiohttp.encode_basic_auth(username, password)
+    async with _get_session().get(url, headers=request_headers or None) as response:
         response_text = await response.text()
         logger.info(f"Ical {id} response status: {response.status}")
 
     start_date = datetime.datetime.now(ZoneInfo(app_config.timezone))
-    end_date = start_date + datetime.timedelta(days=app_config.ical_max_days)
+    end_date = start_date + datetime.timedelta(days=max_days)
 
     organizer_names = []
     if organizer_names_file and os.path.exists(organizer_names_file) and extract_organizer_from_summary:
@@ -125,7 +141,7 @@ async def get_from_ical(ical_dir: Path, organizer_names_file: Optional[Path], id
 
     events = await asyncio.to_thread(
         _extract_events, response_text, start_date, end_date,
-        organizer_names, extract_organizer_from_summary)
+        organizer_names, extract_organizer_from_summary, max_days)
 
     data = {
         'last_update': start_date.isoformat(),

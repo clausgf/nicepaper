@@ -1,7 +1,11 @@
+import asyncio
 import datetime
+import json
 from zoneinfo import ZoneInfo
 
-from extensions.epaper.core.datasources.ical import _extract_events
+import aiohttp
+
+from extensions.epaper.core.datasources.ical import _extract_events, get_from_ical
 
 
 ICS = """BEGIN:VCALENDAR
@@ -28,7 +32,7 @@ END = START + datetime.timedelta(days=30)
 
 
 def test_timed_event_keeps_its_time():
-    events = _extract_events(ICS, START, END, [], False)
+    events = _extract_events(ICS, START, END, [], False, 30)
     timed = next(e for e in events if e["summary"] == "Timed event")
     dtstart = datetime.datetime.fromisoformat(timed["dtstart"])
     dtend = datetime.datetime.fromisoformat(timed["dtend"])
@@ -37,7 +41,7 @@ def test_timed_event_keeps_its_time():
 
 
 def test_all_day_event_ends_at_2359_of_last_day():
-    events = _extract_events(ICS, START, END, [], False)
+    events = _extract_events(ICS, START, END, [], False, 30)
     allday = next(e for e in events if e["summary"] == "Two-day all-day event")
     dtstart = datetime.datetime.fromisoformat(allday["dtstart"])
     dtend = datetime.datetime.fromisoformat(allday["dtend"])
@@ -47,14 +51,74 @@ def test_all_day_event_ends_at_2359_of_last_day():
 
 
 def test_events_sorted_by_start():
-    events = _extract_events(ICS, START, END, [], False)
+    events = _extract_events(ICS, START, END, [], False, 30)
     starts = [e["dtstart"] for e in events]
     assert starts == sorted(starts)
 
 
 def test_organizer_extracted_from_summary():
     ics = ICS.replace("SUMMARY:Timed event", "SUMMARY:Maier Besprechung")
-    events = _extract_events(ics, START, END, ["Maier", "Schulze"], True)
+    events = _extract_events(ics, START, END, ["Maier", "Schulze"], True, 30)
     timed = next(e for e in events if "Besprechung" in e["summary"])
     assert timed["organizer"] == "Maier"
     assert timed["summary"] == "Besprechung"
+
+
+def test_get_from_ical_uses_cache_within_update_interval(tmp_path):
+    now = datetime.datetime.now(ZoneInfo("Europe/Berlin"))
+    (tmp_path / "room-x.json").write_text(json.dumps({
+        "last_update": now.isoformat(), "events": [{"summary": "cached"}],
+    }))
+    events = asyncio.run(get_from_ical(tmp_path, None, "room-x", "https://example.com/cal.ics",
+                                       update_interval_s=600, max_days=30))
+    assert events == [{"summary": "cached"}]
+
+
+class _FakeIcalResponse:
+    def __init__(self, text):
+        self._text = text
+        self.status = 200
+    async def __aenter__(self):
+        return self
+    async def __aexit__(self, *a):
+        return False
+    async def text(self):
+        return self._text
+
+
+class _FakeIcalSession:
+    def __init__(self, text, captured):
+        self._text = text
+        self._captured = captured
+    def get(self, url, headers=None):
+        self._captured.update(url=url, headers=headers)
+        return _FakeIcalResponse(self._text)
+
+
+def test_get_from_ical_passes_auth_and_headers_to_the_request(tmp_path, monkeypatch):
+    """A booking system's username/password/header (room/backend.py's
+    get_room_events) must actually reach the HTTP request -- this is the
+    'ical datasource compatible with the booking system config' part."""
+    captured: dict = {}
+    monkeypatch.setattr("extensions.epaper.core.datasources.ical._get_session",
+                        lambda: _FakeIcalSession(ICS, captured))
+    # the fixture's fixed 2026-07 dates are incidental here (this test is
+    # about request wiring, not event parsing -- that's covered above), so
+    # don't assert on how many of them still lie in get_from_ical's own
+    # datetime.now()-based window
+    asyncio.run(get_from_ical(tmp_path, None, "room-x", "https://example.com/cal.ics",
+                              update_interval_s=600, max_days=30,
+                              username="alice", password="secret",
+                              headers={"X-Test": "1"}))
+    assert captured["url"] == "https://example.com/cal.ics"
+    assert captured["headers"]["X-Test"] == "1"
+    assert captured["headers"]["Authorization"] == aiohttp.encode_basic_auth("alice", "secret")
+
+
+def test_get_from_ical_omits_auth_without_username(tmp_path, monkeypatch):
+    captured: dict = {}
+    monkeypatch.setattr("extensions.epaper.core.datasources.ical._get_session",
+                        lambda: _FakeIcalSession(ICS, captured))
+    asyncio.run(get_from_ical(tmp_path, None, "room-y", "https://example.com/cal.ics",
+                              update_interval_s=600, max_days=30))
+    assert captured["headers"] is None

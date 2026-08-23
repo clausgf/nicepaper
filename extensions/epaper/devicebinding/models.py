@@ -8,6 +8,12 @@ Both relations live here, so it is the single source of truth for them:
   device -> room    (room_id)
 A room's displays are found by scanning for room_id -- the room itself
 stores no device ids, so a deleted device can never dangle.
+
+panel_type_id is a third, independent fact about the device -- which panel
+it actually is (from the panel-type catalog, catalog/models.py) -- used only
+to restrict the Screen select to matching resolution/palette (UI-side only;
+nothing here validates screen_id against it, so a mismatched pair set some
+other way still renders, same as any other dangling reference in this app).
 """
 from typing import Optional
 
@@ -25,5 +31,13 @@ class DeviceBinding(BaseModel):
             "Id of the screen (screens/<id>.json) this device renders -- the "
             "former alias target, resolved when the device fetches its image "
             "by name. Empty = no screen assigned."
+        ),
+    )
+    panel_type_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Id of this device's actual panel (catalog/panel_types.json). "
+            "Restricts the Screen select to screens of matching resolution/"
+            "palette. Empty = no restriction."
         ),
     )

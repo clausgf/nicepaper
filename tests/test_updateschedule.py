@@ -8,9 +8,31 @@ import pytest
 from pydantic import ValidationError
 
 from extensions.epaper.global_config.backend import app_config
-from extensions.epaper.schedule.backend import UpdateSchedule, get_schedule_by_id
+from extensions.epaper.schedule.backend import UpdateSchedule, get_schedule_by_id, times_in_range
 from extensions.epaper.schedule.models import ALL_MONTHS, ALL_WEEKDAYS, WeeklyScheduleModel
 from extensions.epaper.paths import EpaperPaths
+
+
+def test_times_in_range_steps_inclusive():
+    assert times_in_range("08:00", "09:00", 30) == ["08:00", "08:30", "09:00"]
+
+
+def test_times_in_range_stops_before_overshooting_end():
+    assert times_in_range("08:00", "08:50", 30) == ["08:00", "08:30"]
+
+
+def test_times_in_range_single_time_when_start_equals_end():
+    assert times_in_range("12:00", "12:00", 60) == ["12:00"]
+
+
+def test_times_in_range_rejects_start_after_end():
+    with pytest.raises(ValueError, match="Start time"):
+        times_in_range("10:00", "09:00", 30)
+
+
+def test_times_in_range_rejects_malformed_time():
+    with pytest.raises(ValueError, match="HH:MM"):
+        times_in_range("8:00", "09:00", 30)
 
 
 def test_weekly_schedule_defaults_to_all_months_and_weekdays():

@@ -13,6 +13,7 @@ from extensions.epaper.paths import EpaperPaths
 
 from extensions.epaper.bookingsystem.simplified_ui import render_booking_systems
 from extensions.epaper.room.simplified_ui import render_rooms
+from extensions.epaper.schedule.simplified_ui import render_schedule
 from extensions.epaper.screen.simplified_ui import render_templates
 
 from extensions.epaper.display.simplified_ui import render_displays
@@ -44,13 +45,22 @@ def _nav() -> list[NavItem]:
         NavItem('templates', 'Templates', 'wallpaper', render=render_templates),
         NavItem('displays', 'Displays', 'tv', render=render_displays),
         NavItem('settings', 'Preferences', 'settings', children=(
+            NavItem('schedule', 'Schedule', 'schedule', render=render_schedule),
             NavItem('booking', 'Booking systems', 'event', render=render_booking_systems),
         )),
     ]
 
 
-def render(project_name: str, paths: Optional[EpaperPaths] = None) -> None:
+def render(project_name: str, paths: Optional[EpaperPaths] = None,
+          image_base_url: Optional[str] = None) -> None:
     """Entry point. As a nice4iot extension it is called with just the
     project name (register_project_page) and derives the paths; standalone
-    passes its fixed paths in (see ui/standalone.py)."""
-    build_page(project_name, paths or _paths_for_project(project_name), _nav())
+    passes its fixed paths in (see ui/standalone.py).
+
+    image_base_url is the display API's screen-image prefix (Templates'
+    previews). nice4iot's register_project_page calls render(project_name)
+    with nothing else, so it defaults to the same extension image route
+    __init__.py's device card uses; standalone passes its own."""
+    if image_base_url is None:
+        image_base_url = f'/api/ext/epaper/{project_name}/screens'
+    build_page(project_name, paths or _paths_for_project(project_name), _nav(), image_base_url)

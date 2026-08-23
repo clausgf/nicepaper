@@ -1,7 +1,13 @@
+import asyncio
+import datetime
+
+import pytest
+
 from extensions.epaper.room.backend import (
-    create_room, delete_room, list_rooms, read_room, room_path,
+    create_room, delete_room, get_room_events, list_rooms, read_room, room_adapter, room_path,
 )
 from extensions.epaper.paths import EpaperPaths
+import extensions.epaper.room.backend as room_backend
 
 
 def _paths(tmp_path) -> EpaperPaths:
@@ -96,3 +102,112 @@ def test_rooms_adapter_crud(tmp_path):
 
     adapter.delete(room.id)
     assert list(adapter.items()) == []
+
+
+def _room_with_booking_system(paths, **system_fields):
+    from extensions.epaper.bookingsystem.backend import booking_system_adapter, create_booking_system
+
+    system = create_booking_system(paths)
+    for name, value in system_fields.items():
+        setattr(system, name, value)
+    booking_system_adapter(paths, system.id).save(system)
+
+    room = create_room(paths)
+    room.booking_system_id = system.id
+    room_adapter(paths, room.id).save(room)
+    return room, system
+
+
+def test_get_room_events_without_booking_system_raises(tmp_path):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    with pytest.raises(ValueError, match="no booking system"):
+        asyncio.run(get_room_events(paths, room))
+
+
+def test_get_room_events_with_dangling_booking_system_raises(tmp_path):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    room.booking_system_id = "does-not-exist"
+    room_adapter(paths, room.id).save(room)
+    with pytest.raises(ValueError, match="not found"):
+        asyncio.run(get_room_events(paths, room))
+
+
+def test_get_room_events_without_url_raises(tmp_path):
+    paths = _paths(tmp_path)
+    room, _system = _room_with_booking_system(paths)  # url="" by default
+    with pytest.raises(ValueError, match="no URL"):
+        asyncio.run(get_room_events(paths, room))
+
+
+def test_get_room_events_prefers_room_url_over_system_url(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    room, system = _room_with_booking_system(
+        paths, url="https://example.com/system.ics", header={"X-Test": "1"})
+    room.booking_ical_url = "https://example.com/room-specific.ics"
+    room_adapter(paths, room.id).save(room)
+
+    captured: dict = {}
+
+    async def fake_get_from_ical(ical_dir, organizer_names_file, id, url, **kwargs):
+        captured.update(url=url, **kwargs)
+        return ["EVENT"]
+
+    monkeypatch.setattr(room_backend, "get_from_ical", fake_get_from_ical)
+    events = asyncio.run(get_room_events(paths, room))
+
+    assert events == ["EVENT"]
+    assert captured["url"] == "https://example.com/room-specific.ics"
+    assert captured["headers"] == {"X-Test": "1"}
+    assert captured["username"] == system.username
+
+
+def test_get_room_events_falls_back_to_system_url(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    room, _system = _room_with_booking_system(paths, url="https://example.com/system.ics")
+
+    captured: dict = {}
+
+    async def fake_get_from_ical(ical_dir, organizer_names_file, id, url, **kwargs):
+        captured["url"] = url
+        return []
+
+    monkeypatch.setattr(room_backend, "get_from_ical", fake_get_from_ical)
+    asyncio.run(get_room_events(paths, room))
+    assert captured["url"] == "https://example.com/system.ics"
+
+
+def test_get_room_events_passes_system_timing_as_seconds_and_days(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    room, _system = _room_with_booking_system(
+        paths, url="https://example.com/system.ics",
+        update_interval=datetime.timedelta(minutes=5),
+        max_days_ahead=datetime.timedelta(days=14))
+
+    captured: dict = {}
+
+    async def fake_get_from_ical(ical_dir, organizer_names_file, id, url, **kwargs):
+        captured.update(kwargs)
+        return []
+
+    monkeypatch.setattr(room_backend, "get_from_ical", fake_get_from_ical)
+    asyncio.run(get_room_events(paths, room))
+    assert captured["update_interval_s"] == 300
+    assert captured["max_days"] == 14
+
+
+def test_get_room_events_passes_none_for_empty_headers(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    room, _system = _room_with_booking_system(
+        paths, url="https://example.com/system.ics", header={})
+
+    captured: dict = {}
+
+    async def fake_get_from_ical(ical_dir, organizer_names_file, id, url, **kwargs):
+        captured.update(kwargs)
+        return []
+
+    monkeypatch.setattr(room_backend, "get_from_ical", fake_get_from_ical)
+    asyncio.run(get_room_events(paths, room))
+    assert captured["headers"] is None

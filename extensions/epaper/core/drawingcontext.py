@@ -1,10 +1,14 @@
 import os
 import math
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 from PIL import Image, ImageFont, ImageDraw
 
 from extensions.epaper.util import logger
 from extensions.epaper.config import resource_paths
+
+if TYPE_CHECKING:
+    from extensions.epaper.catalog.models import Palette
+    from extensions.epaper.room.models import RoomModel
 
 
 class FontResourceManager:
@@ -62,7 +66,8 @@ icon_resource_manager = IconResourceManager(resource_paths.icon_path)
 class DrawingContext:
 
     def __init__(self, image, color_background: str, color_primary: str, font_model,
-                 color_accent: Optional[str] = None, paths=None):
+                 color_accent: Optional[str] = None, paths=None,
+                 room: 'Optional[RoomModel]' = None, palette: 'Optional[Palette]' = None):
         self.img = image
         self.draw = ImageDraw.Draw(image)
         self.font_provider = font_resource_manager
@@ -90,6 +95,13 @@ class DrawingContext:
         # widgets that need to read/write files (e.g. RoomCalendarWidget's
         # ical cache) work the same standalone and as a nice4iot extension
         self.paths = paths
+        # the room the rendering device is bound to (RoomCalendarWidget), and
+        # the palette the served image will be quantized to (for a widget
+        # that wants to draw an exact, undithered palette color) -- both
+        # None outside that context (most widgets, or a screen/device with
+        # no room binding)
+        self.room = room
+        self.palette = palette
 
 
     def get_font(self, name, size):

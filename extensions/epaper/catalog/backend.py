@@ -28,7 +28,7 @@ from extensions.epaper.util import logger
 
 __all__ = [
     "get_palettes", "get_palette", "get_panel_types", "get_panel_type",
-    "palettes_mtime",
+    "palettes_mtime", "nearest_palette_color",
 ]
 
 _PALETTES_RESOURCE = "palettes.json"
@@ -128,7 +128,30 @@ def get_panel_type(id: Optional[str], paths: Optional[EpaperPaths] = None) -> Op
 
 
 def palettes_mtime(paths: EpaperPaths) -> Optional[float]:
-    """mtime of this root's palettes.json, or None if it has none.
-    Part of the screen cache key (screen/backend.py): a changed palette
-    changes every quantized image rendered from it."""
+    """mtime of this root's palettes.json, or None if it has none."""
     return _file_mtime(paths.palettes_file)
+
+
+def nearest_palette_color(rgb: Tuple[int, int, int], palette: Palette, *,
+                          exclude_white: bool = True) -> Tuple[int, int, int]:
+    """The palette entry closest to rgb (Euclidean distance in RGB space).
+
+    A widget that wants to draw a *solid* color the display can render exactly
+    (e.g. a category-color card outline) needs this instead of relying on the
+    final whole-image quantize() (core/imagecache.py): that step dithers, which
+    looks fine for photographic content but ugly on thin lines/text -- picking
+    the nearest palette member up front draws it as a flat, undithered color.
+
+    exclude_white drops (255, 255, 255) from the candidates when at least one
+    other entry remains, since white is the background on every shipped
+    palette and a color "approximated to white" would just vanish."""
+    candidates = palette.palette
+    if exclude_white:
+        non_white = [c for c in candidates if c != (255, 255, 255)]
+        if non_white:
+            candidates = non_white
+
+    def distance(c: Tuple[int, int, int]) -> int:
+        return (c[0] - rgb[0]) ** 2 + (c[1] - rgb[1]) ** 2 + (c[2] - rgb[2]) ** 2
+
+    return min(candidates, key=distance)

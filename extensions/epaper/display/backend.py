@@ -1,18 +1,18 @@
 """
-The displays grid's data: it joins nice4iot devices (name, last-seen ->
-online) with our device bindings (room_id, screen_id) and the bound room
-(building/floor/number) into RoomDisplayRow rows.
+Displays data: it joins nice4iot devices (name, last-seen -> online) with our
+device bindings (room_id, screen_id) and the bound room (building/floor/
+number/room_label) into RoomDisplayRow rows.
 
 nice4iot owns devices; we only reference them by name. `_project_devices`
 reaches into nice4iot's device backend (in-process; there is no sanctioned
 extension getter yet -- see docs/nice4iot-extension-wishlist.md) and returns
-[] outside nice4iot (standalone/tests), so the grid degrades to empty rather
-than breaking. Tests monkeypatch `_project_devices`.
+[] outside nice4iot (standalone/tests), so any UI built on this degrades to
+empty rather than breaking. Tests monkeypatch `_project_devices`.
 
-RoomDisplaysAdapter is a niceview CollectionAdapter so the UI is a plain
-EditGridWrapper: inline edits to screen_id persist via update() ->
-set_device_binding; delete() unassigns the device from its room (it does not
-delete the nice4iot device).
+RoomDisplaysAdapter is a niceview CollectionAdapter: edits to screen_id persist
+via update() -> set_device_binding; delete() unassigns the device from its
+room (it does not delete the nice4iot device); rename() reassigns a row to a
+different device (see its own docstring).
 """
 import datetime
 from typing import Iterator, Optional
@@ -71,10 +71,12 @@ def display_rows(paths: EpaperPaths, project_name: str,
         rows.append(RoomDisplayRow(
             device_name=device.name,
             screen_id=(binding.screen_id if binding else None) or '',
+            room_label=(room.room_label if room else None) or '',
             building=(room.building if room else None) or '',
             floor=(room.floor if room else None) or '',
             room_number=(room.room_number if room else None) or '',
             online=_is_online(device),
+            last_seen_at=getattr(device, 'last_seen_at', None),
             rssi=None, battery_voltage=None, alarm_count=None,  # no source yet
             device_url=_device_url(project_name, device.name),
         ))
@@ -95,6 +97,32 @@ def project_device_names(project_name: str) -> list[str]:
     existing display row means rather than adding a new one. [] outside
     nice4iot (standalone/tests), same as _project_devices()."""
     return sorted(d.name for d in _project_devices(project_name))
+
+
+def available_screen_ids(paths: EpaperPaths, device_name: str) -> list[str]:
+    """Screen ids selectable for device_name's Screen field (the simplified
+    UI's Displays tabs -- room/simplified_ui.py's _display_detail and this
+    package's own render_displays()): every screen (real files plus the
+    auto-generated Room Calendar templates, screen.backend.
+    synthetic_roomcalendar_screens) when the device has no panel_type_id set
+    (devicebinding/ui.py, the nice4iot device card); otherwise only the ones
+    matching it (screen.backend.screens_matching_panel_type) -- plus the
+    currently assigned screen even if it no longer matches, so a mismatch
+    stays visible rather than silently dropped (same dangling-reference
+    precedent as booking_system_id elsewhere)."""
+    from extensions.epaper.catalog.backend import get_panel_type
+    from extensions.epaper.screen.backend import screens_matching_panel_type, synthetic_roomcalendar_screens
+
+    binding = get_device_bindings(paths).get(device_name)
+    panel_type = get_panel_type(binding.panel_type_id, paths) if binding else None
+    if panel_type is None:
+        options = sorted({*(p.stem for p in paths.screen_dir.glob('*.json')),
+                          *synthetic_roomcalendar_screens(paths)})
+    else:
+        options = sorted(screens_matching_panel_type(paths, panel_type))
+    if binding and binding.screen_id and binding.screen_id not in options:
+        options = sorted([*options, binding.screen_id])
+    return options
 
 
 class RoomDisplaysAdapter:

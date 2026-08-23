@@ -1,4 +1,5 @@
 import datetime
+import json
 import types
 
 import extensions.epaper.display.backend as rd
@@ -156,3 +157,40 @@ def test_adapter_rename_moves_a_device_from_another_room(tmp_path, monkeypatch):
     assert adapter.rename("old", "elsewhere") == "elsewhere"
     moved = get_device_binding(paths, "elsewhere")
     assert (moved.room_id, moved.screen_id) == (room.id, "scr")
+
+
+def test_available_screen_ids_matches_real_screen_by_resolution_and_palette(tmp_path):
+    paths = _paths(tmp_path)
+    (paths.screen_dir / "matching.json").write_text(json.dumps({
+        "width": 400, "height": 300, "palette_id": "bw", "widgets": [],
+    }))
+    (paths.screen_dir / "mismatched.json").write_text(json.dumps({
+        "width": 800, "height": 480, "palette_id": "bw", "widgets": [],
+    }))
+    set_device_binding(paths, "d1", panel_type_id="waveshare_4in2")  # 400x300 bw
+
+    ids = rd.available_screen_ids(paths, "d1")
+    assert "matching" in ids
+    assert "mismatched" not in ids
+
+
+def test_available_screen_ids_keeps_a_dangling_assignment_visible(tmp_path):
+    paths = _paths(tmp_path)
+    set_device_binding(paths, "d1", panel_type_id="waveshare_4in2", screen_id="does-not-match")
+    (paths.screen_dir / "does-not-match.json").write_text(json.dumps({
+        "width": 800, "height": 480, "widgets": [],
+    }))
+
+    ids = rd.available_screen_ids(paths, "d1")
+    assert "does-not-match" in ids  # kept visible even though it doesn't match its panel type
+
+
+def test_available_screen_ids_unfiltered_without_a_panel_type(tmp_path):
+    paths = _paths(tmp_path)
+    (paths.screen_dir / "any.json").write_text(json.dumps({
+        "width": 800, "height": 480, "widgets": [],
+    }))
+    ids = rd.available_screen_ids(paths, "no-binding-device")
+    assert "any" in ids
+    assert any(i.startswith("__roomcalendar_") for i in ids), \
+        "synthetic Room Calendar templates should always be offered"

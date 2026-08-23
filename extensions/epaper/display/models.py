@@ -1,17 +1,20 @@
 """
-Row view-model for the displays grid (EditGridWrapper), one row per e-paper
-display (a nice4iot device). This is a *view* model, not stored as-is: only
-`screen_id` is editable and persisted (into the device binding,
-devicebinding/models.py); everything else is read-only and joined together
-by display/backend.py from the nice4iot device (name, online) and the room
-the device is bound to (building/floor/room number).
+Row view-model for a display (a nice4iot device showing a screen), one row
+per device. This is a *view* model, not stored as-is: only `screen_id` is
+editable and persisted (into the device binding, devicebinding/models.py);
+everything else is read-only and joined together by display/backend.py from
+the nice4iot device (name, online, last_seen_at) and the room the device is
+bound to (building/floor/room number/room_label).
 
 RSSI, battery voltage and alarm count have no per-device source in nice4iot
 today (RSSI/battery are push-only telemetry, not stored readably), so they
 stay empty until the extension interface exposes them -- see
-docs/nice4iot-extension-wishlist.md. Columns are declared in display order;
-their labels/sort/filter/editability ride each field's niceview FieldInfo.
+docs/nice4iot-extension-wishlist.md. Fields are declared in display order;
+their labels/sort/filter/editability ride each field's niceview FieldInfo
+(used where a field is still rendered via ModelForm/ModelGrid; the simplified
+UI's own display/simplified_ui.py mostly renders these by hand).
 """
+import datetime
 from typing import Annotated, Optional
 
 import niceview
@@ -29,6 +32,12 @@ class RoomDisplayRow(BaseModel):
             niceview.Field(label='Screen', table_sortable=True, table_filterable=True)
         ] = ''
 
+    room_label: Annotated[str,
+            Field(description="Compact label of the display's room ('number (name)'), "
+                              "empty if it isn't bound to one -- see RoomModel.room_label."),
+            niceview.Field(label='Room', editable=False, table_sortable=True, table_filterable=True)
+        ] = ''
+
     building: Annotated[str,
             Field(description="Building of the display's room."),
             niceview.Field(label='Building', editable=False, table_sortable=True, table_filterable=True)
@@ -41,13 +50,19 @@ class RoomDisplayRow(BaseModel):
 
     room_number: Annotated[str,
             Field(description="Number of the display's room."),
-            niceview.Field(label='Room', editable=False, table_sortable=True, table_filterable=True)
+            niceview.Field(label='Room number', editable=False, table_sortable=True, table_filterable=True)
         ] = ''
 
     online: Annotated[bool,
             Field(description='Whether the device was seen recently.'),
             niceview.Field(label='Online', editable=False, table_sortable=True)
         ] = False
+
+    last_seen_at: Annotated[Optional[datetime.datetime],
+            Field(description='When the device was last seen by nice4iot (any authenticated '
+                              'request or telemetry push), regardless of the online threshold.'),
+            niceview.Field(label='Last seen', editable=False, table_sortable=True)
+        ] = None
 
     rssi: Annotated[Optional[int],
             Field(description='WiFi signal strength (dBm). Empty until nice4iot exposes it.'),

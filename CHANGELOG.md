@@ -1,5 +1,149 @@
 # Changelog
 
+## 0.19.0 — 2026-08-22
+
+### Added
+
+- **Room Occupancy in the simplified UI.** The room detail's Occupancy tab
+  (`room/simplified_ui.py`) is no longer a placeholder: a status card (Free,
+  or Occupied with an "until" time and, below, when the next meeting today
+  starts) plus an Upcoming list of every event, both from the room's booking
+  system's iCal feed (`room/backend.py`'s new `get_room_events()` — a room's
+  `booking_ical_url`, if set, else the booking system's own `url`). Shows a
+  plain message instead of a card when the room has no booking system
+  configured, or the configured one has no URL.
+- **The iCal datasource is now compatible with a `BookingSystemModel`'s own
+  config**, not just a raw URL: `core/datasources/ical.py`'s `get_from_ical()`
+  takes `update_interval_s`/`max_days` as parameters (was read from the
+  global `ical_update_interval_s`/`ical_max_days` settings) plus optional
+  `username`/`password` (HTTP Basic Auth) and `headers`. The `RoomCalendar`
+  widget now goes through this too, via the room it renders — see below.
+- **Booking system detail: HTTP headers are now a proper list editor**, not a
+  JSON textarea — a two-column list (header, value) with a delete icon per
+  row, and an "Add" button matching DrillDownWrapper's own toolbar style
+  (dense round). `bookingsystem/simplified_ui.py`'s `_header_editor`.
+- **Booking system: category → color mapping**, for `RoomCalendar` card
+  colors. `BookingSystemModel.category_colors` (`Dict[str, str]`, an iCal
+  `CATEGORIES` entry → a hex color), edited the same way as `header` — a
+  swatch list with a delete icon per row and an Add dialog with a color
+  picker (`bookingsystem/simplified_ui.py`'s `_category_color_editor`).
+- **`RoomCalendar` is now room-driven, not hand-typed per screen.** The
+  widget renders whichever room the requesting *device* is bound to
+  (`DrawingContext.room`, resolved from the device binding by
+  `screen/backend.py`'s render pipeline) instead of fixed
+  `room_number`/`room_name`/`ical_url` fields on the widget itself — so one
+  screen can serve every room's door sign. Room number/name and the
+  calendar (via `room/backend.py`'s `get_room_events()`) come from the
+  device's bound `RoomModel`; the room's `notes` (multiline) are drawn under
+  the date. A card's color comes from the event's iCal `CATEGORIES` matched
+  against its booking system's `category_colors`, snapped to the nearest
+  color in the screen's palette (`catalog/backend.py`'s
+  `nearest_palette_color()`, excluding white) so it renders as a flat,
+  undithered color rather than whatever the final whole-image quantize
+  would make of an arbitrary hex. Rendered with no room bound (e.g. the
+  Templates preview below) shows placeholder room data instead of erroring.
+- **Auto-generated Room Calendar templates.** One screen per distinct
+  `(width, height, palette_id)` in the panel-type catalog is synthesized on
+  demand (`screen/backend.py`'s `synthetic_roomcalendar_screens()`, id
+  `__roomcalendar_<w>x<h>_<palette>`) — a full-canvas `RoomCalendar` widget,
+  not a file on disk. Any device can be assigned one directly; the render
+  pipeline resolves its own bound room the same way as for a hand-built
+  screen. Because the same template now has to render differently per
+  device, the screen render/image cache is keyed by `(root, screen id,
+  room id)` instead of just `(root, screen id)` — see
+  `get_screen_by_id()`/`ImageCache`.
+- **Templates section.** The simplified UI's Templates (`screen/
+  simplified_ui.py`) is no longer a placeholder: every screen in
+  `paths.screen_dir` (shared storage with the non-simplified editor) plus
+  the auto-generated Room Calendar templates above, each as a card with a
+  live thumbnail; clicking one opens a larger preview (the same ruler/
+  refresh view the full editor uses, `ui/preview.py`'s
+  `screen_image_view()`). Read-only — no Add/Edit/Delete here.
+- **Device panel type, to restrict its Screen choices.** A device binding
+  can now record its actual panel (`DeviceBinding.panel_type_id`, from the
+  panel-type catalog) — purely to filter the Screen select to matching
+  resolution/palette (`screen/backend.py`'s `screens_matching_panel_type()`,
+  `display/backend.py`'s `available_screen_ids()`); nothing validates
+  `screen_id` against it afterwards, and an already-assigned mismatched
+  screen stays visible rather than being dropped. Wired into nice4iot's
+  device card (`devicebinding/ui.py`, a new "Panel type" select next to
+  Screen) and the simplified UI's two Screen selects (filtered
+  automatically once a device has a panel type set, no picker of their
+  own).
+
+### Changed (breaking: stored data)
+
+- `BookingSystemModel.header` is now `Dict[str, str]` (was a JSON-text
+  `str`, edited as a raw textarea). A `field_validator` migrates an
+  old-format string on load (`json.loads`, `""` → `{}`), so existing booking
+  system files keep working; saving through the new editor rewrites the
+  field as a plain JSON object.
+- `RoomCalendarWidgetModel` no longer has `room_number`/`room_name`/
+  `ical_url` fields (see "room-driven" above) — the room comes from the
+  rendering device's binding instead. A screen file that still has them
+  loads unchanged (pydantic drops unknown fields by default); the widget
+  just ignores them from then on. `examples/screens/roomcalendar.json`
+  updated to match.
+
+### Changed
+
+- **niceview 0.26.3 (was 0.26.2).** Fixes `DrillDownWrapper` replaying its
+  slide-in animation on every data change, not just real navigation — the
+  simplified UI's Room detail no longer re-slides in on every autosaved
+  field edit, only on Back/Open.
+
+## 0.18.3 — 2026-08-22
+
+### Added
+
+- **Preferences > Schedule in the simplified UI.** A new section
+  (`schedule/simplified_ui.py`) edits "default", the schedule every screen
+  uses unless it overrides `update_schedule_id` — the same weekly-rule
+  editor as the non-simplified Schedules tab (`schedule/ui.py`), just fixed
+  to one file (auto-created empty on first visit), no list/rename/delete.
+- **"Add times in a range" dialog.** A dense "+" button next to a weekly
+  rule's Times field (both editors, since they share
+  `schedule_editor_content`) opens a dialog for a start time, end time and
+  interval (every 5/15/30 minutes, every hour — the default — or every 2
+  hours) and adds every time in that range in one go, merged with the
+  existing times. `schedule/backend.py`'s new `times_in_range()` does the
+  HH:MM math; `TIME_RANGE_INTERVALS` holds the interval choices.
+
+### Changed
+
+- The weekly rule editor's weekday/month fields are now labelled "Only on
+  these weekdays" / "Only in these months" (was "By weekdays"/"By months")
+  — both default to "every" (see `WeeklyScheduleModel`), so what unchecking
+  an entry does needed to be in the label itself: `checkbox_group` has no
+  hint slot, and a hover tooltip wouldn't show on a touch device either.
+
+## 0.18.2 — 2026-08-22
+
+### Changed
+
+- **Top-level Displays is now a drill-down list, not a grid.** The
+  project-wide Displays section (`display/simplified_ui.py`'s
+  `render_displays`) is now a niceview `DrillDownWrapper` over
+  `RoomDisplaysAdapter`, matching the room-scoped Displays tab: each row
+  shows an online/offline status dot, device name, room + screen, and
+  WiFi/battery icons; the detail adds the room's building/floor/number, last
+  seen, numeric RSSI/battery, an editable Screen select, and an "Open in
+  nice4iot" link for experts. No Add or Delete, same as before. `RSSI`/
+  `battery_voltage`/`last_seen_at`/`room_label`/`building`/`floor`/
+  `room_number` are populated on `RoomDisplayRow` for both the room-scoped
+  and top-level views (`RSSI`/`battery_voltage` stay `None` — no per-device
+  source in nice4iot yet). Replaces the old `EditGridWrapper`-based grid.
+- Moved `humanize_age()` (`ui/cards.py` → `util.py`) so it's shared by the
+  new "last seen" line and the datasource health rows that already used it.
+
+### Fixed
+
+- **A device binding's Screen select crashed with no screens in the
+  project.** An empty options list crashes the select widget regardless of
+  `clearable`; both display details (room-scoped and top-level) now fall
+  back to a plain hinted field when the project has no screens yet, same
+  rule `booking_system_field_infos()` already used for booking systems.
+
 ## 0.18.1 — 2026-08-22
 
 ### Fixed

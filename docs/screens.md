@@ -15,9 +15,18 @@ A screen's `widgets` list is made of typed widgets, each positioned with
 
 - **`Text`** / **`Date`** — static text and a formatted current date
   (`date_format`, e.g. `EEEE, dd. MMMM yyyy`), with configurable font and size.
-- **`RoomCalendar`** — fetches an iCal feed (`ical_url`) with recurring-event
-  expansion, caches it, and shows the current and next appointments plus a
-  list of further ones. `room_number`/`room_name` label the screen.
+- **`RoomCalendar`** — shows whichever room the *device* rendering the screen
+  is bound to (Displays, or the device's E-Paper/general card): its number,
+  name and notes (multiline, under the date), and its booking system's iCal
+  feed (recurring-event expansion, cached) with the current and next
+  appointments plus a list of further ones. A card's color comes from the
+  event's iCal `CATEGORIES` matched against the booking system's
+  `category_colors` (Settings › Booking systems), approximated to the
+  screen's palette. Rendered with no room bound (e.g. a Templates preview)
+  it shows placeholder room data instead of erroring. Since the widget
+  carries no room data of its own, one screen can serve every room's door
+  sign — see [Auto-generated Room Calendar templates](#auto-generated-room-calendar-templates)
+  below.
 - **`Image`** — renders an image loaded from a `url` or from a `file` in the
   project directory (`source_type` selects which). By default the image is
   loaded once and cached; set `reload_each_time` to re-fetch on every render
@@ -189,14 +198,35 @@ overrides) the shipped ones. Unlike `panel_types.json`, editing it changes what
 gets served — a screen references a palette by id rather than containing it —
 so a change there re-renders every screen using it.
 
+### Auto-generated Room Calendar templates
+
+For every distinct `(width, height, palette_id)` combination in the
+panel-type catalog, a screen is synthesized on demand — a full-canvas
+`RoomCalendar` widget, sized and paletted for that panel, id
+`__roomcalendar_<width>x<height>_<palette_id>` (e.g.
+`__roomcalendar_800x480_bw`). Not a file in `data/screens/` — built fresh
+from `panel_types.json` every time it's requested, so it can never drift out
+of sync with the catalog. The simplified UI's Templates section lists these
+alongside real screens (read-only preview only); a device can be pointed at
+one directly, the same as any other screen id, and will show whichever room
+it is bound to. Since a template is shared across every device that
+resolution/palette applies to, `/…/screens/<id>/image.png` renders and
+caches differently for each requesting device (by its device binding's
+`room_id`) rather than once for the id alone.
+
 ## Display bindings
 
 An optional `data/device_bindings.json` file maps a display's name to the
-screen it renders (and, in nice4iot mode, the room it hangs in), e.g.
-`{"hallway": {"screen_id": "epaper_43bw"}}`. A display can then be addressed
-by a stable name instead of the screen file name, and several displays can
-share one screen. (In nice4iot extension mode, assigning a screen or room to a
-device writes this file automatically — see [Architecture](architecture.md).)
+screen it renders, the room it hangs in, and (optionally) its actual panel
+type, e.g. `{"hallway": {"screen_id": "epaper_43bw", "room_id": "a-101",
+"panel_type_id": "waveshare_7in5_v2"}}`. A display can then be addressed by
+a stable name instead of the screen file name, and several displays can
+share one screen. `panel_type_id` only restricts which screens the
+management UI's Screen select offers (matching resolution/palette) — it is
+never checked against `screen_id` at render time, so a mismatch set some
+other way still renders. (In nice4iot extension mode, assigning a screen,
+room or panel type to a device writes this file automatically — see
+[Architecture](architecture.md).)
 
 An older `data/aliases.json` (the bare `{"hallway": "epaper_43bw"}` format) is
 migrated to `device_bindings.json` automatically on first use.
@@ -207,8 +237,13 @@ A schedule file in `data/schedules/` is a plain JSON list of weekly rules
 (weekdays, months, times of day) that determine when a screen expires and is
 re-rendered. Screens reference one by `update_schedule_id` (default:
 `"default"`, so most setups need a `default.json`). The management UI edits a
-schedule as one card per weekly rule with weekday checkboxes, a month
-multiselect, and time chips.
+schedule as one card per weekly rule with weekday checkboxes ("Only on these
+weekdays"), a month multiselect ("Only in these months"), and time chips; a
+"+" next to the times adds every time in a range (start, end, interval —
+every 5/15/30 minutes, hour, or two hours) in one go instead of one chip at a
+time. The simplified UI has the same editor, under Preferences > Schedule,
+fixed to `default.json` — since screens default to it, that's the one
+schedule that governs every display unless a screen overrides it.
 
 Leaving `update_schedule_id` empty means the screen has no schedule and is only
 re-rendered on request or when a widget provides its own expiry (e.g. a
@@ -230,7 +265,10 @@ formats):
 - `examples/screens/simple.json` — a minimal screen with `Text` and `Date`
   widgets, no external dependencies.
 - `examples/screens/roomcalendar.json` — a full-size door sign using the
-  `RoomCalendar` widget. Set `ical_url` to a real iCal feed before use.
+  `RoomCalendar` widget (or use one of the auto-generated templates instead —
+  see [Auto-generated Room Calendar templates](#auto-generated-room-calendar-templates)).
+  Bind a device to it and assign that device a room with a booking system to
+  see it render.
 - `examples/screens/weather.json` — all three `Weather*` widgets (current
   conditions, forecast strip, and a combined temperature+precipitation chart)
   for Berlin; adjust `latitude`/`longitude` for your location.

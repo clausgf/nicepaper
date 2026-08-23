@@ -9,11 +9,12 @@ each shows its own calendar; for Exchange later the split is the same (system =
 account/server, room = mailbox/resource).
 """
 import datetime
-from typing import Annotated, Literal
+import json
+from typing import Annotated, Dict, Literal
 from uuid import uuid4
 
 import niceview
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 BookingSystemType = Literal["iCal"]
 
@@ -51,10 +52,41 @@ class BookingSystemModel(BaseModel):
             niceview.Field(password=True)
         ] = ""
 
-    header: Annotated[str,
-            Field(description='Optional HTTP header dictionary.'),
-            niceview.Field(widget_type='ui.textarea', placeholder='{"Header-Name": "value"}')
-        ] = '{\n  "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0"\n}'
+    # a dict, not a JSON-text field: hand-rendered as a two-column list with a
+    # delete icon per row (bookingsystem/simplified_ui.py's _header_editor),
+    # not through ModelForm -- see BookingSystemModel.Meta.layout, which
+    # omits it. hidden=True keeps it out of any *other* form that renders
+    # this model without an explicit layout (e.g. RoomModel's modelselect).
+    header: Annotated[Dict[str, str],
+            Field(default_factory=lambda: {
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0'},
+                description='Extra HTTP headers sent with every request to the feed.'),
+            niceview.Field(hidden=True)
+        ]
+
+    @field_validator('header', mode='before')
+    @classmethod
+    def _migrate_legacy_header(cls, v):
+        # pre-0.19 stored header as JSON text (a plain textarea); coerce it to
+        # the dict this field is now typed as, so files written before this
+        # change still load instead of failing validation.
+        if isinstance(v, str):
+            return json.loads(v) if v.strip() else {}
+        return v
+
+    # a dict, not a JSON-text field -- hand-rendered as a color-swatch list with
+    # a delete icon per row (bookingsystem/simplified_ui.py's
+    # _category_color_editor), same shape as header above. hidden=True for the
+    # same reason: keep it out of any *other* form that renders this model
+    # without an explicit layout (e.g. RoomModel's modelselect).
+    category_colors: Annotated[Dict[str, str],
+            Field(default_factory=dict,
+                 description="Maps an iCal event's CATEGORIES entry to a color "
+                             "(hex, e.g. '#ff0000') for RoomCalendar cards. A "
+                             "color not in the panel's palette is approximated "
+                             "to the nearest palette color at render time."),
+            niceview.Field(hidden=True)
+        ]
 
     update_interval: Annotated[datetime.timedelta,
             Field(description='How often the system fetches the calendar feed.'),
@@ -80,10 +112,9 @@ class BookingSystemModel(BaseModel):
         title_plural = "Booking systems"
         description = "A calendar source to determine a room's occupancy."
         layout = [
-            ['name', 'type:shrink'], 
-            'url', 
-            ['username', 'password'], 
-            'header', 
-            ['update_interval', 'max_days_ahead'], 
+            ['name', 'type:shrink'],
+            'url',
+            ['username', 'password'],
+            ['update_interval', 'max_days_ahead'],
             'description',
         ]

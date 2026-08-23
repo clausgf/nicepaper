@@ -96,7 +96,7 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
         # Full-page chrome of its own -- deliberately not wrapped in frame().
         # Standalone has no project concept, so it renders the single fixed
         # root (passed in) under the name 'standalone'.
-        simplified_ui.render('standalone', paths=paths)
+        simplified_ui.render('standalone', paths=paths, image_base_url=image_base_url)
 
     @ui.page('/project')
     def page_project():

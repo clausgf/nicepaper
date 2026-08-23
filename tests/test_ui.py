@@ -2,7 +2,6 @@ import datetime
 
 from niceview.dataadapter import FileEntry
 
-from extensions.epaper.ui.cards import _humanize_age
 from extensions.epaper.ui.drilldown import _entry_caption
 
 
@@ -20,16 +19,6 @@ def test_entry_caption_uses_kib_below_1_mib():
 
 def test_entry_caption_uses_mib_at_1_mib_and_above():
     assert "1.0 MiB" in _entry_caption(_entry(1024**2))
-
-
-def test_humanize_age():
-    now = datetime.datetime(2026, 1, 1, 12, 0, tzinfo=datetime.timezone.utc)
-    d = datetime.timedelta
-    assert _humanize_age(None, now) == "never"
-    assert _humanize_age(now - d(seconds=30), now) == "just now"
-    assert _humanize_age(now - d(minutes=5), now) == "5 min ago"
-    assert _humanize_age(now - d(hours=3), now) == "3 h ago"
-    assert _humanize_age(now - d(days=2), now) == "2 d ago"
 
 
 def test_default_widgets_have_no_empty_required_fields():
@@ -151,16 +140,16 @@ def _element_type_names(client) -> list:
 
 
 def test_simplified_ui_nav_leaves_are_the_content_sections():
-    """The sidebar's leaves (the addressable views) are exactly the four
+    """The sidebar's leaves (the addressable views) are exactly the five
     content sections, Templates right after Rooms; Settings is a group and
-    never a view itself."""
+    never a view itself, with Schedule before Booking systems."""
     from extensions.epaper.ui.simplified_ui import _nav
     from extensions.epaper.ui.simplified_ui.layout import _flatten
 
     nav = _nav()
-    assert list(_flatten(nav)) == ["rooms", "templates", "displays", "booking"]
+    assert list(_flatten(nav)) == ["rooms", "templates", "displays", "schedule", "booking"]
     settings = next(i for i in nav if i.id == "settings")
-    assert settings.render is None and [c.id for c in settings.children] == ["booking"]
+    assert settings.render is None and [c.id for c in settings.children] == ["schedule", "booking"]
 
 
 def _simplified_paths(tmp_path):
@@ -191,6 +180,36 @@ def test_simplified_ui_frame_renders_header_and_drawer(tmp_path):
     assert "Rooms" in labels
 
 
+def test_templates_section_lists_real_and_synthetic_screens(tmp_path):
+    """Templates lists every screen file (shared storage with the
+    non-simplified editor) plus the auto-generated Room Calendar templates
+    (one per distinct panel-catalog resolution/palette), each as a card with
+    its panel_label/generated name."""
+    import json
+
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.screen.simplified_ui import render_templates
+    from extensions.epaper.ui.simplified_ui import _nav
+    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+
+    paths = _simplified_paths(tmp_path)
+    (paths.screen_dir / "my-screen.json").write_text(json.dumps({
+        "width": 200, "height": 100,
+        "widgets": [{"widget_type": "Text", "position_x": 0, "position_y": 0, "text": "hi"}],
+    }))
+
+    shell = Shell("demo-project", paths, _flatten(_nav()), image_base_url="/api/screen")
+    with Client(page("/test-templates"), request=None) as client:
+        render_templates(shell)
+        labels = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+
+    assert any("200x100" in label for label in labels), "the real screen's panel label should be listed"
+    assert any(label.startswith("Room Calendar ") for label in labels), \
+        "the auto-generated templates should be listed too"
+
+
 def test_simplified_ui_room_detail_lays_out_every_setting(tmp_path):
     """The room detail lays out the full (English) field set -- number, name,
     building, floor, type, capacity, photo, notes, booking system, iCal URL --
@@ -217,6 +236,67 @@ def test_simplified_ui_room_detail_lays_out_every_setting(tmp_path):
                   "Capacity", "Photo", "Description", "Booking system", "iCal URL"):
         assert field in labels, f"{field!r} missing from room settings"
     assert {"Occupancy", "Settings", "Displays"} <= tab_labels
+
+
+def test_room_occupancy_status_shows_free_or_occupied():
+    """_occupancy_status (room/simplified_ui.py) shows 'Occupied' with an
+    'Until HH:MM' line when now falls inside an event, 'Free' otherwise, plus
+    a 'Next'/'Then' line naming today's next event when there is one."""
+    from zoneinfo import ZoneInfo
+
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.global_config.backend import app_config
+    from extensions.epaper.room.simplified_ui import _occupancy_status
+
+    now = datetime.datetime.now(ZoneInfo(app_config.timezone))
+
+    def _event(start_delta, end_delta, summary):
+        return {"dtstart": (now + start_delta).isoformat(), "dtend": (now + end_delta).isoformat(),
+                "organizer": "", "summary": summary, "categories": ""}
+
+    current = _event(datetime.timedelta(minutes=-10), datetime.timedelta(minutes=20), "Ongoing")
+    later_today = _event(datetime.timedelta(hours=2), datetime.timedelta(hours=3), "Later meeting")
+
+    with Client(page("/test-occupancy-occupied"), request=None) as client:
+        _occupancy_status([current, later_today])
+        texts = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+    assert "Occupied" in texts
+    assert any(t.startswith("Then:") and "Later meeting" in t for t in texts)
+
+    with Client(page("/test-occupancy-free"), request=None) as client:
+        _occupancy_status([later_today])
+        texts = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+    assert "Free" in texts
+    assert any(t.startswith("Next:") and "Later meeting" in t for t in texts)
+
+    with Client(page("/test-occupancy-free-nothing-today"), request=None) as client:
+        _occupancy_status([])
+        texts = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+    assert "Free" in texts
+    assert "No more meetings today" in texts
+
+
+def test_room_occupancy_upcoming_lists_events_with_organizer():
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.room.simplified_ui import _occupancy_upcoming
+
+    events = [{"dtstart": "2026-09-01T10:00:00+02:00", "dtend": "2026-09-01T11:00:00+02:00",
+              "organizer": "Alice", "summary": "Kickoff", "categories": ""}]
+
+    with Client(page("/test-occupancy-upcoming"), request=None) as client:
+        _occupancy_upcoming(events)
+        labels = {e.text for e in client.elements.values() if type(e).__name__ == "ItemLabel"}
+    assert "Kickoff" in labels
+    assert any("Alice" in label for label in labels)
+
+    with Client(page("/test-occupancy-upcoming-empty"), request=None) as client:
+        _occupancy_upcoming([])
+        texts = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+    assert "No upcoming appointments." in texts
 
 
 def test_room_displays_panel_shows_summary_and_bound_devices(tmp_path, monkeypatch):
@@ -260,6 +340,121 @@ def test_room_displays_panel_shows_summary_and_bound_devices(tmp_path, monkeypat
     assert "weather" in labels  # list row subtitle (screen_id)
 
 
+def test_displays_top_level_lists_devices_and_shows_room_and_status(tmp_path, monkeypatch):
+    """The project-wide Displays view (display/simplified_ui.py) lists every
+    device (title=device_name, subtitle=room_label + screen_id) and, in the
+    detail, shows the room info block, an online/last-seen line and the
+    nice4iot expert link -- without needing a room_id."""
+    import datetime
+    import types
+
+    import extensions.epaper.display.backend as display_backend
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.devicebinding.backend import set_device_binding
+    from extensions.epaper.display.backend import RoomDisplaysAdapter
+    from extensions.epaper.display.simplified_ui import render_displays, _render_detail
+    from extensions.epaper.room.backend import create_room, room_adapter
+    from extensions.epaper.ui.simplified_ui import _nav
+    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+
+    paths = _simplified_paths(tmp_path)
+    room = create_room(paths)
+    room.room_number, room.room_name = "A-101", "North Conference"
+    room_adapter(paths, room.id).save(room)
+    set_device_binding(paths, "sign-1", room_id=room.id, screen_id="weather")
+
+    monkeypatch.setattr(display_backend, "_project_devices", lambda project: [
+        types.SimpleNamespace(name="sign-1", last_seen_at=datetime.datetime.now(datetime.timezone.utc)),
+        types.SimpleNamespace(name="sign-2", last_seen_at=None),
+    ])
+    monkeypatch.setattr(display_backend, "_device_url",
+                        lambda project, name: f"https://nice4iot.example/{project}/devices/{name}")
+
+    shell = Shell("demo-project", paths, _flatten(_nav()))
+    with Client(page("/test-displays-list"), request=None) as client:
+        render_displays(shell)
+        labels = {e.text for e in client.elements.values()
+                  if type(e).__name__ in ("Label", "ItemLabel")}
+
+    assert "sign-1" in labels and "sign-2" in labels  # list row titles (device_name)
+    assert "A-101 (North Conference) · weather" in labels  # sign-1's subtitle
+
+    adapter = RoomDisplaysAdapter(paths, "demo-project")
+    with Client(page("/test-displays-detail-bound"), request=None) as client:
+        _render_detail(paths, adapter, "sign-1")
+        texts = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+        links = [e for e in client.elements.values() if type(e).__name__ == "Link"]
+    assert any("A-101 (North Conference)" in t for t in texts)
+    assert any("Online" in t and "last seen" in t for t in texts)
+    assert links and links[0]._props.get("href") == "https://nice4iot.example/demo-project/devices/sign-1"
+
+    with Client(page("/test-displays-detail-unbound"), request=None) as client:
+        _render_detail(paths, adapter, "sign-2")
+        texts = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+    assert "Not assigned to a room" in texts
+    assert any("Offline" in t and "never" in t for t in texts)
+
+
+def test_display_screen_select_falls_back_when_no_screens_exist(tmp_path, monkeypatch):
+    """A select widget crashes on an empty options list, so if
+    available_screen_ids() ever returns [] (it no longer can from "zero
+    screens in the project" alone -- the auto-generated Room Calendar
+    templates, screen.backend.synthetic_roomcalendar_screens, always give at
+    least one -- but the guard stays for a hypothetically empty panel-type
+    catalog too) both the top-level and room-scoped display details must
+    fall back to a plain hinted field instead of an empty select."""
+    import types
+
+    import extensions.epaper.display.backend as display_backend
+    import extensions.epaper.display.simplified_ui as display_simplified_ui
+    import extensions.epaper.room.simplified_ui as room_simplified_ui
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.devicebinding.backend import set_device_binding
+    from extensions.epaper.display.backend import RoomDisplaysAdapter
+    from extensions.epaper.display.simplified_ui import _render_detail as top_level_detail
+    from extensions.epaper.room.backend import create_room
+    from extensions.epaper.room.simplified_ui import _display_detail
+    from extensions.epaper.ui.simplified_ui import _nav
+    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+
+    paths = _simplified_paths(tmp_path)
+    room = create_room(paths)
+    set_device_binding(paths, "sign-1", room_id=room.id)
+    monkeypatch.setattr(display_backend, "_project_devices", lambda project: [
+        types.SimpleNamespace(name="sign-1", last_seen_at=None)])
+    monkeypatch.setattr(display_simplified_ui, "available_screen_ids", lambda paths, device_name: [])
+    monkeypatch.setattr(room_simplified_ui, "available_screen_ids", lambda paths, device_name: [])
+
+    adapter = RoomDisplaysAdapter(paths, "demo-project")
+    with Client(page("/test-no-screens-top-level"), request=None) as client:
+        top_level_detail(paths, adapter, "sign-1")
+        hints = {e._props.get("hint") for e in client.elements.values()}
+    assert "No screens yet — add one in Templates" in hints
+
+    shell = Shell("demo-project", paths, _flatten(_nav()))
+    room_adapter = RoomDisplaysAdapter(paths, "demo-project", room.id)
+    with Client(page("/test-no-screens-room"), request=None) as client:
+        _display_detail(shell, room_adapter, "sign-1", lambda new_key: None)
+        hints = {e._props.get("hint") for e in client.elements.values()}
+    assert "No screens yet — add one in Templates" in hints
+
+
+def test_available_screen_ids_always_offers_synthetic_templates(tmp_path):
+    """With zero real screen files, available_screen_ids() still offers the
+    auto-generated Room Calendar templates -- the empty-project case is no
+    longer reachable through it (see the fallback test above)."""
+    from extensions.epaper.display.backend import available_screen_ids
+
+    paths = _simplified_paths(tmp_path)
+    ids = available_screen_ids(paths, "sign-1")
+    assert ids, "the built-in panel catalog should yield at least one template"
+    assert all(i.startswith("__roomcalendar_") for i in ids)
+
+
 def test_rooms_project_tab_grid_resolves_booking_system_name(tmp_path):
     """The unsimplified Rooms project tab (room/ui.py) is an EditGridWrapper over
     the rooms directory. Its Booking system column is a modelselect resolved
@@ -295,6 +490,31 @@ def test_rooms_project_tab_grid_resolves_booking_system_name(tmp_path):
         "booking system name not resolved in the grid (modelselect/repository/__str__ wiring)"
 
 
+def test_rooms_project_tab_create_dialog_survives_no_booking_systems(tmp_path):
+    """With zero booking systems configured, niceview resolves the modelselect
+    repository to options={} -- and its own select widget then treats that
+    falsy dict as "no options defined" and raises. The Add/Edit dialog builds
+    its form the same way (ModelForm.from_item + with_repositories), so
+    rooms_wrapper() must not register an empty repository, or opening the
+    dialog on a fresh install (no booking systems yet) crashes."""
+    from nicegui.client import Client
+    from nicegui.page import page
+    from niceview import ModelForm
+
+    from extensions.epaper.room.models import RoomModel
+    from extensions.epaper.room.ui import rooms_wrapper
+
+    paths = _simplified_paths(tmp_path)
+    wrapper = rooms_wrapper(paths, "demo-project")
+
+    with Client(page("/test-rooms-create-dialog"), request=None) as client:
+        form = ModelForm.from_item(RoomModel())
+        if wrapper._model_repositories:
+            form.with_repositories(wrapper._model_repositories)
+        form.render()  # must not raise ValueError("... has no options ...")
+        assert client.elements
+
+
 def test_simplified_ui_booking_form_lays_out_fields():
     """The BookingSystemModel form (rendered by the booking DrillDownWrapper's
     default detail) exposes the system's fields."""
@@ -310,6 +530,128 @@ def test_simplified_ui_booking_form_lays_out_fields():
 
     for field in ("Name", "Type", "Url", "Description"):
         assert field in labels, f"{field!r} missing from booking system form"
+
+
+def test_booking_system_header_editor_lists_entries_with_round_add_and_delete(tmp_path):
+    """Booking system detail's header editor (bookingsystem/simplified_ui.py):
+    a two-column list (header, value) with a delete icon per row, and an Add
+    button matching DrillDownWrapper's own toolbar style (dense round --
+    see main.py's niceview.set_chrome_style(toolbar_icon_button_props=...))."""
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.bookingsystem.backend import booking_systems_adapter, create_booking_system
+    from extensions.epaper.bookingsystem.simplified_ui import _header_editor
+
+    paths = _simplified_paths(tmp_path)
+    adapter = booking_systems_adapter(paths)
+    system = create_booking_system(paths)
+    system.header = {"X-Api-Key": "secret123", "Accept": "text/calendar"}
+    adapter.update(system)
+
+    with Client(page("/test-booking-header-editor"), request=None) as client:
+        _header_editor(adapter, system.id)
+        item_labels = {e.text for e in client.elements.values() if type(e).__name__ == "ItemLabel"}
+        buttons = [e for e in client.elements.values() if type(e).__name__ == "Button"]
+
+    assert {"X-Api-Key", "secret123", "Accept", "text/calendar"} <= item_labels
+
+    delete_buttons = [b for b in buttons if b._props.get("icon") == "delete"]
+    assert len(delete_buttons) == 2
+    for b in delete_buttons:
+        assert b._props.get("round") and b._props.get("color") == "negative"
+
+    add_buttons = [b for b in buttons if b._props.get("icon") == "add"]
+    assert len(add_buttons) == 1
+    assert add_buttons[0]._props.get("dense") and add_buttons[0]._props.get("round")
+
+
+def test_booking_system_header_editor_shows_placeholder_when_empty(tmp_path):
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.bookingsystem.backend import booking_systems_adapter, create_booking_system
+    from extensions.epaper.bookingsystem.simplified_ui import _header_editor
+
+    paths = _simplified_paths(tmp_path)
+    adapter = booking_systems_adapter(paths)
+    system = create_booking_system(paths)
+    system.header = {}
+    adapter.update(system)
+
+    with Client(page("/test-booking-header-editor-empty"), request=None) as client:
+        _header_editor(adapter, system.id)
+        item_labels = {e.text for e in client.elements.values() if type(e).__name__ == "ItemLabel"}
+
+    assert "No custom headers." in item_labels
+
+
+def test_simplified_schedule_creates_and_edits_the_default_schedule(tmp_path):
+    """Preferences > Schedule (schedule/simplified_ui.py) auto-creates
+    default.json on first visit and renders schedule/ui.py's rule-cards
+    editor for it directly -- no list/rename/delete chrome, since there is
+    only ever one schedule here."""
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.schedule.simplified_ui import DEFAULT_SCHEDULE_FILENAME, render_schedule
+    from extensions.epaper.ui.simplified_ui import _nav
+    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+
+    paths = _simplified_paths(tmp_path)
+    shell = Shell("demo-project", paths, _flatten(_nav()))
+
+    with Client(page("/test-simplified-schedule"), request=None) as client:
+        render_schedule(shell)
+        labels = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+        button_texts = {e.text for e in client.elements.values() if type(e).__name__ == "Button"}
+
+    assert (paths.schedule_dir / DEFAULT_SCHEDULE_FILENAME).is_file()
+    assert "Schedule" in labels
+    assert "No weekly rules yet — add one below." in labels
+    assert "Add Rule" in button_texts
+
+
+def test_schedule_rule_card_has_an_add_times_button(tmp_path):
+    """Each weekly rule card offers a '+' next to Times to bulk-add times in
+    a range, in both the simplified and non-simplified editor (same
+    schedule_editor_content); by_weekdays/by_months carry a restriction
+    hint so an unfamiliar user can tell what unchecking an entry does."""
+    from nicegui.client import Client
+    from nicegui.page import page
+    from niceview import JsonListAdapter
+
+    from extensions.epaper.schedule.models import WeeklyScheduleModel
+    from extensions.epaper.schedule.ui import schedule_editor_content
+    from extensions.epaper.paths import EpaperPaths
+
+    paths = EpaperPaths(root=tmp_path)
+    paths.ensure_dirs()
+    schedule_path = paths.schedule_dir / "default.json"
+    JsonListAdapter(WeeklyScheduleModel, schedule_path).create(WeeklyScheduleModel(times=["08:00"]))
+
+    with Client(page("/test-schedule-rule-card"), request=None) as client:
+        schedule_editor_content(paths, "default.json")
+        tooltips = {e.text for e in client.elements.values() if type(e).__name__ == "Tooltip"}
+        labels = {e._props.get("label") for e in client.elements.values()}
+        texts = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+
+    assert "Add times in a range" in tooltips
+    assert "Only on these weekdays" in labels or "Only on these weekdays" in texts
+    assert "Only in these months" in labels or "Only in these months" in texts
+
+
+def test_times_in_range_used_by_add_times_dialog():
+    """The dialog's own math (times_in_range + set-union merge) matches what
+    a user adding a lunch-hours range on top of an existing morning time
+    would expect -- guards the merge/sort/dedup behavior schedule/ui.py's
+    add_times_in_range relies on, without driving the async dialog itself."""
+    from extensions.epaper.schedule.backend import times_in_range
+
+    existing = ["08:00"]
+    new_times = times_in_range("12:00", "13:00", 30)
+    merged = sorted(set(existing) | set(new_times))
+    assert merged == ["08:00", "12:00", "12:30", "13:00"]
 
 
 def test_room_booking_select_lists_configured_systems(tmp_path):

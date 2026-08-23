@@ -8,6 +8,11 @@ from extensions.epaper.screen.models import (
 
 
 def test_screen_model_valid():
+    """Also covers loading a pre-0.20 RoomCalendar widget: room_number/
+    room_name/ical_url used to be typed directly into the widget and are
+    dropped now (the widget derives them from the rendering device's own
+    room, see core/widgets/roomcalendar.py) -- an old screen file with them
+    must still load instead of failing on now-unknown fields."""
     valid_data = {
         "width": 400,
         "height": 300,
@@ -39,6 +44,8 @@ def test_screen_model_valid():
     assert screen.widgets[0].position == (0, 0)
     assert screen.widgets[0].size == (100, 200)
     assert isinstance(screen.widgets[1], RoomCalendarWidgetModel)
+    for legacy_field in ("room_number", "room_name", "ical_url"):
+        assert not hasattr(screen.widgets[1], legacy_field)
 
 
 def test_screen_model_missing_size():

@@ -13,10 +13,7 @@
       "position_x": 0,
       "position_y": 0,
       "size_width": 800,
-      "size_height": 480,
-      "room_number": "101",
-      "room_name": "Conference Room",
-      "ical_url": "https://example.com/calendar.ics"
+      "size_height": 480
     }
   ]
 }

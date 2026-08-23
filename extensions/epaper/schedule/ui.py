@@ -12,6 +12,7 @@ from nicegui import ui
 from niceview import DrillDownWrapper, Field, JsonListAdapter, ModelForm
 from niceview.util import confirm_dialog
 
+from extensions.epaper.schedule.backend import TIME_RANGE_INTERVALS, times_in_range
 from extensions.epaper.schedule.models import WeeklyScheduleModel
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.ui.drilldown import directory_drilldown
@@ -19,9 +20,15 @@ from extensions.epaper.ui.forms import FORM_STYLE
 from extensions.epaper.util import check_filename
 
 
-_RULE_LAYOUT = ['by_weekdays', 'by_months', 'times']
+_RULE_LAYOUT = ['by_weekdays', 'by_months']
 _RULE_FIELD_INFOS = {
-    'by_weekdays': Field(widget_type='checkbox_group', props='inline'),
+    # by_weekdays/by_months default to "every" (see WeeklyScheduleModel), so
+    # unchecking entries is what restricts the rule -- labelled by what
+    # unchecking does, not by the field name, since checkbox_group has no
+    # hint slot to add that as a separate note (and a hint/tooltip wouldn't
+    # show on a touch device anyway).
+    'by_weekdays': Field(widget_type='checkbox_group', props='inline', label='Only on these weekdays'),
+    'by_months': Field(label='Only in these months'),
     # times: List[Annotated[str, pattern]] -> ui.input_chips. Which timezone
     # the times are in isn't guessable and the description is only a tooltip
     # (no hover on a touch device), so it gets a short permanent hint too.
@@ -63,6 +70,30 @@ def schedule_editor_content(paths: EpaperPaths, filename: str,
 
     adapter = JsonListAdapter(WeeklyScheduleModel, schedule_path)
 
+    async def add_times_in_range(key: str) -> None:
+        """'+' next to Times: pick a start/end (HH:MM) and an interval, and
+        add every time in that range to the rule (merged with what's already
+        there, deduplicated -- WeeklyScheduleModel sorts on save either way)."""
+        with ui.dialog() as dialog, ui.card().classes('min-w-72 gap-2'):
+            ui.label('Add times in a range').classes('text-subtitle1')
+            start = ui.input('Start', placeholder='HH:MM').props('mask="##:##" outlined dense')
+            end = ui.input('End', placeholder='HH:MM').props('mask="##:##" outlined dense')
+            interval = ui.select(TIME_RANGE_INTERVALS, value=60, label='Interval').props('outlined dense')
+            with ui.row().classes('w-full justify-end'):
+                ui.button('Cancel', on_click=lambda: dialog.submit(False)).props('flat')
+                ui.button('Add', on_click=lambda: dialog.submit(True)).props('unelevated')
+        if not await dialog:
+            return
+        try:
+            new_times = times_in_range(start.value, end.value, interval.value)
+        except ValueError as exc:
+            ui.notify(str(exc), type='negative')
+            return
+        item = adapter.read(key)
+        item.times = sorted(set(item.times) | set(new_times))
+        adapter.update(item)
+        rule_cards.refresh()
+
     @ui.refreshable
     def rule_cards():
         rules = list(adapter.items())
@@ -78,6 +109,16 @@ def schedule_editor_content(paths: EpaperPaths, filename: str,
                 ModelForm.from_adapter(WeeklyScheduleModel, adapter, key, autosave=True,
                                        layout=_RULE_LAYOUT, field_infos=_RULE_FIELD_INFOS,
                                        **FORM_STYLE).render()
+                # Times gets its own single-field form so the '+' can sit in the
+                # same row, right after it -- ModelForm has no per-field action slot.
+                with ui.row().classes('w-full items-start gap-2 no-wrap'):
+                    with ui.column().classes('flex-grow gap-0'):
+                        ModelForm.from_adapter(WeeklyScheduleModel, adapter, key, autosave=True,
+                                               layout=['times'], field_infos=_RULE_FIELD_INFOS,
+                                               **FORM_STYLE).render()
+                    ui.button(icon='add').props('dense') \
+                        .tooltip('Add times in a range') \
+                        .on_click(lambda _, k=key: add_times_in_range(k))
 
     async def delete_rule(key: str):
         if not await confirm_dialog('Delete rule', 'Delete this weekly rule? This cannot be undone.',

@@ -9,25 +9,12 @@ import datetime
 from typing import Optional, Sequence
 from zoneinfo import ZoneInfo
 
-from nicegui import ui
+from nicegui import context, ui
 
 from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.core.datasources.homeassistant import EntityStatus
 from extensions.epaper.core.datasources.weather import WeatherStatus
-
-
-def _humanize_age(dt: Optional[datetime.datetime], now: datetime.datetime) -> str:
-    """'just now' / 'N min ago' / 'N h ago' / 'N d ago' for a past datetime."""
-    if dt is None:
-        return 'never'
-    minutes = max(0, int((now - dt).total_seconds() // 60))
-    if minutes < 1:
-        return 'just now'
-    if minutes < 60:
-        return f'{minutes} min ago'
-    if minutes < 60 * 24:
-        return f'{minutes // 60} h ago'
-    return f'{minutes // (60 * 24)} d ago'
+from extensions.epaper.util import humanize_age
 
 
 def _failure_tooltip(status, now: datetime.datetime) -> str:
@@ -61,12 +48,12 @@ def _datasource_row(status, now: datetime.datetime, icons: tuple[str, str], subj
     caller rather than an attribute lookup here."""
     ok_icon, bad_icon = icons
     if not status.failing:
-        _health_row(ok_icon, 'positive', f'{subject}: updated {_humanize_age(status.last_update, now)}', None)
+        _health_row(ok_icon, 'positive', f'{subject}: updated {humanize_age(status.last_update, now)}', None)
         return
     tip = _failure_tooltip(status, now)
     if has_value:
         _health_row(bad_icon, 'warning',
-                    f'{subject}: stale, last OK {_humanize_age(status.last_update, now)}', tip)
+                    f'{subject}: stale, last OK {humanize_age(status.last_update, now)}', tip)
     else:
         _health_row(bad_icon, 'negative', f'{subject}: unavailable', tip)
 
@@ -89,8 +76,13 @@ def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
     with ui.card().classes('w-full'):
         with ui.row().classes('w-full items-center justify-between'):
             ui.label('E-Paper').classes('text-subtitle1 font-bold')
+            # ui.navigate.to() would route this through nice4iot's ui.sub_pages client-side
+            # router (this card lives inside it) -- which has no entry for the extension's
+            # standalone page (only a real HTTP request reaches that route, in
+            # nice4iot's home_page()) and shows its own 404. client.open() forces a real
+            # browser navigation instead, bypassing that router.
             ui.button(icon='open_in_new').props('dense flat size=sm') \
-                .tooltip('Open the screens').on_click(lambda: ui.navigate.to(open_url))
+                .tooltip('Open the screens').on_click(lambda: context.client.open(open_url))
         ui.label(f'{num_screens} screen(s), {num_schedules} schedule(s)').classes('text-caption text-grey-7')
         for status in weather_statuses:
             _datasource_row(status, now, ('cloud_done', 'cloud_off'),

@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import re
 from typing import List, Optional
 from zoneinfo import ZoneInfo
 import aiofiles
@@ -8,10 +9,30 @@ import pydantic
 from dateutil.rrule import rrule, DAILY
 from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.util import logger
-from extensions.epaper.schedule.models import ALL_WEEKDAYS, WeeklyScheduleModel
+from extensions.epaper.schedule.models import ALL_WEEKDAYS, TIME_PATTERN, WeeklyScheduleModel
 from extensions.epaper.paths import EpaperPaths
 
 _schedules_adapter = pydantic.TypeAdapter(List[WeeklyScheduleModel])
+
+# Interval choices for the editor's "add times in a range" dialog: minutes -> label.
+TIME_RANGE_INTERVALS = {5: 'Every 5 minutes', 15: 'Every 15 minutes', 30: 'Every 30 minutes',
+                        60: 'Every hour', 120: 'Every 2 hours'}
+
+
+def times_in_range(start: str, end: str, interval_minutes: int) -> List[str]:
+    """'HH:MM' start/end (inclusive) stepped by interval_minutes -> a list of
+    'HH:MM' times, for the schedule editor's "add times" dialog. Raises
+    ValueError if start/end aren't 'HH:MM' or start is after end."""
+    def to_minutes(hhmm: str) -> int:
+        if not re.match(TIME_PATTERN, hhmm):
+            raise ValueError(f"'{hhmm}' is not a valid time (expected HH:MM)")
+        hours, minutes = hhmm.split(':')
+        return int(hours) * 60 + int(minutes)
+
+    start_minutes, end_minutes = to_minutes(start), to_minutes(end)
+    if start_minutes > end_minutes:
+        raise ValueError('Start time must not be after end time')
+    return [f'{m // 60:02d}:{m % 60:02d}' for m in range(start_minutes, end_minutes + 1, interval_minutes)]
 
 
 class UpdateSchedule:

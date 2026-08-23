@@ -18,8 +18,9 @@ Code: `extensions/epaper/ui/simplified_ui/` holds the shared frame —
 `layout.py` (frame + nav) and `common.py` (view helpers). Each feature ships its
 own section renderer in its package: `room/simplified_ui.py`,
 `screen/simplified_ui.py` (Templates, scaffolding for now),
-`bookingsystem/simplified_ui.py` and `display/simplified_ui.py` (the top-level
-Displays section and its shared grid); room storage is `room/backend.py`.
+`bookingsystem/simplified_ui.py`, `schedule/simplified_ui.py` (Preferences >
+Schedule) and `display/simplified_ui.py` (the top-level Displays section);
+room storage is `room/backend.py`.
 `render(project_name, paths=None)` is the entry point — the extension derives
 `paths` from the project, standalone passes its fixed paths in.
 
@@ -44,10 +45,19 @@ only folds it). Current sections:
   Occupancy (status), Settings (number, name, building, floor, type, photo,
   booking system, room-specific iCal URL), and Displays (the devices bound
   to the room, see below).
-- **Templates** — scaffolding for now; will become the screen editor.
-- **Displays** — the flat, project-wide list; list only, no Add (assigning a
-  display to a room happens in the room's own Displays tab, or the device's
-  E-Paper card).
+- **Templates** — read-only: every screen (shared storage with the
+  non-simplified editor) plus the auto-generated Room Calendar templates
+  (see [screens.md](screens.md#auto-generated-room-calendar-templates)),
+  each a card with a live thumbnail; clicking one opens a larger preview.
+  No Add/Edit/Delete here — that's still the non-simplified editor
+  (`screen/ui.py`'s `screens_wrapper`) or the standalone editor.
+- **Displays** — the flat, project-wide drill-down list of every device; no
+  Add or Delete (assigning a display to a room happens in the room's own
+  Displays tab, or the device's E-Paper card).
+- **Settings › Schedule** — the weekly-rule editor for "default", the one
+  schedule every screen uses unless it overrides `update_schedule_id` (see
+  [screens.md](screens.md#update-schedules)); no list/rename/delete chrome,
+  since there is only ever one schedule to manage here.
 - **Settings › Booking systems** — list + Add; per-system config (iCal URL +
   refresh today; Exchange and others later).
 
@@ -65,6 +75,17 @@ Displays). The Settings form autosaves through the adapter, its field
 labels/widgets/hints come from each `RoomModel` field's `Annotated` `FieldInfo`
 (the UI supplies only the layout).
 
+The room's **Occupancy** tab (`room/simplified_ui.py`'s `_occupancy_panel`) shows
+a status card (Free, or Occupied with an "until" time and, below, when the next
+meeting today starts) and an Upcoming list of every event, both from
+`room/backend.py`'s `get_room_events()` -- the room's booking system's iCal
+feed (see [screens.md](screens.md#update-schedules) for the datasource itself).
+Raises a plain message (no booking system configured, or one with no URL) that
+the panel shows instead of a card, rather than an empty "no events" that would
+look the same either way. The fetch is a network call, so the panel renders a
+loading state first and refreshes once it lands (`nicegui.background_tasks`,
+not a bare `asyncio.create_task`, so the refresh reaches the right client).
+
 The room's **Displays** tab (`room/simplified_ui.py`'s `_displays_panel`) leads
 with a compact room summary (label + type, and, smaller, building/floor), then
 its own niceview `DrillDownWrapper` (not the shared grid below) over
@@ -74,7 +95,11 @@ a select over every project device (`display.backend.project_device_names`),
 reassigning the row to a different device via `RoomDisplaysAdapter.rename()`
 (moves the room/screen assignment, unbinding the old device) wired through
 niceview's `set_key` -- the same rename pattern the file editors already use
-for their Name field; Screen is a select over the project's screen files. Add
+for their Name field; Screen is a select over the project's screens (real
+files plus the auto-generated Room Calendar templates), narrowed to the
+device's own panel type when nice4iot's device card has one set for it
+(`display.backend.available_screen_ids`) — a mismatched existing assignment
+stays visible rather than being dropped. Add
 is the wrapper's own standard button, driving a small dialog that picks from
 `display.backend.assignable_devices()` (devices not already in this room) since
 there is nothing to type; Delete unassigns the device from the room (the
@@ -87,15 +112,32 @@ device and its screen stay).
 select of the configured systems. A booking system is the connection/type
 (iCal today); the room supplies its own resource (the iCal URL).
 
-The top-level **Displays** section is a niceview `EditGridWrapper`
-(`display/simplified_ui.py`'s `render_displays_grid`) over `display/backend.py`,
-flat and unfiltered (every display in the project), with no Add — a display is
-a nice4iot device, assigned to a room via the room's own Displays tab above or
-the device's E-Paper card. Each row joins a nice4iot device (name, online) with
-its binding (screen) and bound room (building/floor/number); the Screen column
-is inline-editable, Remove unassigns the device. RSSI, battery and alarm
-columns are present but empty — nice4iot exposes no per-device source yet
-(see [extension wishlist](nice4iot-extension-wishlist.md)).
+A booking system's detail has a custom `render_detail`
+(`bookingsystem/simplified_ui.py`): the `BookingSystemModel` form (its own
+`Meta.layout`, which omits `header`) plus two hand-built editors for the
+fields that layout omits — `header` (`Dict[str, str]`, extra HTTP headers
+sent with every feed request) and `category_colors` (`Dict[str, str]`, an
+iCal `CATEGORIES` entry mapped to a card color for the `RoomCalendar`
+widget) — both a swatch/text list with a delete icon per row and an "Add"
+button matching DrillDownWrapper's own toolbar style (dense round);
+`category_colors`' Add dialog uses a color picker for the value.
+
+The top-level **Displays** section (`display/simplified_ui.py`'s
+`render_displays`) is a niceview `DrillDownWrapper` over
+`RoomDisplaysAdapter(paths, project_name)` (no `room_id` — every device in the
+project, bound to a room or not), so technically less versed people can point
+a device at a screen without opening nice4iot's own device UI. No Add or
+Delete — a display is a nice4iot device, assigned to a room via the room's own
+Displays tab above or the device's E-Paper card. Each row shows an
+online/offline status dot, the device name, room + screen as subtitle, and
+WiFi/battery icons; the detail adds the room's building/floor/number, last
+seen, numeric RSSI/battery, an editable Screen select (narrowed to the
+device's panel type when one is set, same as the room's own Displays tab
+above), and an "Open in nice4iot" link for experts (`device_url`). RSSI and
+battery have no per-device source in nice4iot yet, so their icons/values
+stay at "no data" — see [extension wishlist](nice4iot-extension-wishlist.md).
+A device's panel type itself is set on nice4iot's own device card
+(`devicebinding/ui.py`), not here — this select only reads it.
 
 ## Notes for the nice4iot extension interface
 

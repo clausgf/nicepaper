@@ -15,6 +15,8 @@ from typing import Optional
 
 from niceview import JsonAdapter, JsonDirectoryAdapter
 
+from extensions.epaper.bookingsystem.backend import read_booking_system
+from extensions.epaper.core.datasources.ical import get_from_ical
 from extensions.epaper.room.models import RoomModel
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.util import logger
@@ -64,6 +66,35 @@ def delete_room(paths: EpaperPaths, room_id: str) -> None:
     """Remove a room's file. Device bindings that still reference it are left
     dangling on purpose (flagged in the device card), not silently rewritten."""
     room_path(paths, room_id).unlink(missing_ok=True)
+
+
+async def get_room_events(paths: EpaperPaths, room: RoomModel) -> list:
+    """This room's calendar events (sorted, from its booking system's iCal
+    feed -- see BookingSystemModel and RoomModel.booking_system_id/
+    booking_ical_url), for the simplified UI's Occupancy panel.
+
+    booking_ical_url, if set, is the room's own full feed URL (e.g. one iCal
+    URL per resource on the same server); empty falls back to the booking
+    system's own url (fine for a single-room setup). Credentials/headers/
+    timing all come from the booking system -- get_from_ical() itself reads
+    no config. Raises ValueError (not e.g. returning []) when the room isn't
+    configured yet, so the panel can show why rather than an empty list
+    indistinguishable from "no events"."""
+    if not room.booking_system_id:
+        raise ValueError("This room has no booking system configured yet.")
+    system = read_booking_system(paths, room.booking_system_id)
+    if system is None:
+        raise ValueError(f"Booking system '{room.booking_system_id}' not found.")
+    url = room.booking_ical_url or system.url
+    if not url:
+        raise ValueError(f"Booking system '{system.name}' has no URL configured.")
+
+    return await get_from_ical(
+        paths.ical_dir, paths.organizer_names_file, f"room-{room.id}", url,
+        update_interval_s=int(system.update_interval.total_seconds()),
+        max_days=system.max_days_ahead.days,
+        username=system.username, password=system.password, headers=system.header or None,
+        extract_organizer_from_summary=True)
 
 
 def rooms_adapter(paths: EpaperPaths) -> JsonDirectoryAdapter[RoomModel]:
