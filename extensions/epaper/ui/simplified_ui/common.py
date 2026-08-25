@@ -7,14 +7,14 @@ notice, until the Room / Display / BookingSystem models and their storage
 exist.
 """
 from contextlib import contextmanager
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from nicegui import ui
 
 
 @contextmanager
 def view_header(title: str, *, action: Optional[str] = None,
-                on_action: Optional[Callable[[], None]] = None):
+                on_action: Optional[Callable[[], Any]] = None):
     """A view's top row: a title on the left and an optional primary button
     on the right (e.g. 'Add Room'). Yields so callers can drop extra
     controls into the same row (a back button, a filter, ...)."""

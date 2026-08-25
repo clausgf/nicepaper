@@ -12,6 +12,8 @@ from typing import Optional
 from extensions.epaper.paths import EpaperPaths
 
 from extensions.epaper.bookingsystem.simplified_ui import render_booking_systems
+from extensions.epaper.global_config.simplified_ui import render_global_settings
+from extensions.epaper.organizer.simplified_ui import render_organizer_names
 from extensions.epaper.room.simplified_ui import render_rooms
 from extensions.epaper.schedule.simplified_ui import render_schedule
 from extensions.epaper.screen.simplified_ui import render_templates
@@ -47,6 +49,8 @@ def _nav() -> list[NavItem]:
         NavItem('settings', 'Preferences', 'settings', children=(
             NavItem('schedule', 'Schedule', 'schedule', render=render_schedule),
             NavItem('booking', 'Booking systems', 'event', render=render_booking_systems),
+            NavItem('global', 'Global settings', 'tune', render=render_global_settings),
+            NavItem('organizer', 'Organizer names', 'badge', render=render_organizer_names),
         )),
     ]
 

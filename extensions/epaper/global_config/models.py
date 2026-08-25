@@ -26,12 +26,6 @@ class GlobalConfig(BaseModel):
     The three colors below stay: they are the *defaults*, applied where a
     screen (and, within a screen, a widget) doesn't set its own.
     """
-    # Only for the raw-URL RoomCalendar widget (core/widgets/roomcalendar.py),
-    # which has no BookingSystemModel of its own to read these from. The
-    # simplified UI's room Occupancy panel uses a room's BookingSystemModel
-    # instead (update_interval/max_days_ahead), see room/backend.py.
-    ical_update_interval_s: int = 600
-    ical_max_days: int = 30
     ical_error: str = "Error fetching calendar data"
     no_appointments: str = "No appointments"
     next_appointment: str = "Next appointment"

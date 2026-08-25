@@ -140,16 +140,21 @@ def _element_type_names(client) -> list:
 
 
 def test_simplified_ui_nav_leaves_are_the_content_sections():
-    """The sidebar's leaves (the addressable views) are exactly the five
+    """The sidebar's leaves (the addressable views) are exactly the seven
     content sections, Templates right after Rooms; Settings is a group and
-    never a view itself, with Schedule before Booking systems."""
+    never a view itself, with Schedule, Booking systems, Global settings and
+    Organizer names in that order."""
     from extensions.epaper.ui.simplified_ui import _nav
     from extensions.epaper.ui.simplified_ui.layout import _flatten
 
     nav = _nav()
-    assert list(_flatten(nav)) == ["rooms", "templates", "displays", "schedule", "booking"]
+    assert list(_flatten(nav)) == [
+        "rooms", "templates", "displays", "schedule", "booking", "global", "organizer",
+    ]
     settings = next(i for i in nav if i.id == "settings")
-    assert settings.render is None and [c.id for c in settings.children] == ["schedule", "booking"]
+    assert settings.render is None and [c.id for c in settings.children] == [
+        "schedule", "booking", "global", "organizer",
+    ]
 
 
 def _simplified_paths(tmp_path):
@@ -533,7 +538,7 @@ def test_simplified_ui_booking_form_lays_out_fields():
 
 
 def test_booking_system_header_editor_lists_entries_with_round_add_and_delete(tmp_path):
-    """Booking system detail's header editor (bookingsystem/simplified_ui.py):
+    """Booking system detail's header editor (bookingsystem/ui.py):
     a two-column list (header, value) with a delete icon per row, and an Add
     button matching DrillDownWrapper's own toolbar style (dense round --
     see main.py's niceview.set_chrome_style(toolbar_icon_button_props=...))."""
@@ -541,7 +546,7 @@ def test_booking_system_header_editor_lists_entries_with_round_add_and_delete(tm
     from nicegui.page import page
 
     from extensions.epaper.bookingsystem.backend import booking_systems_adapter, create_booking_system
-    from extensions.epaper.bookingsystem.simplified_ui import _header_editor
+    from extensions.epaper.bookingsystem.ui import _header_editor
 
     paths = _simplified_paths(tmp_path)
     adapter = booking_systems_adapter(paths)
@@ -571,7 +576,7 @@ def test_booking_system_header_editor_shows_placeholder_when_empty(tmp_path):
     from nicegui.page import page
 
     from extensions.epaper.bookingsystem.backend import booking_systems_adapter, create_booking_system
-    from extensions.epaper.bookingsystem.simplified_ui import _header_editor
+    from extensions.epaper.bookingsystem.ui import _header_editor
 
     paths = _simplified_paths(tmp_path)
     adapter = booking_systems_adapter(paths)

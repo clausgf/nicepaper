@@ -100,11 +100,9 @@ async def get_from_ical(ical_dir: Path, organizer_names_file: Optional[Path], id
     Fetch and cache events from an iCal feed, `id` naming the cache file.
 
     update_interval_s/max_days are the caller's own config, not read from
-    anywhere here: the raw-URL RoomCalendar widget passes the global
-    ical_update_interval_s/ical_max_days settings (core/widgets/roomcalendar.py),
-    the room Occupancy panel passes its BookingSystemModel's update_interval/
-    max_days_ahead (room/backend.py's get_room_events). username/password (HTTP
-    Basic Auth) and headers are optional, both from a BookingSystemModel when
+    anywhere here: RoomCalendar passes its room's BookingSystemModel's
+    update_interval/max_days_ahead (room/backend.py's get_room_events).
+    username/password (HTTP Basic Auth) and headers are optional, both from a BookingSystemModel when
     the feed needs them.
     """
     # load data from cache

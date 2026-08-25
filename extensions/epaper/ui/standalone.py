@@ -8,6 +8,7 @@ global_config/ui.py, screen/ui.py, schedule/ui.py) are reused.
 from contextlib import contextmanager
 from nicegui import ui
 
+from extensions.epaper.bookingsystem.ui import booking_systems_wrapper
 from extensions.epaper.devicebinding.ui import device_config_card
 from extensions.epaper.global_config.backend import save_global_config
 from extensions.epaper.global_config.ui import global_config_card
@@ -32,7 +33,7 @@ SIMPLIFIED_ROUTE = '/simplified'
 # DrillDownWrapper-based screens_wrapper()/schedules_wrapper() the nice4iot
 # extension does (see __init__.py) rather than its own /screens/{filename}
 # sub-route.
-TAB_ROUTES = {'Global': '/global', 'Project': '/project', 'Device': '/device', 'Rooms': '/rooms', 'Screens': '/screens', 'Schedules': '/schedules'}
+TAB_ROUTES = {'Global': '/global', 'Project': '/project', 'Device': '/device', 'Rooms': '/rooms', 'Screens': '/screens', 'Schedules': '/schedules', 'Booking systems': '/booking-systems'}
 
 
 @contextmanager
@@ -54,6 +55,7 @@ def frame(active_tab: str):
             ui.tab('Rooms')
             ui.tab('Screens')
             ui.tab('Schedules')
+            ui.tab('Booking systems')
     with ui.column().classes('w-full'):
         yield
 
@@ -124,3 +126,8 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
     def page_schedules():
         with frame('Schedules'):
             schedules_wrapper(paths).render()
+
+    @ui.page('/booking-systems')
+    def page_booking_systems():
+        with frame('Booking systems'):
+            booking_systems_wrapper(paths).render()

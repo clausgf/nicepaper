@@ -39,8 +39,6 @@ same settings with humanized labels):
   wind speed/gusts in: `kmh` (default), `ms`, `mph` or `kn` (knots). Open-Meteo
   is always fetched in km/h and converted locally, so changing this takes effect
   without a refetch.
-- `ical_update_interval_s`, `ical_max_days` — iCal feed polling/lookahead for
-  the `RoomCalendar` widget.
 - `latitude`, `longitude` — the default forecast location, used by every
   `Weather*` widget that sets no coordinates of its own (defaults to 52.52 /
   13.405, Berlin). Most installations show the same place on every screen, so

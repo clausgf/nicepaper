@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.20.0 — 2026-08-25
+
+### Added
+
+- **Booking systems as a nice4iot project tab.** `bookingsystem/ui.py` (new)
+  hosts the list/detail/header-editor/category-color-editor UI, registered
+  via `register_project_tab('Booking systems', ...)` and the standalone
+  `/booking-systems` route; `bookingsystem/simplified_ui.py`'s Preferences >
+  Booking systems view now just wraps the same `booking_systems_wrapper()`.
+- **Preferences > Global settings** in the simplified UI
+  (`global_config/simplified_ui.py`): the same fields as nice4iot's "E-Paper"
+  global settings card, embedded for convenience. The setting is still
+  project-independent — editing it here changes it for every project.
+- **Preferences > Organizer names** in the simplified UI
+  (`organizer/simplified_ui.py`, `organizer/backend.py`): `organizer_names_file`
+  (previously admin-only, hand-placed on disk) is now readable and editable
+  from the UI — a list plus an Edit dialog (one name per line).
+- **`GlobalConfig.date_format`/`time_format`/`roomcalendar_date_format_long`/
+  `roomcalendar_date_format_short`/`roomcalendar_time_format`** are now
+  `ui.select` with a curated list of common CLDR date/time patterns
+  (`global_config/ui.py`), still editable to any custom pattern
+  (`with_input=True`).
+
+### Removed
+
+- **`GlobalConfig.ical_update_interval_s`/`ical_max_days`** — dead since
+  0.19.0 made `RoomCalendar` room-driven (it now always gets
+  `update_interval`/`max_days_ahead` from the room's `BookingSystemModel`);
+  no code read the global settings anymore.
+
 ## 0.19.0 — 2026-08-22
 
 ### Added

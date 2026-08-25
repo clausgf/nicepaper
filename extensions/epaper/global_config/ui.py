@@ -22,13 +22,19 @@ from extensions.epaper.ui.forms import (
 
 _LOCATION_HINT = 'Used by weather widgets that set no location'
 
+# Curated CLDR patterns for the date/time ui.select fields below --
+# with_input=True keeps them editable, so any other CLDR pattern still works.
+_SHORT_DATE_FORMATS = ['dd.MM.yy', 'dd.MM.yyyy', 'yyyy-MM-dd', 'MM/dd/yy', 'MM/dd/yyyy', 'dd/MM/yyyy']
+_LONG_DATE_FORMATS = ['EEEE, dd.MM.yyyy', 'EEEE, dd. MMMM yyyy', 'EEEE, MMMM d, yyyy', 'yyyy-MM-dd']
+_TIME_FORMATS = ['HH:mm', 'HH:mm:ss', 'hh:mm a', 'h:mm a']
+
 _LAYOUT = [
     ['## General', COL, [ROW, 'locale', 'timezone'], [ROW, 'date_format', 'time_format']],
     ['## Font & Colors', COL,
      [ROW, 'font_name', 'font_size'],
      [ROW, 'color_background', 'color_primary', 'color_accent']],
     ['## iCal (Room Calendar)', COL,
-     [ROW, 'ical_update_interval_s', 'ical_max_days'], 'ical_error',
+     'ical_error',
      [ROW, 'no_appointments', 'next_appointment'],
      [ROW, 'current_appointment', 'further_appointments'],
      [ROW, 'roomcalendar_date_format_long', 'roomcalendar_date_format_short',
@@ -52,6 +58,11 @@ def _field_infos() -> dict:
     return {
         'font_name': Field(widget_type='ui.select', options=font_names),
         'wind_speed_unit': Field(widget_type='ui.select', options=['kmh', 'ms', 'mph', 'kn']),
+        'date_format': Field(widget_type='ui.select', options=_SHORT_DATE_FORMATS, with_input=True),
+        'time_format': Field(widget_type='ui.select', options=_TIME_FORMATS, with_input=True),
+        'roomcalendar_date_format_long': Field(widget_type='ui.select', options=_LONG_DATE_FORMATS, with_input=True),
+        'roomcalendar_date_format_short': Field(widget_type='ui.select', options=_SHORT_DATE_FORMATS, with_input=True),
+        'roomcalendar_time_format': Field(widget_type='ui.select', options=_TIME_FORMATS, with_input=True),
         'color_background': Field(widget_type='ui.color_input'),
         'color_primary': Field(widget_type='ui.color_input'),
         'color_accent': Field(widget_type='ui.color_input'),

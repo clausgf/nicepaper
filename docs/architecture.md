@@ -83,8 +83,8 @@ In extension mode:
     by nice4iot's per-project extension activation (General tab →
     Extensions card) before the handler runs.
 - UI: a project Dashboard card (screen/schedule counts, link into the
-  Screens tab) plus Screens/Schedules tabs registered via
-  `register_project_tab` on nice4iot's own project page — no separate
+  Screens tab) plus Rooms/Screens/Schedules/Booking systems tabs registered
+  via `register_project_tab` on nice4iot's own project page — no separate
   routes of our own. No built-in login here either — nice4iot's own
   auth and per-project activation gate access.
 - Each nice4iot **device**'s General tab gets an "E-Paper" card

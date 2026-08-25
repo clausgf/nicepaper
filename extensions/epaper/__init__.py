@@ -33,6 +33,7 @@ def register(app: FastAPI) -> None:
     from extensions.epaper.global_config.backend import load_global_config, save_global_config
     from extensions.epaper.global_config.ui import global_config_fields
     from extensions.epaper.paths import EpaperPaths
+    from extensions.epaper.bookingsystem.ui import booking_systems_wrapper
     from extensions.epaper.room.ui import rooms_wrapper
     from extensions.epaper.devicebinding.ui import device_config_card
     from extensions.epaper.ui.cards import dashboard_card
@@ -104,6 +105,10 @@ def register(app: FastAPI) -> None:
     def _schedules_tab(project_name: str) -> None:
         schedules_wrapper(_paths_for_project(project_name)).render()
 
+    def _booking_systems_tab(project_name: str) -> None:
+        booking_systems_wrapper(_paths_for_project(project_name)).render()
+
     register_project_tab('Rooms', _rooms_tab)
     register_project_tab('Screens', _screens_tab)
     register_project_tab('Schedules', _schedules_tab)
+    register_project_tab('Booking systems', _booking_systems_tab)

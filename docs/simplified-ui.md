@@ -18,9 +18,12 @@ Code: `extensions/epaper/ui/simplified_ui/` holds the shared frame —
 `layout.py` (frame + nav) and `common.py` (view helpers). Each feature ships its
 own section renderer in its package: `room/simplified_ui.py`,
 `screen/simplified_ui.py` (Templates, scaffolding for now),
-`bookingsystem/simplified_ui.py`, `schedule/simplified_ui.py` (Preferences >
-Schedule) and `display/simplified_ui.py` (the top-level Displays section);
-room storage is `room/backend.py`.
+`bookingsystem/simplified_ui.py` (a thin wrapper around `bookingsystem/ui.py`,
+shared with the nice4iot "Booking systems" project tab), `schedule/simplified_ui.py`
+(Preferences > Schedule), `global_config/simplified_ui.py` (Preferences >
+Global settings), `organizer/simplified_ui.py` (Preferences > Organizer names)
+and `display/simplified_ui.py` (the top-level Displays section); room storage
+is `room/backend.py`.
 `render(project_name, paths=None)` is the entry point — the extension derives
 `paths` from the project, standalone passes its fixed paths in.
 
@@ -59,7 +62,15 @@ only folds it). Current sections:
   [screens.md](screens.md#update-schedules)); no list/rename/delete chrome,
   since there is only ever one schedule to manage here.
 - **Settings › Booking systems** — list + Add; per-system config (iCal URL +
-  refresh today; Exchange and others later).
+  refresh today; Exchange and others later). Also reachable as a nice4iot
+  project tab ("Booking systems"), sharing the same `bookingsystem/ui.py`
+  wrapper.
+- **Settings › Global settings** — the same project-independent fields as
+  nice4iot's "E-Paper" global settings card, embedded for convenience;
+  editing here changes the setting for every project.
+- **Settings › Organizer names** — a read-only list plus an Edit dialog for
+  `organizer_names_file` (one name per line), previously admin-only/hand-placed
+  on disk.
 
 Switching is **client-side state on the `Shell`**, not URL routing:
 `shell.navigate(id, **params)` sets the active view and refreshes the
