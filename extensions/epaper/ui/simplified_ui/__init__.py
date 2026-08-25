@@ -7,7 +7,7 @@ nice4iot editors, rendered as the extension's standalone project page
 sidebar navigation and hands off to layout.build_page(); every section's
 content lives in its own module (rooms, templates/screens, displays, booking).
 """
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from extensions.epaper.paths import EpaperPaths
 
@@ -19,7 +19,7 @@ from extensions.epaper.schedule.simplified_ui import render_schedule
 from extensions.epaper.screen.simplified_ui import render_templates
 
 from extensions.epaper.display.simplified_ui import render_displays
-from .layout import NavItem, build_page
+from .layout import NavItem, Shell, build_page
 
 
 def _paths_for_project(project_name: str) -> EpaperPaths:
@@ -55,11 +55,26 @@ def _nav() -> list[NavItem]:
     ]
 
 
+def _root_path(project_name: str) -> str:
+    """The extension page's own base URL, everything else routes relative
+    to. Deferred `app.*` import: it exists only inside the nice4iot process;
+    standalone passes its own fixed route in (see ui/standalone.py)."""
+    from app.routes import project_extension_url
+    return project_extension_url(project_name, 'epaper')
+
+
+def _extra_routes(shell: Shell) -> dict[str, Callable[..., Any]]:
+    """Room-detail deep link: /rooms/{room_id} opens straight to that room --
+    see room/simplified_ui.py::render_rooms's room_id parameter."""
+    return {'/rooms/{room_id}': lambda room_id: render_rooms(shell, room_id=room_id)}
+
+
 def render(project_name: str, paths: Optional[EpaperPaths] = None,
-          image_base_url: Optional[str] = None) -> None:
+          image_base_url: Optional[str] = None, root_path: Optional[str] = None) -> None:
     """Entry point. As a nice4iot extension it is called with just the
-    project name (register_project_page) and derives the paths; standalone
-    passes its fixed paths in (see ui/standalone.py).
+    project name (register_project_page) and derives the paths and
+    root_path; standalone passes its fixed paths and route in (see
+    ui/standalone.py).
 
     image_base_url is the display API's screen-image prefix (Templates'
     previews). nice4iot's register_project_page calls render(project_name)
@@ -67,4 +82,7 @@ def render(project_name: str, paths: Optional[EpaperPaths] = None,
     __init__.py's device card uses; standalone passes its own."""
     if image_base_url is None:
         image_base_url = f'/api/ext/epaper/{project_name}/screens'
-    build_page(project_name, paths or _paths_for_project(project_name), _nav(), image_base_url)
+    if root_path is None:
+        root_path = _root_path(project_name)
+    build_page(project_name, paths or _paths_for_project(project_name), _nav(),
+              image_base_url, root_path, extra_routes=_extra_routes)

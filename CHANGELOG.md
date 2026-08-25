@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.21.0 — 2026-08-25
+
+### Added
+
+- **The simplified UI is now deep-linkable.** Every sidebar section (Rooms,
+  Templates, Displays, and each Preferences submenu item) has its own
+  bookmarkable URL — `/rooms`, `/templates`, `/displays`, `/settings/schedule`,
+  `/settings/booking`, `/settings/global`, `/settings/organizer` (relative to
+  the page's own base URL) — built with `nicegui.ui.sub_pages`
+  (`ui/simplified_ui/layout.py`, rewritten from client-side state switching).
+  `/rooms/{room_id}` opens a room's detail directly on load (one-directional:
+  clicking a different room afterward doesn't change the URL, since
+  niceview's `DrillDownWrapper` has no public hook for that). Needs a
+  matching nice4iot change (routing an extension page's whole subtree to it,
+  not just its exact base URL) that was still unreleased at the time this was
+  built — see `docs/nice4iot-extension-wishlist.md`.
+- `nicegui` dependency now pinned to `>=2.22.0` (`ui.sub_pages`/`PageArguments`).
+
 ## 0.20.0 — 2026-08-25
 
 ### Added

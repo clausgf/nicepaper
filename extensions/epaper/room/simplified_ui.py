@@ -11,7 +11,7 @@ The form's field metadata (labels/widgets/hints) lives on RoomModel itself
 (its fields' Annotated FieldInfo); only the visual layout is here.
 """
 import datetime
-from typing import Any, cast
+from typing import Any, Optional, cast
 from zoneinfo import ZoneInfo
 
 from babel.dates import format_datetime
@@ -32,14 +32,27 @@ from extensions.epaper.room.models import ROOM_TYPE_LABELS, RoomModel
 from extensions.epaper.ui.simplified_ui.layout import Shell
 
 
-def render_rooms(shell: Shell) -> None:
+def render_rooms(shell: Shell, room_id: Optional[str] = None) -> None:
+    """room_id, when given (the /rooms/{room_id} deep link, see
+    ui/simplified_ui/__init__.py), opens straight to that room's detail
+    instead of the list. An unknown id falls back to DrillDownWrapper's own
+    "not found" label.
+
+    Sets the wrapper's initial state directly rather than calling its public
+    open() after render(): open() is meant for an already-rendered wrapper
+    (e.g. a click handler) and refreshes its body accordingly, which needs a
+    running event loop -- here we know the detail view from the start, so
+    building straight into it avoids that refresh entirely."""
     adapter = rooms_adapter(shell.paths)
-    DrillDownWrapper(
+    wrapper = DrillDownWrapper(
         RoomModel, adapter,  # list title/description come from RoomModel.Meta
         item_title_field='room_label',
         item_subtitle_fields=['room_type', 'capacity'],
         render_detail=lambda a, key, set_key: _render_detail(shell, a, key),
-    ).render()
+    )
+    if room_id is not None:
+        wrapper._state.update(view='detail', key=room_id, animate=False)
+    wrapper.render()
 
 
 def _render_detail(shell: Shell, adapter: CollectionAdapter[RoomModel], key: str) -> None:

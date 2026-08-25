@@ -174,7 +174,7 @@ def test_simplified_ui_frame_renders_header_and_drawer(tmp_path):
     from extensions.epaper.ui.simplified_ui import render
 
     with Client(page("/test-simplified-frame"), request=None) as client:
-        render("demo-project", paths=_simplified_paths(tmp_path))
+        render("demo-project", paths=_simplified_paths(tmp_path), root_path="/test-simplified-frame")
         names = _element_type_names(client)
         labels = {e.text for e in client.elements.values()
                   if type(e).__name__ in ("Label", "ItemLabel")}
@@ -196,8 +196,7 @@ def test_templates_section_lists_real_and_synthetic_screens(tmp_path):
     from nicegui.page import page
 
     from extensions.epaper.screen.simplified_ui import render_templates
-    from extensions.epaper.ui.simplified_ui import _nav
-    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+    from extensions.epaper.ui.simplified_ui.layout import Shell
 
     paths = _simplified_paths(tmp_path)
     (paths.screen_dir / "my-screen.json").write_text(json.dumps({
@@ -205,7 +204,7 @@ def test_templates_section_lists_real_and_synthetic_screens(tmp_path):
         "widgets": [{"widget_type": "Text", "position_x": 0, "position_y": 0, "text": "hi"}],
     }))
 
-    shell = Shell("demo-project", paths, _flatten(_nav()), image_base_url="/api/screen")
+    shell = Shell("demo-project", paths, image_base_url="/api/screen")
     with Client(page("/test-templates"), request=None) as client:
         render_templates(shell)
         labels = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
@@ -224,13 +223,12 @@ def test_simplified_ui_room_detail_lays_out_every_setting(tmp_path):
     from nicegui.page import page
 
     from extensions.epaper.room.backend import rooms_adapter, create_room
-    from extensions.epaper.ui.simplified_ui import _nav
-    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+    from extensions.epaper.ui.simplified_ui.layout import Shell
     from extensions.epaper.room.simplified_ui import _render_detail
 
     paths = _simplified_paths(tmp_path)
     room = create_room(paths)
-    shell = Shell("demo-project", paths, _flatten(_nav()))
+    shell = Shell("demo-project", paths)
     with Client(page("/test-simplified-room"), request=None) as client:
         _render_detail(shell, rooms_adapter(paths), room.id)
         labels = {e._props.get("label") for e in client.elements.values()}
@@ -241,6 +239,28 @@ def test_simplified_ui_room_detail_lays_out_every_setting(tmp_path):
                   "Capacity", "Photo", "Description", "Booking system", "iCal URL"):
         assert field in labels, f"{field!r} missing from room settings"
     assert {"Occupancy", "Settings", "Displays"} <= tab_labels
+
+
+def test_render_rooms_with_room_id_opens_straight_to_that_rooms_detail(tmp_path):
+    """The /rooms/{room_id} deep link (ui/simplified_ui/__init__.py's
+    _extra_routes) passes room_id through to render_rooms(), which must open
+    the DrillDownWrapper straight to that room's detail -- not the list --
+    so a bookmarked/shared room URL shows the room, not the list, on load."""
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.room.backend import create_room
+    from extensions.epaper.room.simplified_ui import render_rooms
+    from extensions.epaper.ui.simplified_ui.layout import Shell
+
+    paths = _simplified_paths(tmp_path)
+    room = create_room(paths)
+    shell = Shell("demo-project", paths)
+    with Client(page("/test-room-deep-link"), request=None) as client:
+        render_rooms(shell, room_id=room.id)
+        labels = {e._props.get("label") for e in client.elements.values()}
+
+    assert "Room number" in labels, "room_id should open the detail view directly, not the list"
 
 
 def test_room_occupancy_status_shows_free_or_occupied():
@@ -318,8 +338,7 @@ def test_room_displays_panel_shows_summary_and_bound_devices(tmp_path, monkeypat
     from extensions.epaper.devicebinding.backend import set_device_binding
     from extensions.epaper.room.backend import create_room
     from extensions.epaper.room.simplified_ui import _displays_panel
-    from extensions.epaper.ui.simplified_ui import _nav
-    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+    from extensions.epaper.ui.simplified_ui.layout import Shell
 
     paths = _simplified_paths(tmp_path)
     room = create_room(paths)
@@ -333,7 +352,7 @@ def test_room_displays_panel_shows_summary_and_bound_devices(tmp_path, monkeypat
         types.SimpleNamespace(name="sign-1", last_seen_at=datetime.datetime.now(datetime.timezone.utc)),
     ])
 
-    shell = Shell("demo-project", paths, _flatten(_nav()))
+    shell = Shell("demo-project", paths)
     with Client(page("/test-room-displays"), request=None) as client:
         _displays_panel(shell, room.id)
         labels = {e.text for e in client.elements.values()
@@ -361,8 +380,7 @@ def test_displays_top_level_lists_devices_and_shows_room_and_status(tmp_path, mo
     from extensions.epaper.display.backend import RoomDisplaysAdapter
     from extensions.epaper.display.simplified_ui import render_displays, _render_detail
     from extensions.epaper.room.backend import create_room, room_adapter
-    from extensions.epaper.ui.simplified_ui import _nav
-    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+    from extensions.epaper.ui.simplified_ui.layout import Shell
 
     paths = _simplified_paths(tmp_path)
     room = create_room(paths)
@@ -377,7 +395,7 @@ def test_displays_top_level_lists_devices_and_shows_room_and_status(tmp_path, mo
     monkeypatch.setattr(display_backend, "_device_url",
                         lambda project, name: f"https://nice4iot.example/{project}/devices/{name}")
 
-    shell = Shell("demo-project", paths, _flatten(_nav()))
+    shell = Shell("demo-project", paths)
     with Client(page("/test-displays-list"), request=None) as client:
         render_displays(shell)
         labels = {e.text for e in client.elements.values()
@@ -423,8 +441,7 @@ def test_display_screen_select_falls_back_when_no_screens_exist(tmp_path, monkey
     from extensions.epaper.display.simplified_ui import _render_detail as top_level_detail
     from extensions.epaper.room.backend import create_room
     from extensions.epaper.room.simplified_ui import _display_detail
-    from extensions.epaper.ui.simplified_ui import _nav
-    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+    from extensions.epaper.ui.simplified_ui.layout import Shell
 
     paths = _simplified_paths(tmp_path)
     room = create_room(paths)
@@ -440,7 +457,7 @@ def test_display_screen_select_falls_back_when_no_screens_exist(tmp_path, monkey
         hints = {e._props.get("hint") for e in client.elements.values()}
     assert "No screens yet — add one in Templates" in hints
 
-    shell = Shell("demo-project", paths, _flatten(_nav()))
+    shell = Shell("demo-project", paths)
     room_adapter = RoomDisplaysAdapter(paths, "demo-project", room.id)
     with Client(page("/test-no-screens-room"), request=None) as client:
         _display_detail(shell, room_adapter, "sign-1", lambda new_key: None)
@@ -600,11 +617,10 @@ def test_simplified_schedule_creates_and_edits_the_default_schedule(tmp_path):
     from nicegui.page import page
 
     from extensions.epaper.schedule.simplified_ui import DEFAULT_SCHEDULE_FILENAME, render_schedule
-    from extensions.epaper.ui.simplified_ui import _nav
-    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+    from extensions.epaper.ui.simplified_ui.layout import Shell
 
     paths = _simplified_paths(tmp_path)
-    shell = Shell("demo-project", paths, _flatten(_nav()))
+    shell = Shell("demo-project", paths)
 
     with Client(page("/test-simplified-schedule"), request=None) as client:
         render_schedule(shell)
@@ -667,8 +683,7 @@ def test_room_booking_select_lists_configured_systems(tmp_path):
 
     from extensions.epaper.bookingsystem.backend import booking_systems_adapter, create_booking_system
     from extensions.epaper.room.backend import rooms_adapter, create_room
-    from extensions.epaper.ui.simplified_ui import _nav
-    from extensions.epaper.ui.simplified_ui.layout import Shell, _flatten
+    from extensions.epaper.ui.simplified_ui.layout import Shell
     from extensions.epaper.room.simplified_ui import _render_detail
 
     paths = _simplified_paths(tmp_path)
@@ -676,7 +691,7 @@ def test_room_booking_select_lists_configured_systems(tmp_path):
     system.name = "iCal Uni"
     booking_systems_adapter(paths).update(system)
     room = create_room(paths)
-    shell = Shell("demo-project", paths, _flatten(_nav()))
+    shell = Shell("demo-project", paths)
     with Client(page("/test-room-booking-select"), request=None) as client:
         _render_detail(shell, rooms_adapter(paths), room.id)
         selects = [e for e in client.elements.values()

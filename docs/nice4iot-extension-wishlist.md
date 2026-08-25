@@ -27,16 +27,16 @@ each item below says what it currently does instead.
 - **Per-device alarm count.** The grid has an "Alarms" column with no source
   yet. — *Wanted:* a per-device active-alarm count via the extension API.
 
-## Pages
-
-- **Deep-linkable extension sub-paths.** nice4iot routes only an extension
-  page's *exact* base URL to the extension (`home_page`'s regex ends in `/?$`),
-  so a sub-path like `.../ext/epaper/rooms` 404s on reload; the simplified UI
-  therefore navigates via client-side state, not `ui.sub_pages`. — *Wanted:* the
-  extension-page match includes sub-paths, with the remainder passed to
-  `render_fn`.
-
 ## Done
 
 - **User menu** — `app.extensions.render_user_menu()` now lets an extension's
   own page chrome host nice4iot's standard user menu.
+- **Deep-linkable extension sub-paths** — nice4iot now routes an extension
+  page's whole subtree to `render_fn`, not just its exact base URL (see its
+  `docs/extensions.md`, "Deep links within a standalone page"), so the
+  simplified UI builds its own nested `ui.sub_pages` for real, bookmarkable
+  section URLs (`ui/simplified_ui/layout.py`) — see
+  [simplified-ui.md](simplified-ui.md#navigation). At the time this was
+  built, the nice4iot-side change was still unreleased (uncommitted in the
+  nice4iot working tree); re-check against a released nice4iot before relying
+  on this in production.

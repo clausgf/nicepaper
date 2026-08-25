@@ -94,11 +94,16 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
             global_config_card(persist=lambda: save_global_config(paths.root / "global_config.json"))
 
     @ui.page(SIMPLIFIED_ROUTE)
+    @ui.page(f'{SIMPLIFIED_ROUTE}/{{_:path}}')
     def page_simplified():
         # Full-page chrome of its own -- deliberately not wrapped in frame().
         # Standalone has no project concept, so it renders the single fixed
-        # root (passed in) under the name 'standalone'.
-        simplified_ui.render('standalone', paths=paths, image_base_url=image_base_url)
+        # root (passed in) under the name 'standalone'. Stacked with a
+        # catch-all route (mirrors nice4iot's own '/ui' + '/ui/{_:path}') so
+        # simplified_ui's own ui.sub_pages sub-routes (e.g. /simplified/rooms)
+        # reach this same handler instead of 404ing.
+        simplified_ui.render('standalone', paths=paths, image_base_url=image_base_url,
+                             root_path=SIMPLIFIED_ROUTE)
 
     @ui.page('/project')
     def page_project():

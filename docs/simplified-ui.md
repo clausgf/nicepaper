@@ -72,9 +72,20 @@ only folds it). Current sections:
   `organizer_names_file` (one name per line), previously admin-only/hand-placed
   on disk.
 
-Switching is **client-side state on the `Shell`**, not URL routing:
-`shell.navigate(id, **params)` sets the active view and refreshes the
-sidebar and content. It is *not* deep-linkable — see the note below.
+Switching is **real, bookmarkable URL routing** (`ui/simplified_ui/layout.py`,
+`nicegui.ui.sub_pages`): each section has its own path relative to the page's
+own base URL — `/rooms`, `/templates`, `/displays`, `/settings/schedule`,
+`/settings/booking`, `/settings/global`, `/settings/organizer` (`/` aliases
+`/rooms`, the landing view) — plus `/rooms/{room_id}` to open a room's
+detail directly. Clicking a sidebar row calls `ui.navigate.to()`, same as
+nice4iot's own internal navigation; the active row is recomputed from the
+browser's current path on every navigation (`sub_pages_router.on_path_changed`).
+This needs nice4iot to route the extension page's whole subtree to it, not
+just its exact base URL — see the note below. One asymmetry: opening
+`/rooms/{room_id}` directly (fresh load or reload) shows that room, but
+clicking a different room from the list afterward does not push a new URL —
+that goes through niceview's `DrillDownWrapper`, which has no public
+navigation-changed hook to sync from.
 
 **Rooms** are wired to real storage: `room/backend.py` keeps one JSON file per
 room (`RoomModel`, named by its stable surrogate id, see `room/models.py`).
@@ -154,11 +165,7 @@ A device's panel type itself is set on nice4iot's own device card
 
 The header consumes nice4iot's user menu through the public
 `app.extensions.render_user_menu()` (added to the extension API for this
-page). One further nice4iot improvement would help but does not block it:
-
-- **Deep-linkable sub-paths.** nice4iot routes only the extension page's
-   *exact* base URL to the extension (`home_page`'s regex ends in `/?$`), so
-   a sub-path like `.../ext/epaper/rooms` would 404 on reload. That is why
-   navigation here is client-side state, not `ui.sub_pages`. Letting the
-   extension-page match include sub-paths (and passing the remainder to
-   `render_fn`) would let sections become bookmarkable.
+page). Deep-linkable sub-paths (above) need a matching nice4iot change:
+routing the extension page's whole subtree to `render_fn`, not just its
+exact base URL, so `.../ext/epaper/rooms` doesn't 404 on reload — see
+nice4iot's own `docs/extensions.md`, "Deep links within a standalone page".
