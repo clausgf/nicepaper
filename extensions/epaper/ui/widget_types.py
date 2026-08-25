@@ -18,20 +18,22 @@ the deciding field in `refresh_on` so changing it rebuilds the form.
 `extra` renders what is not a field at all -- a button, a warning.
 """
 from dataclasses import dataclass, field as dataclass_field
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 
 from nicegui import ui
 from niceview import Field, ModelForm
 
+from extensions.epaper.catalog.models import Palette
 from extensions.epaper.config import resource_paths
 from extensions.epaper.core.datasources.image import clear_cache as clear_image_cache
 from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.screen.models import (
     DateWidgetModel, HomeAssistantWidgetModel, ImageWidgetModel, RoomCalendarWidgetModel,
-    TextWidgetModel, WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
-    WeatherWidgetModel, WidgetModel,
+    ScreenModel, TextWidgetModel, WeatherChartWidgetModel, WeatherForecastWidgetModel,
+    WeatherNowWidgetModel, WeatherWidgetModel, WidgetModel,
 )
 from extensions.epaper.paths import EpaperPaths
+from extensions.epaper.ui.compact_fields import compact_color_field, compact_font_field
 from extensions.epaper.ui.forms import (
     ALIGNMENT_HINT, COL, DATE_PATTERN_HINT, FORM_STYLE, LOCATION_HINT, ROW, ROW_CENTER,
     SHORT_DATE_PATTERN_HINT, TIME_PATTERN_HINT, hints,
@@ -65,6 +67,8 @@ class WidgetType:
     """Fields whose change rebuilds the form, because `content` reads them."""
     font: bool = True
     """Whether the Appearance section offers font_name/font_size."""
+    colors: bool = True
+    """Whether the Appearance section offers color_primary/color_accent."""
 
 
 def _resolve(value: Any, widget: WidgetModel, paths: EpaperPaths) -> Any:
@@ -173,7 +177,8 @@ WIDGET_TYPES: dict[str, WidgetType] = {
         model=WeatherChartWidgetModel, icon='show_chart', title='Weather (Chart) Widget',
         summary=_chart_summary,
         content=[[ROW, 'latitude', 'longitude'],
-                 [ROW, 'primary_metric', 'secondary_metric'], 'forecast_hours'],
+                 [ROW, 'primary_metric', 'secondary_metric'], [ROW, 'forecast_hours', 'line_style']],
+        field_infos={'line_style': Field(widget_type='ui.select', options=['solid', 'dashed', 'dotted'])},
     ),
     'Image': WidgetType(
         model=ImageWidgetModel, icon='image', title='Image Widget',
@@ -185,7 +190,8 @@ WIDGET_TYPES: dict[str, WidgetType] = {
         field_infos=_image_field_infos,
         extra=_image_extra,
         refresh_on=('source_type',),
-        font=False,  # the Image widget has no text of its own
+        font=False,  # the Image widget has no text or lines of its own
+        colors=False,
     ),
     'HomeAssistant': WidgetType(
         model=HomeAssistantWidgetModel, icon='sensors', title='Home Assistant Widget',
@@ -218,27 +224,28 @@ def new_widget(widget_type: str) -> WidgetModel:
     return entry.model(position_x=0, position_y=0, **entry.defaults)
 
 
-def _layout(entry: WidgetType, widget: WidgetModel, paths: EpaperPaths) -> list:
-    """The whole form: the two sections every widget shares, then the
-    type's own Content section."""
-    appearance = ['## Appearance', COL, [ROW, 'init_background', 'clipping']]
-    if entry.font:
-        appearance.append([ROW, 'font_name', 'font_size'])
+def _layout_top(entry: WidgetType) -> list:
+    """Layout + Appearance sections shared by every widget -- position/size
+    and background/clipping. font_name/font_size and color_primary/
+    color_accent render as compact controls instead (see
+    _render_appearance_extras()), between this and _layout_content()."""
     return [
         ['## Layout', COL, [ROW, 'position_x', 'position_y'], [ROW, 'size_width', 'size_height']],
-        appearance,
-        ['## Content', COL, *_resolve(entry.content, widget, paths)],
+        ['## Appearance', COL, [ROW, 'init_background', 'clipping']],
     ]
+
+
+def _layout_content(entry: WidgetType, widget: WidgetModel, paths: EpaperPaths) -> list:
+    return [['## Content', COL, *_resolve(entry.content, widget, paths)]]
+
+
+def _font_names() -> List[str]:
+    return sorted(p.name for p in resource_paths.font_path.glob('*') if p.is_file())
 
 
 def _field_infos(entry: WidgetType, widget: WidgetModel, paths: EpaperPaths) -> dict:
     """The shared field customizations, with the type's own merged on top."""
-    font_names = sorted(p.name for p in resource_paths.font_path.glob('*') if p.is_file())
     shared = {
-        # both font aspects clearable so each can be reverted to the screen
-        # default independently (an empty name/size falls back on its own)
-        'font_name': Field(widget_type='ui.select', options=font_names, clearable=True),
-        'font_size': Field(clearable=True),
         'alignment': Field(hint=ALIGNMENT_HINT, classes='w-40'),
         'latitude': Field(hint=LOCATION_HINT, clearable=True),
         'longitude': Field(hint=LOCATION_HINT, clearable=True),
@@ -246,27 +253,86 @@ def _field_infos(entry: WidgetType, widget: WidgetModel, paths: EpaperPaths) -> 
     return {**shared, **_resolve(entry.field_infos, widget, paths)}
 
 
+def _render_appearance_extras(adapter, key: str, entry: WidgetType,
+                              screen: Optional[ScreenModel], palette: Optional[Palette]) -> None:
+    """The compact font/color controls between the Layout+Appearance and
+    Content sections -- see compact_fields.py for why these can't just be
+    more ModelForm fields."""
+    # the global accent is itself optional (clearable in the settings), same
+    # fallback screen/backend.py's Screen.colors uses -- some concrete color
+    # has to reach the swatch either way
+    default_accent = app_config.color_accent or app_config.color_primary
+    if screen is not None:
+        _, screen_primary, screen_accent = screen.resolved_colors(
+            app_config.color_background, app_config.color_primary, default_accent)
+    else:
+        screen_primary, screen_accent = app_config.color_primary, default_accent
+    palette_hex = [f'#{r:02x}{g:02x}{b:02x}' for r, g, b in palette.palette] if palette else None
+    font_options = _font_names()
+
+    def save(**fields: Any) -> None:
+        item = adapter.read(key)
+        for name, value in fields.items():
+            setattr(item, name, value)
+        adapter.update(item)
+        row.refresh()
+
+    @ui.refreshable
+    def row() -> None:
+        item = adapter.read(key)
+        with ui.row().classes('items-center gap-3 q-px-sm q-pb-sm'):
+            if entry.font:
+                resolved_name, resolved_size = item.resolved_font(app_config.font_name, app_config.font_size)
+                compact_font_field(
+                    resolved_name=resolved_name, resolved_size=resolved_size,
+                    default_name=app_config.font_name, default_size=app_config.font_size,
+                    font_name=item.font_name, font_size=item.font_size, font_options=font_options,
+                    on_save=lambda name, size: save(font_name=name, font_size=size))
+            if entry.colors:
+                resolved_primary, resolved_accent = item.resolved_colors(screen_primary, screen_accent)
+                compact_color_field(
+                    label='Primary color', value=item.color_primary, resolved=resolved_primary,
+                    default=screen_primary, palette_hex=palette_hex,
+                    on_change=lambda c: save(color_primary=c))
+                compact_color_field(
+                    label='Accent color', value=item.color_accent, resolved=resolved_accent,
+                    default=screen_accent, palette_hex=palette_hex,
+                    on_change=lambda c: save(color_accent=c))
+
+    row()
+
+
 def render_widget_form(widget: WidgetModel, adapter, key: str, paths: EpaperPaths,
-                       persist: Callable[[], None], refresh: Callable[[], None]) -> None:
+                       persist: Callable[[], None], refresh: Callable[[], None],
+                       screen: Optional[ScreenModel] = None, palette: Optional[Palette] = None) -> None:
     """The editing form for one widget, autosaving through `adapter`.
 
     `refresh` rebuilds the detail view; it is called when a field in the
     type's `refresh_on` changes, since those decide which fields the form
-    shows at all.
-
-    TODO: color_primary/color_accent are deliberately not in any layout
-    yet; a widget's colors are editable in the screen JSON only until this
-    form gets a color section."""
+    shows at all. `screen`/`palette` (the screen being edited and its
+    resolved Palette, see catalog/backend.py::get_palette) inform the
+    compact color field's defaults/options -- both optional so this can
+    still be called without a screen in scope (falls back to the global
+    defaults and an unrestricted color picker)."""
     entry = WIDGET_TYPES[widget.widget_type]
 
     def on_change(e) -> None:
         if e.field_name in entry.refresh_on:
             refresh()
 
-    form = ModelForm.from_adapter(
+    top_form = ModelForm.from_adapter(
         entry.model, adapter, key, autosave=True, on_change=on_change,
-        layout=_layout(entry, widget, paths),
+        layout=_layout_top(entry),
         field_infos=_field_infos(entry, widget, paths), **FORM_STYLE)
-    form.render()
+    top_form.render()
+
+    if entry.font or entry.colors:
+        _render_appearance_extras(adapter, key, entry, screen, palette)
+
+    content_form = ModelForm.from_adapter(
+        entry.model, adapter, key, autosave=True, on_change=on_change,
+        layout=_layout_content(entry, widget, paths),
+        field_infos=_field_infos(entry, widget, paths), **FORM_STYLE)
+    content_form.render()
     if entry.extra is not None:
-        entry.extra(form, widget, paths, persist)
+        entry.extra(content_form, widget, paths, persist)

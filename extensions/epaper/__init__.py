@@ -108,7 +108,7 @@ def register(app: FastAPI) -> None:
     def _booking_systems_tab(project_name: str) -> None:
         booking_systems_wrapper(_paths_for_project(project_name)).render()
 
-    register_project_tab('Rooms', _rooms_tab)
-    register_project_tab('Screens', _screens_tab)
-    register_project_tab('Schedules', _schedules_tab)
-    register_project_tab('Booking systems', _booking_systems_tab)
+    register_project_tab('Rooms', _rooms_tab, icon='meeting_room')
+    register_project_tab('Screens', _screens_tab, icon='wallpaper')
+    register_project_tab('Schedules', _schedules_tab, icon='schedule')
+    register_project_tab('Booking systems', _booking_systems_tab, icon='event')

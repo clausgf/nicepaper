@@ -29,7 +29,7 @@ from niceview.util import confirm_dialog
 # is created dynamically after the initial page load. Importing the module here at
 # setup registers the ESM eagerly so 'nicegui-sortable' is in every page's importmap.
 
-from extensions.epaper.catalog.backend import get_palettes, get_panel_type, get_panel_types
+from extensions.epaper.catalog.backend import get_palette, get_palettes, get_panel_type, get_panel_types
 from extensions.epaper.catalog.models import PanelTypeModel
 from extensions.epaper.screen.models import ScreenModel, WidgetModel
 from extensions.epaper.paths import EpaperPaths
@@ -359,7 +359,8 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
                     .on_click(lambda: _delete_widget(key))
 
             render_widget_form(widget, widgets_adapter, key, paths,
-                               persist_screen, _refresh_editor_area)
+                               persist_screen, _refresh_editor_area,
+                               screen=screen, palette=get_palette(screen.palette_id, paths))
 
     def _open_detail(key: str) -> None:
         state.update({'view': 'detail', 'key': key, 'direction': 'right'})

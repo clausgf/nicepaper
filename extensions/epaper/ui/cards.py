@@ -64,9 +64,9 @@ def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
     """
     Compact always-visible summary card for nice4iot's project Dashboard
     tab. open_url is where the "open" button navigates -- resolved by the
-    caller (project_url(project_name, tab='Screens')), since URL
-    construction is nice4iot-specific and doesn't belong in this UI-only
-    module.
+    caller (project_extension_url(project_name, 'epaper'), the simplified
+    UI's own standalone page), since URL construction is nice4iot-specific
+    and doesn't belong in this UI-only module.
 
     weather_statuses / homeassistant_statuses (read from the respective caches
     by the caller) render one health line per location/entity, so an outage of

@@ -181,14 +181,14 @@ _METRIC_KIND: dict[str, charting.Kind] = {
 
 
 def _metric_series(hourly: dict, metric: str, start_idx: int, end_idx: int,
-                   axis: charting.Axis) -> charting.ChartSeries:
+                   axis: charting.Axis, line_style: charting.LineStyle) -> charting.ChartSeries:
     """One ChartSeries for a metric over [start_idx, end_idx). Open-Meteo
     delivers wind in km/h, so the 'wind' series is converted to the configured
     wind_speed_unit here (the other metrics have no unit choice)."""
     values = hourly[_METRIC_FIELD[metric]][start_idx:end_idx]
     if metric == "wind":
         values = [None if v is None else convert_wind_speed(v) for v in values]
-    return charting.ChartSeries(values, kind=_METRIC_KIND[metric], axis=axis)
+    return charting.ChartSeries(values, kind=_METRIC_KIND[metric], axis=axis, line_style=line_style)
 
 
 class WeatherChartWidget(_WeatherWidgetBase):
@@ -213,10 +213,12 @@ class WeatherChartWidget(_WeatherWidgetBase):
         start_idx = next((i for i, t in enumerate(times) if t >= now_iso), 0)
         end_idx = min(start_idx + self.config.forecast_hours, len(times))
 
-        series = [_metric_series(hourly, self.config.primary_metric, start_idx, end_idx, 'primary')]
+        series = [_metric_series(hourly, self.config.primary_metric, start_idx, end_idx,
+                                 'primary', self.config.line_style)]
         if self.config.secondary_metric:
             series.append(
-                _metric_series(hourly, self.config.secondary_metric, start_idx, end_idx, 'secondary'))
+                _metric_series(hourly, self.config.secondary_metric, start_idx, end_idx,
+                               'secondary', 'dashed'))
 
         labels = [times[i][11:16] for i in range(start_idx, end_idx)]
         charting.draw_chart(

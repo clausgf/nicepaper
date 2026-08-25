@@ -26,6 +26,19 @@ def test_negative_and_positive_values_render_without_crashing():
     assert any(image.getpixel((x, y)) != (255, 255, 255) for x in range(200) for y in range(100))
 
 
+def test_line_style_dotted_and_dashed_differ_from_solid():
+    """Regression guard for ChartSeries.line_style being silently ignored:
+    each style must draw a visibly different set of pixels for the same
+    primary-axis series (dotted/dashed skip pixels a solid line wouldn't)."""
+    values = [1, 5, 3, 8, 2, 6, 4, 7, 3, 5]
+    images = {style: _render([ChartSeries(values, kind="line", axis="primary", line_style=style)])
+              for style in ("solid", "dashed", "dotted")}
+    pixels = {style: img.tobytes() for style, img in images.items()}
+    assert pixels["solid"] != pixels["dashed"]
+    assert pixels["solid"] != pixels["dotted"]
+    assert pixels["dashed"] != pixels["dotted"]
+
+
 def test_axis_labels_stay_within_chart_bounds():
     """Regression test: axis min/max labels were originally vertically
     centered on the min/max gridline, so the top label's box straddled

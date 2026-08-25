@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.23.0 — 2026-08-25
+
+### Changed
+
+- **Adapt to nice4iot's project-tab sidebar** (still unreleased in the
+  nice4iot repo at the time of this change): nice4iot moved its project
+  page's tab strip to a left sidebar and gave `register_project_tab` an
+  optional `icon=` (Material icon name, default `'extension'`) for the
+  sidebar row. `extensions/epaper/__init__.py`'s four project tabs (Rooms,
+  Screens, Schedules, Booking systems) now pass fitting icons
+  (`meeting_room`, `wallpaper`, `schedule`, `event`) instead of the
+  generic default. `register_project_tab`'s `render_fn` signature and
+  calling convention are unchanged, so this needed no other code changes.
+
+## 0.22.0 — 2026-08-25
+
+### Added
+
+- **Compact color and font controls in the widget editor.** Every widget
+  type except `Image` now exposes `color_primary`/`color_accent` (already
+  model fields, never surfaced in the editor before) alongside
+  `font_name`/`font_size`, all four as small square swatch/icon buttons
+  instead of full-width rows (`ui/compact_fields.py`, new). The color swatch
+  opens a menu restricted to the screen's own palette colors
+  (`catalog.backend.get_palette`) — only colors the panel can actually
+  display — plus a "Default" entry to clear the override; a screen with no
+  palette set falls back to a plain, unrestricted color picker. The font
+  icon opens a dialog with a Font Name select and a Size field.
+- **`WeatherChart` widget: `line_style`** (`solid`/`dashed`/`dotted`,
+  default `solid`) for the primary series when it renders as a line —
+  `core/charting.py`'s `ChartSeries` gained the same field, and
+  `_draw_polyline()` now takes a style instead of a bare dashed flag. The
+  secondary series keeps its existing fixed dashed style.
+
 ## 0.21.0 — 2026-08-25
 
 ### Added

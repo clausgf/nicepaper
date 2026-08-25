@@ -71,7 +71,11 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   In `WeatherChart`, `primary_metric` is always shown and `secondary_metric`
   is optional on its own right Y axis (e.g. temperature + precipitation
   combined). Available metrics are `temperature`, `precipitation`, `humidity`,
-  `pressure` and `wind` (the wind series honours `WIND_SPEED_UNIT`). Each axis
+  `pressure` and `wind` (the wind series honours `WIND_SPEED_UNIT`).
+  `line_style` (`solid`/`dashed`/`dotted`) sets `primary_metric`'s line style
+  when it renders as a line (bar metrics, e.g. `precipitation`, ignore it);
+  `secondary_metric` always stays dashed, to keep it visually distinct from
+  the primary series even on a black/white/red panel. Each axis
   is titled with its metric name and unit above the plot (primary left,
   secondary right) — e.g. `Temperatur (°C)`, `Wind (km/h)` — in the `LOCALE`
   language. All three are backed by [Open-Meteo](https://open-meteo.com)
@@ -136,10 +140,15 @@ they stay correct at whatever width the browser scales the image to. The frame
 stops growing at 48rem — a preview is for judging the layout, not for reading
 it at 1:1 — and scales down freely below that.
 
-Individual widgets can override `color_primary`/`color_accent` for themselves,
-each aspect falling back to the screen's color independently — the same
-per-aspect override `font_name`/`font_size` use. These two fields are not in
-the editor form yet and are set in the screen JSON directly.
+Individual widgets can override `color_primary`/`color_accent` for
+themselves, each aspect falling back to the screen's color independently —
+the same per-aspect override `font_name`/`font_size` use. In the widget
+editor's Appearance section, both show as small, compact controls rather
+than full-width fields: a font icon opens a dialog with a Font Name/Size
+picker, and a color swatch opens a menu of the screen's palette colors
+(`palette_id`, above) — so only colors the panel can actually display are
+offered — with a "Default" entry to clear the override. A screen with no
+palette set falls back to a plain, unrestricted color picker instead.
 
 ### Panel types
 

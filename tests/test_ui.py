@@ -64,6 +64,84 @@ def test_every_widget_type_renders_its_form(tmp_path):
             f"{widget_type} rendered sections {headings}"
 
 
+def _new_widget_form(tmp_path, widget_type, *, screen=None, palette=None):
+    """render_widget_form() for a fresh widget of widget_type, returning the
+    client's elements for inspection. Shared by the compact-appearance-field
+    tests below."""
+    from nicegui.client import Client
+    from nicegui.page import page
+    from niceview import ListAdapter
+
+    from extensions.epaper.paths import EpaperPaths
+    from extensions.epaper.screen.models import WidgetModel
+    from extensions.epaper.ui.widget_types import new_widget, render_widget_form
+
+    paths = EpaperPaths(root=tmp_path)
+    paths.ensure_dirs()
+
+    widget = new_widget(widget_type)
+    adapter = ListAdapter(WidgetModel, [widget])
+    key = adapter.key_from_item(widget)
+    with Client(page(f"/test-widget-appearance-{widget_type}"), request=None) as client:
+        render_widget_form(widget, adapter, key, paths, lambda: None, lambda: None,
+                           screen=screen, palette=palette)
+        elements = list(client.elements.values())
+    return elements
+
+
+def test_widget_appearance_extras_restrict_colors_to_the_palette(tmp_path):
+    """The compact color fields (ui/compact_fields.py) must only offer the
+    current screen's palette colors -- one swatch button per palette entry,
+    styled with that entry's own hex -- plus the font icon button; both are
+    absent for widget types with colors=False/font=False (Image)."""
+    from extensions.epaper.catalog.models import Palette
+
+    palette = Palette(id="test", name="Test", palette=[(0, 0, 0), (255, 255, 255), (255, 0, 0)])
+    elements = _new_widget_form(tmp_path, "Text", palette=palette)
+
+    swatch_colors = {e._style.get("background-color") for e in elements
+                     if type(e).__name__ == "Button" and "background-color" in e._style}
+    palette_hex = {f"#{r:02x}{g:02x}{b:02x}" for r, g, b in palette.palette}
+    assert palette_hex <= swatch_colors, \
+        f"expected every palette color among the swatches, got {swatch_colors}"
+
+    font_icons = [e for e in elements if type(e).__name__ == "Button" and e.icon == "text_fields"]
+    assert len(font_icons) == 1, "expected exactly one compact font field"
+
+    assert not any(type(e).__name__ == "ColorInput" for e in elements), \
+        "a palette was given, so the unrestricted color_input fallback shouldn't render"
+
+
+def test_widget_appearance_extras_fall_back_without_a_palette(tmp_path):
+    """No palette resolvable for the screen (e.g. palette_id unset) -> the
+    color fields fall back to a plain, unrestricted ui.color_input."""
+    elements = _new_widget_form(tmp_path, "Text", palette=None)
+    color_inputs = [e for e in elements if type(e).__name__ == "ColorInput"]
+    assert len(color_inputs) == 2, "expected one color_input per color field (primary, accent)"
+
+
+def test_image_widget_has_no_appearance_extras(tmp_path):
+    """Image opts out of both font and colors (font=False, colors=False) --
+    no compact font icon, no color swatches/inputs at all."""
+    from extensions.epaper.catalog.models import Palette
+
+    palette = Palette(id="test", name="Test", palette=[(0, 0, 0), (255, 255, 255)])
+    elements = _new_widget_form(tmp_path, "Image", palette=palette)
+    assert not any(type(e).__name__ == "ColorInput" for e in elements)
+    assert not any(type(e).__name__ == "Button" and e.icon == "text_fields" for e in elements)
+
+
+def test_weather_chart_line_style_defaults_to_solid_and_renders_as_select(tmp_path):
+    from extensions.epaper.screen.models import WeatherChartWidgetModel
+
+    assert WeatherChartWidgetModel(position_x=0, position_y=0).line_style == "solid"
+
+    elements = _new_widget_form(tmp_path, "WeatherChart")
+    selects = [e for e in elements if type(e).__name__ == "Select" and e._props.get("label") == "Line style"]
+    assert len(selects) == 1
+    assert set(selects[0].options) == {"solid", "dashed", "dotted"}
+
+
 def test_widget_forms_follow_the_field_they_switch_on(tmp_path):
     """Two widget types show different fields depending on one of their own
     values (WidgetType.refresh_on). Both directions have to render, and each

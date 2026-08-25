@@ -1004,7 +1004,7 @@ wheels = [
 
 [[package]]
 name = "nicepaper"
-version = "0.21.0"
+version = "0.23.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aiofiles" },

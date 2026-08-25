@@ -37,6 +37,12 @@ from typing import Literal, Optional, Sequence
 
 Axis = Literal['primary', 'secondary']
 Kind = Literal['bar', 'line']
+LineStyle = Literal['solid', 'dashed', 'dotted']
+
+# (dash, gap) length presets for the non-solid styles, in the same units as
+# _draw_polyline's own defaults -- 'dashed' matches its previous hardcoded
+# pattern, 'dotted' reuses the gridline helpers' (_draw_dotted_hline/vline).
+_DASH_PRESETS: dict[LineStyle, tuple[int, int]] = {'dashed': (5, 4), 'dotted': (2, 3)}
 
 
 @dataclass
@@ -44,6 +50,7 @@ class ChartSeries:
     values: Sequence[float]
     kind: Kind = 'line'
     axis: Axis = 'primary'
+    line_style: LineStyle = 'solid'
 
 
 def _abs_pt(ctx, x: float, y: float) -> tuple[int, int]:
@@ -66,11 +73,12 @@ def _draw_dotted_vline(ctx, x: float, y0: float, y1: float, fill, dash: int = 2,
         y += dash + gap
 
 
-def _draw_polyline(ctx, points: list[tuple[float, float]], fill, width: int, dashed: bool,
-                    dash: int = 5, gap: int = 4) -> None:
-    if not dashed:
+def _draw_polyline(ctx, points: list[tuple[float, float]], fill, width: int,
+                    style: LineStyle = 'solid') -> None:
+    if style == 'solid':
         ctx.draw.line([_abs_pt(ctx, x, y) for x, y in points], fill=fill, width=width)
         return
+    dash, gap = _DASH_PRESETS[style]
     for (x0, y0), (x1, y1) in zip(points, points[1:]):
         length = math.hypot(x1 - x0, y1 - y0)
         if length == 0:
@@ -249,7 +257,7 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
                     ctx.draw.rectangle([_abs_pt(ctx, bx0, top), _abs_pt(ctx, bx1, bottom)], fill=color)
         else:
             points = [(slot_center_x(i), to_y(v, s.axis)) for i, v in enumerate(s.values)]
-            _draw_polyline(ctx, points, fill=color, width=2 if is_primary else 1, dashed=not is_primary)
+            _draw_polyline(ctx, points, fill=color, width=2 if is_primary else 1, style=s.line_style)
 
     for i in x_indices:
         assert labels is not None  # x_indices is only ever non-empty when labels is set (see above)
