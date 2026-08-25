@@ -192,8 +192,8 @@ def _metric_series(hourly: dict, metric: str, start_idx: int, end_idx: int,
 
 
 class WeatherChartWidget(_WeatherWidgetBase):
-    """Renders primary_metric (and optionally secondary_metric) as a
-    combined bar/line chart via charting.draw_chart() -- see
+    """Renders primary_metric and/or secondary_metric (either may be unset)
+    as a combined bar/line chart via charting.draw_chart() -- see
     WeatherChartWidgetModel's docstring for why this replaced separate
     precipitation/temperature widgets."""
 
@@ -213,8 +213,10 @@ class WeatherChartWidget(_WeatherWidgetBase):
         start_idx = next((i for i, t in enumerate(times) if t >= now_iso), 0)
         end_idx = min(start_idx + self.config.forecast_hours, len(times))
 
-        series = [_metric_series(hourly, self.config.primary_metric, start_idx, end_idx,
-                                 'primary', self.config.line_style)]
+        series = []
+        if self.config.primary_metric:
+            series.append(_metric_series(hourly, self.config.primary_metric, start_idx, end_idx,
+                                         'primary', self.config.line_style))
         if self.config.secondary_metric:
             series.append(
                 _metric_series(hourly, self.config.secondary_metric, start_idx, end_idx,
@@ -223,5 +225,5 @@ class WeatherChartWidget(_WeatherWidgetBase):
         labels = [times[i][11:16] for i in range(start_idx, end_idx)]
         charting.draw_chart(
             ctx, (0, 0), (w, h), series, font=self.font, labels=labels,
-            primary_title=metric_title(self.config.primary_metric),
+            primary_title=metric_title(self.config.primary_metric) if self.config.primary_metric else None,
             secondary_title=metric_title(self.config.secondary_metric) if self.config.secondary_metric else None)

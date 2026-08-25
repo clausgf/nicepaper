@@ -125,7 +125,12 @@ stays visible rather than being dropped. Add
 is the wrapper's own standard button, driving a small dialog that picks from
 `display.backend.assignable_devices()` (devices not already in this room) since
 there is nothing to type; Delete unassigns the device from the room (the
-device and its screen stay).
+device and its screen stay). Below the Screen select, `display/preview.py`'s
+`render_device_preview()` adds Current/Last delivered tabs — the screen as it
+renders right now, and the actual PNG + timestamp the device's own alias URL
+last served with a real `200 OK` (not a `304`, tracked by
+`devicebinding/snapshot.py`, `GET .../last_delivered.png`) — so a stale or
+never-polling device is visible here, not just assumed from "Online".
 
 **Booking systems** (Settings › Booking systems) are wired the same way:
 `bookingsystem/backend.py` stores one JSON file per system
@@ -135,14 +140,19 @@ select of the configured systems. A booking system is the connection/type
 (iCal today); the room supplies its own resource (the iCal URL).
 
 A booking system's detail has a custom `render_detail`
-(`bookingsystem/simplified_ui.py`): the `BookingSystemModel` form (its own
-`Meta.layout`, which omits `header`) plus two hand-built editors for the
-fields that layout omits — `header` (`Dict[str, str]`, extra HTTP headers
-sent with every feed request) and `category_colors` (`Dict[str, str]`, an
-iCal `CATEGORIES` entry mapped to a card color for the `RoomCalendar`
-widget) — both a swatch/text list with a delete icon per row and an "Add"
-button matching DrillDownWrapper's own toolbar style (dense round);
-`category_colors`' Add dialog uses a color picker for the value.
+(`bookingsystem/ui.py`, shared by both UIs — see above): the
+`BookingSystemModel` form (its own `Meta.layout`, which omits `header`)
+plus two hand-built editors for the fields that layout omits — `header`
+(`Dict[str, str]`, extra HTTP headers sent with every feed request) and
+`category_colors` (`Dict[str, str]`, an iCal `CATEGORIES` entry mapped to a
+card color for the `RoomCalendar` widget) — both a swatch/text list with a
+delete icon per row and an "Add" button matching DrillDownWrapper's own
+toolbar style (dense round). `category_colors`' Add dialog restricts the
+color picker to the 6-color display's own colors (the `e6` Spectra palette
+— black, white, yellow, red, blue, green): a booking system isn't tied to
+one screen/panel, so there's no single "closest" color that would be right
+for every room using it; a panel that doesn't have the chosen color exactly
+falls back to black at render time instead (`core/widgets/roomcalendar.py`).
 
 The top-level **Displays** section (`display/simplified_ui.py`'s
 `render_displays`) is a niceview `DrillDownWrapper` over
@@ -159,7 +169,9 @@ above), and an "Open in nice4iot" link for experts (`device_url`). RSSI and
 battery have no per-device source in nice4iot yet, so their icons/values
 stay at "no data" — see [extension wishlist](nice4iot-extension-wishlist.md).
 A device's panel type itself is set on nice4iot's own device card
-(`devicebinding/ui.py`), not here — this select only reads it.
+(`devicebinding/ui.py`), not here — this select only reads it. Same
+Current/Last delivered preview tabs as the room-scoped detail above
+(`render_device_preview()`, shared by both).
 
 ## Notes for the nice4iot extension interface
 

@@ -195,15 +195,16 @@ WeatherMetric = Literal["temperature", "precipitation", "humidity", "pressure", 
 
 class WeatherChartWidgetModel(WeatherWidgetModel):
     """One configurable chart instead of separate precipitation/temperature
-    widgets: primary_metric always drawn (solid, accent-colored, its own
-    left Y axis); secondary_metric optional (dashed, black, its own right
-    Y axis) -- e.g. temperature + precipitation combined in one chart.
-    Which metric renders as bars vs. a line is fixed per metric (only
-    precipitation is bursty/mostly-zero enough to read better as bars),
-    not separately configurable."""
+    widgets: primary_metric (solid, accent-colored, its own left Y axis) and
+    secondary_metric (dashed, black, its own right Y axis) -- e.g.
+    temperature + precipitation combined in one chart. Either can be empty;
+    an empty one simply draws no trace, so a single-metric chart is just
+    the other one left unset. Which metric renders as bars vs. a line is
+    fixed per metric (only precipitation is bursty/mostly-zero enough to
+    read better as bars), not separately configurable."""
     widget_type: Literal["WeatherChart"] = "WeatherChart"
-    primary_metric: WeatherMetric = Field(default="temperature", description="Always shown; solid line/bars, left Y axis.")
-    secondary_metric: Optional[WeatherMetric] = Field(default=None, description="Shown alongside primary_metric if set; dashed, right Y axis.")
+    primary_metric: Optional[WeatherMetric] = Field(default="temperature", description="Solid line/bars, left Y axis. Empty draws no primary trace.")
+    secondary_metric: Optional[WeatherMetric] = Field(default=None, description="Dashed, right Y axis. Empty draws no secondary trace.")
     forecast_hours: int = Field(default=24, description="How many hours ahead the chart covers.")
     line_style: Literal["solid", "dashed", "dotted"] = Field(
         default="solid", description="Line style of primary_metric, if it renders as a line "

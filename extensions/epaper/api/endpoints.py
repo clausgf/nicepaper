@@ -1,12 +1,17 @@
 import asyncio
 import datetime
 import io
+from pathlib import Path
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Header, Path as PathParam, Query, Response, status
 from typing import Optional
 from fastapi.responses import FileResponse
 
+from extensions.epaper.devicebinding.backend import get_device_bindings
+from extensions.epaper.devicebinding.snapshot import (
+    device_snapshot_png_path, read_device_snapshot, save_device_snapshot,
+)
 from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.util import logger, clean_path_parameter
 from extensions.epaper.screen.backend import get_screen_by_id
@@ -32,6 +37,14 @@ _RAW_DESCRIPTION = (
     "Return the unquantized RGB render instead of the palette image. For "
     "debugging what quantization did to a color; a display never needs it."
 )
+
+_LAST_DELIVERED_RESPONSES: dict[int | str, dict[str, Any]] = {
+    200: {
+        "content": {"image/png": {}},
+        "description": "The last image this device fetched with a real 200 OK (not a 304).",
+    },
+    404: {"description": "This device has not fetched an image yet, or is not a known device name."},
+}
 
 _BOXES_DESCRIPTION = (
     "Outline every widget's box, marking the anchor of widgets that size "
@@ -101,7 +114,29 @@ async def _render_screen_image(paths: EpaperPaths, id: str, if_none_match: Optio
         # raised), which only happens once the screen has an rgb.png -- the
         # one thing that makes get_image_path() return None
         raise HTTPException(status_code=500, detail="Error getting image")
+
+    # A real 200 to a device's own alias URL: remember this exact PNG + when,
+    # for the "Last delivered" view (display/preview.py) -- distinct from
+    # `raw`, which a display never requests (see _RAW_DESCRIPTION), and only
+    # for `id`s that are genuinely a device's own name, not a literal screen
+    # id an editor preview happens to hit this same endpoint with.
+    if not raw and get_device_bindings(paths).get(id) is not None:
+        await asyncio.to_thread(save_device_snapshot, paths, id, Path(filename))
+
     return FileResponse(path=filename, media_type="image/png", headers=headers)
+
+
+async def _render_last_delivered_image(paths: EpaperPaths, id: str) -> Response:
+    """The PNG a device (`id`, its own name) last actually fetched with a
+    real 200 OK, frozen at that point in time -- see
+    devicebinding/snapshot.py. Not cached client-side: it changes underneath
+    the same URL whenever the device fetches again, unlike image.png's
+    ETag-identified versions."""
+    id = clean_path_parameter(id)
+    if read_device_snapshot(paths, id) is None:
+        raise HTTPException(status_code=404, detail="No image has been delivered to this device yet")
+    return FileResponse(path=device_snapshot_png_path(paths, id), media_type="image/png",
+                        headers={"Cache-Control": "no-store"})
 
 
 def build_standalone_router(paths: EpaperPaths) -> APIRouter:
@@ -135,6 +170,18 @@ def build_standalone_router(paths: EpaperPaths) -> APIRouter:
         """
         return await _render_screen_image(paths, id, if_none_match, raw, boxes)
 
+    @router.get(
+        "/screen/{id}/last_delivered.png",
+        summary="Get the last image this device actually fetched",
+        tags=["devices"],
+        response_class=FileResponse,
+        responses=_LAST_DELIVERED_RESPONSES,
+    )
+    async def get_last_delivered_image(
+        id: str = PathParam(description="Device name -- last-delivered snapshots are recorded per device, not per screen."),
+    ):
+        return await _render_last_delivered_image(paths, id)
+
     return router
 
 
@@ -164,5 +211,19 @@ def build_extension_router(paths_for_project: Callable[[str], EpaperPaths]) -> A
     ):
         paths = paths_for_project(project_name)
         return await _render_screen_image(paths, id, if_none_match, raw, boxes)
+
+    @router.get(
+        "/{project_name}/screens/{id}/last_delivered.png",
+        summary="Get the last image this device actually fetched",
+        tags=["devices"],
+        response_class=FileResponse,
+        responses=_LAST_DELIVERED_RESPONSES,
+    )
+    async def get_last_delivered_image(
+        project_name: str = PathParam(description="nice4iot project name."),
+        id: str = PathParam(description="Device name -- last-delivered snapshots are recorded per device, not per screen."),
+    ):
+        paths = paths_for_project(project_name)
+        return await _render_last_delivered_image(paths, id)
 
     return router

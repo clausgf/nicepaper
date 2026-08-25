@@ -15,9 +15,17 @@ to restrict the Screen select to matching resolution/palette (UI-side only;
 nothing here validates screen_id against it, so a mismatched pair set some
 other way still renders, same as any other dangling reference in this app).
 """
+import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+
+class DeviceSnapshot(BaseModel):
+    """Metadata sidecar for a device's last successfully delivered image
+    (devicebinding/snapshot.py) -- just the fetch time; the PNG bytes
+    themselves live next to it as a plain file, not base64 in here."""
+    fetched_at: datetime.datetime
 
 
 class DeviceBinding(BaseModel):

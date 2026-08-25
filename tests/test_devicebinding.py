@@ -1,3 +1,4 @@
+import datetime
 import json
 
 from extensions.epaper.devicebinding.backend import (
@@ -5,6 +6,9 @@ from extensions.epaper.devicebinding.backend import (
     resolve_screen_id, set_device_binding,
 )
 from extensions.epaper.devicebinding.models import DeviceBinding
+from extensions.epaper.devicebinding.snapshot import (
+    device_snapshot_png_path, read_device_snapshot, save_device_snapshot,
+)
 from extensions.epaper.paths import EpaperPaths
 
 
@@ -122,3 +126,49 @@ def test_resolve_screen_and_room(tmp_path):
     # a device bound to a room only falls back to its own name as the screen id
     set_device_binding(paths, "roomonly", room_id="a-101")
     assert resolve_screen_and_room(paths, "roomonly") == ("roomonly", "a-101")
+
+
+def test_device_snapshot_missing_reads_as_none(tmp_path):
+    paths = _paths(tmp_path)
+    assert read_device_snapshot(paths, "dev") is None
+
+
+def test_device_snapshot_save_and_read_round_trip(tmp_path):
+    paths = _paths(tmp_path)
+    source = tmp_path / "source.png"
+    source.write_bytes(b"first-image-bytes")
+
+    save_device_snapshot(paths, "dev", source)
+
+    snapshot = read_device_snapshot(paths, "dev")
+    assert snapshot is not None
+    now = datetime.datetime.now(datetime.timezone.utc)
+    assert (now - snapshot.fetched_at).total_seconds() < 5
+    assert device_snapshot_png_path(paths, "dev").read_bytes() == b"first-image-bytes"
+
+
+def test_device_snapshot_save_overwrites_the_previous_one(tmp_path):
+    paths = _paths(tmp_path)
+    source = tmp_path / "source.png"
+
+    source.write_bytes(b"first")
+    save_device_snapshot(paths, "dev", source)
+    first = read_device_snapshot(paths, "dev")
+
+    source.write_bytes(b"second")
+    save_device_snapshot(paths, "dev", source)
+    second = read_device_snapshot(paths, "dev")
+
+    assert device_snapshot_png_path(paths, "dev").read_bytes() == b"second"
+    assert second is not None and first is not None
+    assert second.fetched_at >= first.fetched_at
+
+
+def test_device_snapshots_are_independent_per_device(tmp_path):
+    paths = _paths(tmp_path)
+    source = tmp_path / "source.png"
+    source.write_bytes(b"data")
+
+    save_device_snapshot(paths, "dev-a", source)
+    assert read_device_snapshot(paths, "dev-b") is None
+    assert read_device_snapshot(paths, "dev-a") is not None

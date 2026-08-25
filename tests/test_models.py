@@ -244,6 +244,16 @@ def test_weather_chart_widget_accepts_wind_metric():
     assert widget.primary_metric == "wind"
 
 
+def test_weather_chart_widget_primary_metric_can_be_cleared():
+    """primary_metric, like secondary_metric, may be None -- a chart with
+    only a secondary series is valid (see core/charting.py's draw_chart,
+    which then drives its gridlines off the secondary axis instead)."""
+    widget = WeatherChartWidgetModel(position_x=0, position_y=0, latitude=52.52, longitude=13.405,
+                                      primary_metric=None, secondary_metric="temperature")
+    assert widget.primary_metric is None
+    assert widget.secondary_metric == "temperature"
+
+
 def test_image_widget_defaults():
     w = ImageWidgetModel(position_x=0, position_y=0)
     assert w.source_type == "url"

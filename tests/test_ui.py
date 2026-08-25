@@ -354,13 +354,20 @@ def test_room_occupancy_status_shows_free_or_occupied():
     from extensions.epaper.room.simplified_ui import _occupancy_status
 
     now = datetime.datetime.now(ZoneInfo(app_config.timezone))
+    # _occupancy_status only counts a "later today" event if it's still on
+    # now's own calendar date -- a fixed +2h/+3h offset would intermittently
+    # cross midnight (and so fail) depending on what time the suite happens
+    # to run, so scale down to a fraction of whatever time is actually left
+    # before midnight instead.
+    midnight = (now + datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    remaining = midnight - now
 
     def _event(start_delta, end_delta, summary):
         return {"dtstart": (now + start_delta).isoformat(), "dtend": (now + end_delta).isoformat(),
                 "organizer": "", "summary": summary, "categories": ""}
 
     current = _event(datetime.timedelta(minutes=-10), datetime.timedelta(minutes=20), "Ongoing")
-    later_today = _event(datetime.timedelta(hours=2), datetime.timedelta(hours=3), "Later meeting")
+    later_today = _event(remaining * 0.5, remaining * 0.75, "Later meeting")
 
     with Client(page("/test-occupancy-occupied"), request=None) as client:
         _occupancy_status([current, later_today])
@@ -478,13 +485,18 @@ def test_displays_top_level_lists_devices_and_shows_room_and_status(tmp_path, mo
         render_displays(shell)
         labels = {e.text for e in client.elements.values()
                   if type(e).__name__ in ("Label", "ItemLabel")}
+        icons = [e for e in client.elements.values() if type(e).__name__ == "Icon"]
 
     assert "sign-1" in labels and "sign-2" in labels  # list row titles (device_name)
     assert "A-101 (North Conference) · weather" in labels  # sign-1's subtitle
+    # a fully custom row (WiFi/battery icons) doesn't get niceview's own
+    # drill-down chevron for free -- must be added by hand, one per row
+    chevrons = [e for e in icons if e._props.get("name") == "chevron_right"]
+    assert len(chevrons) == 2
 
     adapter = RoomDisplaysAdapter(paths, "demo-project")
     with Client(page("/test-displays-detail-bound"), request=None) as client:
-        _render_detail(paths, adapter, "sign-1")
+        _render_detail(paths, "/api/screen", adapter, "sign-1")
         texts = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
         links = [e for e in client.elements.values() if type(e).__name__ == "Link"]
     assert any("A-101 (North Conference)" in t for t in texts)
@@ -492,10 +504,65 @@ def test_displays_top_level_lists_devices_and_shows_room_and_status(tmp_path, mo
     assert links and links[0]._props.get("href") == "https://nice4iot.example/demo-project/devices/sign-1"
 
     with Client(page("/test-displays-detail-unbound"), request=None) as client:
-        _render_detail(paths, adapter, "sign-2")
+        _render_detail(paths, "/api/screen", adapter, "sign-2")
         texts = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
     assert "Not assigned to a room" in texts
     assert any("Offline" in t and "never" in t for t in texts)
+
+
+def test_device_preview_with_no_screen_shows_only_the_fallback_label(tmp_path):
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.display.preview import render_device_preview
+
+    paths = _simplified_paths(tmp_path)
+    with Client(page("/test-preview-no-screen"), request=None) as client:
+        render_device_preview(paths, "sign-1", None, "/api/screen")
+        texts = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+        tabs = [e for e in client.elements.values() if type(e).__name__ == "Tab"]
+    assert "No screen assigned yet." in texts
+    assert not tabs
+
+
+def test_device_preview_with_screen_but_no_delivery_yet(tmp_path):
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.display.preview import render_device_preview
+
+    paths = _simplified_paths(tmp_path)
+    with Client(page("/test-preview-undelivered"), request=None) as client:
+        render_device_preview(paths, "sign-1", "hallway", "/api/screen")
+        texts = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+        tab_labels = {e._props.get("label") for e in client.elements.values() if type(e).__name__ == "Tab"}
+        images = [e for e in client.elements.values() if type(e).__name__ == "Image"]
+    assert tab_labels == {"Current", "Last delivered"}
+    assert "This device hasn't fetched its image yet." in texts
+    # Current tab's live preview is built from image_base_url + device name
+    assert any(e._props.get("src") == "/api/screen/sign-1/image.png" for e in images)
+    # no last_delivered.png element without a snapshot on disk
+    assert not any(e._props.get("src") == "/api/screen/sign-1/last_delivered.png" for e in images)
+
+
+def test_device_preview_shows_the_last_delivered_snapshot_and_its_age(tmp_path):
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.devicebinding.snapshot import save_device_snapshot
+    from extensions.epaper.display.preview import render_device_preview
+
+    paths = _simplified_paths(tmp_path)
+    source = tmp_path / "source.png"
+    source.write_bytes(b"fake-png-bytes")
+    save_device_snapshot(paths, "sign-1", source)
+
+    with Client(page("/test-preview-delivered"), request=None) as client:
+        render_device_preview(paths, "sign-1", "hallway", "/api/screen")
+        texts = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+        images = [e for e in client.elements.values() if type(e).__name__ == "Image"]
+    assert any(t.startswith("Delivered ") for t in texts)
+    assert any(e._props.get("src") == "/api/screen/sign-1/last_delivered.png" for e in images)
 
 
 def test_display_screen_select_falls_back_when_no_screens_exist(tmp_path, monkeypatch):
@@ -531,7 +598,7 @@ def test_display_screen_select_falls_back_when_no_screens_exist(tmp_path, monkey
 
     adapter = RoomDisplaysAdapter(paths, "demo-project")
     with Client(page("/test-no-screens-top-level"), request=None) as client:
-        top_level_detail(paths, adapter, "sign-1")
+        top_level_detail(paths, "/api/screen", adapter, "sign-1")
         hints = {e._props.get("hint") for e in client.elements.values()}
     assert "No screens yet — add one in Templates" in hints
 
@@ -684,6 +751,65 @@ def test_booking_system_header_editor_shows_placeholder_when_empty(tmp_path):
         item_labels = {e.text for e in client.elements.values() if type(e).__name__ == "ItemLabel"}
 
     assert "No custom headers." in item_labels
+
+
+def test_booking_system_category_color_editor_lists_entries(tmp_path):
+    """Booking system detail's category-color editor (bookingsystem/ui.py):
+    a swatch + category name per row, with a delete icon -- same list shape
+    as the header editor above."""
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.bookingsystem.backend import booking_systems_adapter, create_booking_system
+    from extensions.epaper.bookingsystem.ui import _category_color_editor
+
+    paths = _simplified_paths(tmp_path)
+    adapter = booking_systems_adapter(paths)
+    system = create_booking_system(paths)
+    system.category_colors = {"Lecture": "#ff0000", "Exam": "#0000ff"}
+    adapter.update(system)
+
+    with Client(page("/test-booking-category-color-editor"), request=None) as client:
+        _category_color_editor(paths, adapter, system.id)
+        item_labels = {e.text for e in client.elements.values() if type(e).__name__ == "ItemLabel"}
+        buttons = [e for e in client.elements.values() if type(e).__name__ == "Button"]
+
+    assert {"Lecture", "Exam"} <= item_labels
+    delete_buttons = [b for b in buttons if b._props.get("icon") == "delete"]
+    assert len(delete_buttons) == 2
+
+
+def test_booking_system_category_color_editor_shows_placeholder_when_empty(tmp_path):
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.bookingsystem.backend import booking_systems_adapter, create_booking_system
+    from extensions.epaper.bookingsystem.ui import _category_color_editor
+
+    paths = _simplified_paths(tmp_path)
+    adapter = booking_systems_adapter(paths)
+    system = create_booking_system(paths)
+
+    with Client(page("/test-booking-category-color-editor-empty"), request=None) as client:
+        _category_color_editor(paths, adapter, system.id)
+        item_labels = {e.text for e in client.elements.values() if type(e).__name__ == "ItemLabel"}
+
+    assert "No category colors." in item_labels
+
+
+def test_six_color_palette_id_resolves_to_the_spectra_e6_colors(tmp_path):
+    """bookingsystem/ui.py's category-color picker is restricted to
+    _SIX_COLOR_PALETTE_ID -- a typo/renamed id here would silently fall back
+    to the unrestricted ui.color_input path instead of failing loudly."""
+    from extensions.epaper.bookingsystem.ui import _SIX_COLOR_PALETTE_ID
+    from extensions.epaper.catalog.backend import get_palette
+
+    paths = _simplified_paths(tmp_path)
+    palette = get_palette(_SIX_COLOR_PALETTE_ID, paths)
+    assert palette is not None
+    assert set(palette.palette) == {
+        (0, 0, 0), (255, 255, 255), (255, 255, 0), (255, 0, 0), (0, 0, 255), (0, 255, 0),
+    }
 
 
 def test_simplified_schedule_creates_and_edits_the_default_schedule(tmp_path):

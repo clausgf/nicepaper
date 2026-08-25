@@ -131,3 +131,40 @@ def test_secondary_title_is_right_aligned():
     right_top_dark = any(image.getpixel((x, y)) != (255, 255, 255)
                           for x in range(230, 300) for y in range(0, 14))
     assert right_top_dark
+
+
+def test_secondary_only_chart_renders_without_a_primary_series():
+    """Regression: axis_range('primary') used to be called unconditionally,
+    which crashes (min()/max() of an empty sequence) once primary_metric
+    can be cleared (see WeatherChartWidgetModel), leaving only a secondary
+    series -- draw_chart must drive its gridlines off the secondary axis
+    instead and label the right side only. (The main regression is that
+    this renders at all, without raising.)"""
+    image = _render([ChartSeries([1, 2, 3, 4, 5], kind="line", axis="secondary")],
+                    size=(300, 150), secondary_title="Rain")
+    # right-side numeric gridline labels/plot content
+    assert any(image.getpixel((x, y)) != (255, 255, 255)
+              for x in range(260, 300) for y in range(20, 130))
+    # the secondary title (right-aligned) drew in the top strip
+    assert any(image.getpixel((x, y)) != (255, 255, 255)
+              for x in range(200, 300) for y in range(0, 14))
+
+
+def test_axis_title_swatch_reflects_its_series_line_style():
+    """The style swatch next to an axis title (_draw_style_swatch) must
+    match that series' own line_style -- solid/dashed/dotted must draw
+    different pixels in the swatch region (the first ~14px of the title
+    strip), the same regression shape as test_line_style_dotted_and_dashed_differ_from_solid."""
+    values = [5, 10, 15, 20]
+
+    def swatch_region(style):
+        image = _render([ChartSeries(values, kind="line", axis="primary", line_style=style)],
+                        size=(300, 150), primary_title="Temperature")
+        return [image.getpixel((x, y)) for x in range(0, 14) for y in range(0, 20)]
+
+    solid, dashed, dotted = swatch_region("solid"), swatch_region("dashed"), swatch_region("dotted")
+    assert solid != dashed
+    assert solid != dotted
+    assert dashed != dotted
+    # and it's actually drawn, not blank
+    assert any(p != (255, 255, 255) for p in solid)

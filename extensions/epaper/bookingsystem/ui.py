@@ -19,7 +19,16 @@ from niceview import CollectionAdapter, DrillDownWrapper, ModelForm
 
 from extensions.epaper.bookingsystem.backend import booking_systems_adapter
 from extensions.epaper.bookingsystem.models import BookingSystemModel
+from extensions.epaper.catalog.backend import get_palette
 from extensions.epaper.paths import EpaperPaths
+
+# A booking system isn't tied to one screen/panel -- several rooms with
+# different panels can share it -- so the category-color picker offers the
+# richest color set every panel is a subset of ("the 6-color display", the
+# Spectra E6 palette) rather than one screen's own. What a given panel can't
+# actually show gets mapped to black at render time instead (see
+# core/widgets/roomcalendar.py::_event_category_color).
+_SIX_COLOR_PALETTE_ID = 'e6'
 
 
 def booking_systems_wrapper(paths: EpaperPaths) -> DrillDownWrapper:
@@ -28,14 +37,14 @@ def booking_systems_wrapper(paths: EpaperPaths) -> DrillDownWrapper:
         BookingSystemModel, adapter,  # list title/description come from BookingSystemModel.Meta
         item_title_field='name',
         item_subtitle_fields=['type', 'update_interval'],
-        render_detail=lambda a, key, set_key: _render_detail(a, key),
+        render_detail=lambda a, key, set_key: _render_detail(paths, a, key),
     )
 
 
-def _render_detail(adapter: CollectionAdapter[BookingSystemModel], key: str) -> None:
+def _render_detail(paths: EpaperPaths, adapter: CollectionAdapter[BookingSystemModel], key: str) -> None:
     ModelForm.from_adapter(BookingSystemModel, adapter, key, autosave=True).render()
     _header_editor(adapter, key)
-    _category_color_editor(adapter, key)
+    _category_color_editor(paths, adapter, key)
 
 
 def _header_editor(adapter: CollectionAdapter[BookingSystemModel], key: str) -> None:
@@ -87,10 +96,14 @@ def _header_editor(adapter: CollectionAdapter[BookingSystemModel], key: str) -> 
     body()
 
 
-def _category_color_editor(adapter: CollectionAdapter[BookingSystemModel], key: str) -> None:
+def _category_color_editor(paths: EpaperPaths, adapter: CollectionAdapter[BookingSystemModel], key: str) -> None:
     """RoomCalendar card color per iCal CATEGORIES entry -- same list/delete/Add
-    shape as _header_editor above, but the value is a color (swatch + picker)
+    shape as _header_editor above, but the value is a color (swatch + picker
+    restricted to the 6-color display's own colors, see module docstring)
     instead of plain text."""
+    palette = get_palette(_SIX_COLOR_PALETTE_ID, paths)
+    palette_hex = [f'#{r:02x}{g:02x}{b:02x}' for r, g, b in palette.palette] if palette else []
+
     @ui.refreshable
     def body() -> None:
         system = adapter.read(key)
@@ -113,10 +126,37 @@ def _category_color_editor(adapter: CollectionAdapter[BookingSystemModel], key: 
             ui.button(icon='add').props('dense round').tooltip('Add category color').on_click(add)
 
     async def add() -> None:
+        # a color not among the 6-color display's own would just get mapped
+        # to black at render time anyway (roomcalendar.py's
+        # _event_category_color) -- so the picker only offers exactly those,
+        # falling back to an unrestricted one if the palette is unavailable
+        # for some reason (a broken/missing package resource).
+        state = {'color': palette_hex[0] if palette_hex else '#3874c8'}
         with ui.dialog() as dialog, ui.card().classes('min-w-72 gap-2'):
             ui.label('Add category color').classes('text-subtitle1')
             category_input = ui.input('Category').props('outlined dense').classes('w-full')
-            color_input = ui.color_input('Color', value='#3874c8').props('outlined dense').classes('w-full')
+            if palette_hex:
+                ui.label('Color').classes('text-caption text-grey')
+
+                @ui.refreshable
+                def swatches() -> None:
+                    with ui.row().classes('items-center gap-1 flex-wrap'):
+                        for hex_color in palette_hex:
+                            selected = hex_color == state['color']
+                            ui.button().props('flat dense unelevated').style(
+                                f'width:28px;height:28px;min-width:28px;background-color:{hex_color};'
+                                f'border:{"3px solid #1976d2" if selected else "1px solid #8888"}') \
+                                .tooltip(hex_color).on_click(lambda _, c=hex_color: pick(c))
+
+                def pick(c: str) -> None:
+                    state['color'] = c
+                    swatches.refresh()
+
+                swatches()
+            else:
+                ui.color_input('Color', value=state['color'],
+                               on_change=lambda e: state.update(color=e.value)) \
+                    .props('outlined dense').classes('w-full')
             with ui.row().classes('w-full justify-end'):
                 ui.button('Cancel', on_click=lambda: dialog.submit(False)).props('flat')
                 ui.button('Add', on_click=lambda: dialog.submit(True)).props('unelevated')
@@ -126,7 +166,7 @@ def _category_color_editor(adapter: CollectionAdapter[BookingSystemModel], key: 
         if not category:
             return
         system = adapter.read(key)
-        system.category_colors = {**system.category_colors, category: color_input.value}
+        system.category_colors = {**system.category_colors, category: state['color']}
         adapter.update(system)
         body.refresh()
 

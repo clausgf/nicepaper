@@ -21,8 +21,12 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   feed (recurring-event expansion, cached) with the current and next
   appointments plus a list of further ones. A card's color comes from the
   event's iCal `CATEGORIES` matched against the booking system's
-  `category_colors` (Settings › Booking systems), approximated to the
-  screen's palette. Rendered with no room bound (e.g. a Templates preview)
+  `category_colors` (Settings › Booking systems) — a picker restricted to
+  the 6-color display's own colors (black, white, yellow, red, blue,
+  green), since a booking system isn't tied to one panel. A screen whose
+  panel can't show that exact color (e.g. `bw`/`bwr` have no blue/green)
+  falls back to plain black rather than a nearest-color guess. Rendered
+  with no room bound (e.g. a Templates preview)
   it shows placeholder room data instead of erroring. Since the widget
   carries no room data of its own, one screen can serve every room's door
   sign — see [Auto-generated Room Calendar templates](#auto-generated-room-calendar-templates)
@@ -68,17 +72,23 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   `WeatherNow` shows temperature, the condition, and wind (speed, direction as
   an 8-point compass, and gusts). Its text language follows `LOCALE` and the
   wind-speed unit follows `WIND_SPEED_UNIT` (see [Configuration](configuration.md)).
-  In `WeatherChart`, `primary_metric` is always shown and `secondary_metric`
-  is optional on its own right Y axis (e.g. temperature + precipitation
-  combined). Available metrics are `temperature`, `precipitation`, `humidity`,
-  `pressure` and `wind` (the wind series honours `WIND_SPEED_UNIT`).
-  `line_style` (`solid`/`dashed`/`dotted`) sets `primary_metric`'s line style
-  when it renders as a line (bar metrics, e.g. `precipitation`, ignore it);
+  In `WeatherChart`, `primary_metric` and `secondary_metric` each add a
+  trace on their own Y axis (primary left, secondary right) — e.g.
+  temperature + precipitation combined. Either can be left empty to omit
+  its trace entirely (a chart with just one metric is the other one left
+  unset); leaving both empty draws nothing. Available metrics are
+  `temperature`, `precipitation`, `humidity`, `pressure` and `wind` (the
+  wind series honours `WIND_SPEED_UNIT`). `line_style`
+  (`solid`/`dashed`/`dotted`) sets `primary_metric`'s line style when it
+  renders as a line (bar metrics, e.g. `precipitation`, ignore it);
   `secondary_metric` always stays dashed, to keep it visually distinct from
-  the primary series even on a black/white/red panel. Each axis
-  is titled with its metric name and unit above the plot (primary left,
-  secondary right) — e.g. `Temperatur (°C)`, `Wind (km/h)` — in the `LOCALE`
-  language. All three are backed by [Open-Meteo](https://open-meteo.com)
+  the primary series even on a black/white/red panel. Each axis is titled
+  with its metric name and unit above the plot (primary left, secondary
+  right) — e.g. `Temperatur (°C)`, `Wind (km/h)` — in the `LOCALE`
+  language, with a short sample of that trace's own style (line or bar)
+  right next to the title, so the two traces stay distinguishable in the
+  legend the same way they do in the plot. All three are backed by
+  [Open-Meteo](https://open-meteo.com)
   (no API key needed; the DWD ICON model for German/European locations) and
   are placed by `latitude`/`longitude` — leave **both** empty to use the
   default location from the global settings (see
@@ -130,6 +140,15 @@ from, for debugging a color that dithers; a display never needs it.
 `?boxes=true` renders the screen with every widget outlined — see
 [Clipping and debug outline](#clipping-and-debug-outline). Both are editor
 views; neither touches the cached image.
+
+When `<id>` is a device's own name (resolved via its binding, see
+[Display bindings](#display-bindings)), a real `200 OK` response (not a
+`304`) is also remembered as that device's "last delivered" snapshot — the
+exact PNG bytes plus when, served back unchanged at
+`/api/screen/<id>/last_delivered.png` (404 before the device has ever
+fetched). This is what the simplified UI's Display Detail shows next to the
+live preview, so a device that stopped polling or missed an update is
+visible there, not just assumed from its online status.
 
 The preview is framed by a pixel ruler with labelled ticks on all four sides,
 and moving the mouse over it shows the exact pixel under the cursor — widgets

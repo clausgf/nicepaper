@@ -1,5 +1,78 @@
 # Changelog
 
+## 0.26.1 — 2026-08-25
+
+### Fixed
+
+- **Top-level Displays list was missing its drill-down chevron.** Every
+  other list in the app gets one for free from niceview's `ModelList`
+  default row rendering, but `display/simplified_ui.py`'s Displays list
+  uses a fully custom row (status dot + WiFi/battery icons) via
+  `render_list_item`, which niceview never adds a chevron to on its own.
+  Added by hand, matching niceview's own icon/style. (`render_list_container`
+  is unrelated to this — it only wraps the rows in a styled `ui.list()`.)
+
+## 0.26.0 — 2026-08-25
+
+### Changed
+
+- **Booking system category colors are now restricted to the 6-color
+  display's own colors** (black, white, yellow, red, blue, green — the
+  `e6` Spectra palette), in both UIs at once (`bookingsystem/ui.py` is
+  already shared): the "Add category color" dialog offers those 6 swatches
+  instead of an unrestricted color wheel, since a booking system isn't
+  tied to one screen/panel and there's no single "closest" color that
+  would suit every room using it.
+- **A category color a panel can't show exactly now falls back to plain
+  black**, not a nearest-Euclidean-distance guess (`core/widgets/roomcalendar.py`'s
+  `_event_category_color()` — e.g. a `bw`/`bwr` panel has no blue/green).
+  Previously a color like yellow could silently render as red on a `bwr`
+  panel; it renders black now, matching what the new picker's own choices
+  guarantee (an exact palette member, or an intentional fallback).
+
+## 0.25.0 — 2026-08-25
+
+### Added
+
+- **Display Detail shows the rendered screen.** Both Display Detail views
+  (a room's Displays tab and the top-level Displays list) now have
+  Current/Last delivered tabs (`display/preview.py`'s new
+  `render_device_preview()`): Current is a live preview of the screen as it
+  renders right now; Last delivered is the actual PNG a real `200 OK`
+  response (not a `304 Not Modified`) most recently served to that
+  device's own alias URL, plus when, so a device that stopped polling or
+  missed an update is visible here instead of only inferred from "Online".
+- **New API route: `GET /screen/{id}/last_delivered.png`** (standalone) /
+  `GET /{project_name}/screens/{id}/last_delivered.png` (extension), `id`
+  being a device name. 404 until that device has fetched at least once.
+  Every real 200 response to a device's own alias URL (not `?raw=true`, and
+  only when `id` resolves through an actual device binding — a bare screen
+  id, as the editor's own preview uses, is not recorded) now copies the
+  served PNG plus a timestamp into a new per-device snapshot store
+  (`devicebinding/snapshot.py`, `paths.device_snapshot_dir`).
+
+## 0.24.0 — 2026-08-25
+
+### Changed
+
+- **`WeatherChart.primary_metric` can now be empty too**, like
+  `secondary_metric` already could — either metric may be cleared in the
+  editor (both fields are now `clearable`) to omit its trace entirely, so a
+  single-metric chart is just the other one left unset. Clearing both draws
+  nothing. `core/charting.py`'s `draw_chart()` no longer assumes a primary
+  series always exists: a secondary-only chart now drives its own gridlines
+  instead of crashing (previously `axis_range('primary')` on an empty
+  series list would raise).
+
+### Added
+
+- **Chart axis titles carry a style swatch of their own trace** — a short
+  line/bar sample drawn the same way (`line_style`, or a filled block for
+  a bar metric) as the series it labels, next to the title text, so the
+  primary and secondary traces stay visually distinguishable in the legend
+  even on a black/white/red panel where color alone can't tell them apart
+  (`core/charting.py`'s `_draw_style_swatch`).
+
 ## 0.23.0 — 2026-08-25
 
 ### Changed

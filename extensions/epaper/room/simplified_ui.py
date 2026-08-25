@@ -24,6 +24,7 @@ from extensions.epaper.display.backend import (
     RoomDisplaysAdapter, assignable_devices, available_screen_ids, project_device_names,
 )
 from extensions.epaper.display.models import RoomDisplayRow
+from extensions.epaper.display.preview import render_device_preview
 from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.room.backend import get_room_events, read_room, rooms_adapter
@@ -243,6 +244,9 @@ def _display_detail(shell: Shell, adapter: RoomDisplaysAdapter, key: str, set_ke
     autosave, which only ever updates in place under the key it was opened
     with. The body is a local @ui.refreshable so it can redraw itself
     against the new key once the rename actually lands.
+
+    Below the settings, render_device_preview() (display/preview.py) adds
+    Current/Last delivered tabs showing the actual rendered screen.
     """
     paths, project_name = shell.paths, shell.project_name
 
@@ -277,6 +281,8 @@ def _display_detail(shell: Shell, adapter: RoomDisplaysAdapter, key: str, set_ke
                                include=['screen_id'],
                                field_infos={'screen_id': screen_field},
                                ).render()
+
+        render_device_preview(paths, current_key, row.screen_id, shell.image_base_url)
 
     body(key)
 

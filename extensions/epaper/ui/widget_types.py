@@ -89,8 +89,8 @@ def _location_summary(widget: WeatherWidgetModel) -> str:
 
 
 def _chart_summary(widget: WeatherChartWidgetModel) -> str:
-    metrics = widget.primary_metric + (f' + {widget.secondary_metric}' if widget.secondary_metric else '')
-    return f'{_location_summary(widget)} · {metrics}'
+    metrics = ' + '.join(m for m in (widget.primary_metric, widget.secondary_metric) if m)
+    return f'{_location_summary(widget)} · {metrics}' if metrics else f'{_location_summary(widget)} (no metric)'
 
 
 def _homeassistant_summary(widget: HomeAssistantWidgetModel) -> str:
@@ -178,7 +178,10 @@ WIDGET_TYPES: dict[str, WidgetType] = {
         summary=_chart_summary,
         content=[[ROW, 'latitude', 'longitude'],
                  [ROW, 'primary_metric', 'secondary_metric'], [ROW, 'forecast_hours', 'line_style']],
-        field_infos={'line_style': Field(widget_type='ui.select', options=['solid', 'dashed', 'dotted'])},
+        field_infos={'line_style': Field(widget_type='ui.select', options=['solid', 'dashed', 'dotted']),
+                    # clearable: either metric can be emptied to drop its trace
+                    # (see WeatherChartWidgetModel), not just left at the default
+                    'primary_metric': Field(clearable=True), 'secondary_metric': Field(clearable=True)},
     ),
     'Image': WidgetType(
         model=ImageWidgetModel, icon='image', title='Image Widget',

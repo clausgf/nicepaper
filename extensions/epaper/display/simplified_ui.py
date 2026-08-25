@@ -23,6 +23,7 @@ from niceview import CollectionAdapter, DrillDownWrapper, ModelForm
 
 from extensions.epaper.display.backend import RoomDisplaysAdapter, available_screen_ids
 from extensions.epaper.display.models import RoomDisplayRow
+from extensions.epaper.display.preview import render_device_preview
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.ui.simplified_ui.layout import Shell
 from extensions.epaper.util import humanize_age
@@ -37,7 +38,7 @@ def render_displays(shell: Shell) -> None:
         add_button=None, delete_button=None,
         render_list_item=_render_list_item,
         render_list_container=_render_list_container,
-        render_detail=lambda a, key, set_key: _render_detail(paths, a, key),
+        render_detail=lambda a, key, set_key: _render_detail(paths, shell.image_base_url, a, key),
     ).render()
 
 
@@ -47,6 +48,13 @@ def _render_list_container(render_rows) -> None:
 
 
 def _render_list_item(key: str, item: RoomDisplayRow, select) -> None:
+    """A fully custom row (status dot + WiFi/battery icons, which
+    ModelList's default title/subtitle row has no room for) -- so unlike
+    every other list in this app, it doesn't get niceview's own drill-down
+    chevron for free (ModelList adds that itself; DrillDownWrapper only adds
+    it when render_list_item is left unset, see niceview/modellist.py's
+    list_chevron_icon). Added by hand here to match, same icon/style
+    niceview's default chrome uses."""
     with ui.item(on_click=select):
         with ui.item_section().props('avatar'):
             _status_icon(item).props('size=xs')
@@ -60,9 +68,12 @@ def _render_list_item(key: str, item: RoomDisplayRow, select) -> None:
                 ui.icon(_wifi_icon(item.rssi), color='grey-7').props('size=sm')
                 ui.icon(_battery_icon(item.battery_voltage), color=_battery_color(item.battery_voltage)) \
                     .props('size=sm')
+        with ui.item_section().props('side'):
+            ui.icon('chevron_right').classes('text-grey')
 
 
-def _render_detail(paths: EpaperPaths, adapter: CollectionAdapter[RoomDisplayRow], key: str) -> None:
+def _render_detail(paths: EpaperPaths, image_base_url: str,
+                   adapter: CollectionAdapter[RoomDisplayRow], key: str) -> None:
     """Device name is the wrapper's own title row (item_title_field), shown
     in both list and detail already, so it isn't repeated here."""
     item = adapter.read(key)
@@ -85,6 +96,8 @@ def _render_detail(paths: EpaperPaths, adapter: CollectionAdapter[RoomDisplayRow
                                include=['screen_id'],
                                field_infos={'screen_id': screen_field},
                                ).render()
+
+        render_device_preview(paths, item.device_name, item.screen_id, image_base_url)
 
         with ui.row().classes('items-center gap-2'):
             _status_icon(item).props('size=sm')

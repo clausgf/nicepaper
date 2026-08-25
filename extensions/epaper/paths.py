@@ -94,8 +94,18 @@ class EpaperPaths:
     def organizer_names_file(self) -> Path:
         return self.root / "organizer_names.json"
 
+    @property
+    def device_snapshot_dir(self) -> Path:
+        """Last screen PNG actually delivered to each device -- a real 200 OK
+        response, not a 304 Not Modified -- plus when, so Display Detail can
+        show what a device is actually displaying, not just what the current
+        screen would render. One <device_name>.png + <device_name>.json
+        (fetched_at) per device that has fetched at least once. Written by
+        api/endpoints.py's _render_screen_image(); see devicebinding/snapshot.py."""
+        return self.root / "device_snapshots"
+
     def ensure_dirs(self) -> None:
         for d in (self.screen_dir, self.room_dir, self.booking_dir, self.schedule_dir,
                   self.image_dir, self.ical_dir, self.weather_dir, self.image_cache_dir,
-                  self.homeassistant_dir):
+                  self.homeassistant_dir, self.device_snapshot_dir):
             d.mkdir(parents=True, exist_ok=True)

@@ -104,10 +104,16 @@ def test_unmapped_category_falls_back_to_primary_color(tmp_path, monkeypatch):
     assert not _has_pixel(image, (255, 0, 0)), "an unmapped category must not pick up an unrelated color"
 
 
-def test_off_palette_color_snaps_to_nearest_palette_member(tmp_path, monkeypatch):
+def test_off_palette_color_falls_back_to_black_not_a_nearest_guess(tmp_path, monkeypatch):
+    """A booking system isn't tied to one panel (several rooms with
+    different panels can share it), so there's no single "closest" palette
+    member that would be right for all of them -- a color the active panel
+    can't show exactly falls back to plain black instead (see
+    core/widgets/roomcalendar.py::_event_category_color). "#0000ff" (blue)
+    isn't a member of _BWR (black/white/red); a nearest-Euclidean-distance
+    guess would have picked red here, which this guards against."""
     room, system = _room_with_booking_system(paths := _paths(tmp_path))
-    # not a member of _BWR (black/white/red) -- should snap to the nearest, red
-    system.category_colors = {"meeting": "#dd2222"}
+    system.category_colors = {"meeting": "#0000ff"}
     booking_system_adapter(paths, system.id).save(system)
 
     async def fake_get_from_ical(ical_dir, organizer_names_file, id, url, **kwargs):
@@ -116,5 +122,6 @@ def test_off_palette_color_snaps_to_nearest_palette_member(tmp_path, monkeypatch
     monkeypatch.setattr(room_backend, "get_from_ical", fake_get_from_ical)
 
     image = _render(paths, room=room, palette=_BWR)
-    assert _has_pixel(image, (255, 0, 0))
-    assert not _has_pixel(image, (0xdd, 0x22, 0x22))
+    assert _has_pixel(image, (0, 0, 0))
+    assert not _has_pixel(image, (255, 0, 0))
+    assert not _has_pixel(image, (0, 0, 255))

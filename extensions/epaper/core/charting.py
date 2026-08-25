@@ -18,7 +18,10 @@ on those; a display preset for a black/white panel sets the accent to
 black instead, since red could only quantize there. The secondary-axis
 series is drawn dashed in ctx.color_primary instead of a second color,
 since bw/bwr can't tell two accent colors apart -- line style stays the
-primary signal, color is a bonus on richer palettes.
+primary signal, color is a bonus on richer palettes. Each axis title (see
+draw_chart's primary_title/secondary_title) carries a short style swatch of
+its own series (_draw_style_swatch) for the same reason: a bwr panel can't
+lean on color alone to tell the two traces apart in the legend either.
 
 Y-axis gridlines/labels use "nice" round numbers (Heckbert's classic
 algorithm), not raw data min/max, so labels read as round figures instead
@@ -95,6 +98,23 @@ def _draw_polyline(ctx, points: list[tuple[float, float]], fill, width: int,
             ctx.draw.line([_abs_pt(ctx, *p0), _abs_pt(ctx, *p1)], fill=fill, width=width)
 
 
+_STYLE_SWATCH_W = 14
+_STYLE_SWATCH_GAP = 4
+
+
+def _draw_style_swatch(ctx, x: float, y: float, h: float, kind: Kind, style: LineStyle, fill) -> None:
+    """A short sample next to an axis title, drawn the same way (kind +
+    line_style) as the series it labels -- a color-independent legend, so
+    two traces stay distinguishable on a black/white/red panel too. A bar
+    series gets a small filled block instead of a line sample."""
+    mid_y = y + h / 2
+    if kind == 'bar':
+        ctx.draw.rectangle([_abs_pt(ctx, x, mid_y - h / 4), _abs_pt(ctx, x + _STYLE_SWATCH_W, mid_y + h / 4)],
+                           fill=fill)
+    else:
+        _draw_polyline(ctx, [(x, mid_y), (x + _STYLE_SWATCH_W, mid_y)], fill=fill, width=2, style=style)
+
+
 def x_label_step(count: int, width: float, min_label_width: int = 40) -> int:
     """How many data points to skip between x-axis labels so they don't
     overlap -- shared with WeatherForecastWidget's hour labels."""
@@ -141,17 +161,23 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
                primary_title: Optional[str] = None, secondary_title: Optional[str] = None) -> None:
     """
     Draws all `series` (each 'bar' or 'line', on the 'primary' or
-    'secondary' Y axis) sharing one X axis (data point index). Every
-    horizontal gridline gets a numeric label (primary axis on the left,
-    secondary on the right if any secondary series is present); vertical
+    'secondary' Y axis) sharing one X axis (data point index). Either axis
+    may have no series at all (primary_metric/secondary_metric cleared, see
+    WeatherChartWidgetModel) -- that side's gridline labels are simply
+    omitted, and if the *other* axis is the one that's empty, the present
+    axis drives the gridline rows itself instead of primary always doing so.
+    Every horizontal gridline gets a numeric label (primary axis on the
+    left, secondary on the right, whichever are present); vertical
     gridlines are drawn at the same X positions as the (possibly thinned)
     `labels`. `font` should be the caller's configured font (e.g. a
     widget's self.font) -- falls back to ctx.font if not given.
 
     `primary_title`/`secondary_title` label the two Y axes above the plot,
-    left- and right-aligned respectively. They consume a strip at the top
-    (so the plot gets a little shorter, not narrower), keeping the numeric
-    axis labels on the sides where they are.
+    left- and right-aligned respectively, each with a short style swatch of
+    its own series right next to the text (see _draw_style_swatch) so the
+    two traces stay distinguishable without relying on color. They consume
+    a strip at the top (so the plot gets a little shorter, not narrower),
+    keeping the numeric axis labels on the sides where they are.
     """
     x0, y0 = position
     w, h = size
@@ -174,24 +200,45 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
                 return (0.0, 1.0, 1.0)
         return nice_axis_range(data_min, data_max)
 
+    has_primary = any(s.axis == 'primary' for s in series)
     has_secondary = any(s.axis == 'secondary' for s in series)
-    primary_min, primary_max, primary_step = axis_range('primary')
+    primary_min = primary_max = primary_step = 0.0
     secondary_min = secondary_max = secondary_step = 0.0
+    if has_primary:
+        primary_min, primary_max, primary_step = axis_range('primary')
     if has_secondary:
         secondary_min, secondary_max, secondary_step = axis_range('secondary')
 
-    step_count = round((primary_max - primary_min) / primary_step) if primary_step else 0
-    primary_labels = [_format_axis_value(primary_min + i * primary_step) for i in range(step_count + 1)]
+    # Gridline rows follow whichever axis is present; when both are, primary
+    # drives (as before) and secondary's own labels are interpolated by
+    # fraction onto the same rows. A secondary-only chart (primary_metric
+    # cleared) drives its own rows directly instead -- still labeled on its
+    # usual (right) side, so which axis is configured never moves labels to
+    # the other side, it only decides whether that side draws anything.
+    if has_primary:
+        grid_axis: Axis = 'primary'
+        grid_min, grid_max, grid_step = primary_min, primary_max, primary_step
+    else:
+        grid_axis = 'secondary'
+        grid_min, grid_max, grid_step = secondary_min, secondary_max, secondary_step
+    step_count = round((grid_max - grid_min) / grid_step) if grid_step else 0
+
+    primary_labels: list[str] = ([_format_axis_value(primary_min + i * primary_step)
+                                 for i in range(step_count + 1)] if has_primary else [])
     secondary_labels: list[str] = []
-    for i in range(step_count + 1):
-        frac = i / step_count if step_count else 0.0
-        secondary_labels.append(_format_axis_value(secondary_min + frac * (secondary_max - secondary_min)))
+    if has_secondary:
+        for i in range(step_count + 1):
+            if has_primary:
+                frac = i / step_count if step_count else 0.0
+                secondary_labels.append(_format_axis_value(secondary_min + frac * (secondary_max - secondary_min)))
+            else:
+                secondary_labels.append(_format_axis_value(secondary_min + i * secondary_step))
 
     # margins measured from the actual configured font, not a fixed guess,
     # so labels never get clipped at a larger configured font size
     label_gap = 4
     row_h = ctx.textsize("0", label_font)[1] + 2
-    left_margin = max(ctx.textsize(t, label_font)[0] for t in primary_labels) + label_gap
+    left_margin = (max(ctx.textsize(t, label_font)[0] for t in primary_labels) + label_gap) if has_primary else 0
     right_margin = (max(ctx.textsize(t, label_font)[0] for t in secondary_labels) + label_gap) if has_secondary else 0
     label_h = (ctx.textsize("00:00", label_font)[1] + 4) if labels else 0
     # a strip above the plot for the axis titles (leaves plot width alone)
@@ -223,7 +270,7 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
     ctx.draw.line([_abs_pt(ctx, plot_x0, plot_y0 + plot_h), _abs_pt(ctx, plot_x0 + plot_w, plot_y0 + plot_h)],
                   fill=ctx.color_primary, width=1)
     for i in range(step_count + 1):
-        y = to_y(primary_min + i * primary_step, 'primary')
+        y = to_y(grid_min + i * grid_step, grid_axis)
         if 0 < i < step_count:
             _draw_dotted_hline(ctx, plot_x0, plot_x0 + plot_w, y, fill=ctx.color_primary)
         # anchor top/bottom rows within [y0, y0+plot_h] instead of
@@ -234,8 +281,9 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
             align_l, align_r, box_y = 'rb', 'lb', y - row_h
         else:
             align_l, align_r, box_y = 'rc', 'lc', y - row_h / 2
-        ctx.draw_text((x0, int(box_y)), size=(left_margin - label_gap, row_h), text=primary_labels[i],
-                      alignment=align_l, font=label_font)
+        if has_primary:
+            ctx.draw_text((x0, int(box_y)), size=(left_margin - label_gap, row_h), text=primary_labels[i],
+                          alignment=align_l, font=label_font)
         if has_secondary:
             right_x = plot_x0 + plot_w + 2
             ctx.draw_text((int(right_x), int(box_y)), size=(right_margin - label_gap, row_h),
@@ -267,12 +315,24 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
 
     # axis titles in the reserved top strip: primary left-aligned (accent,
     # matching its series), secondary right-aligned. Each gets half the
-    # width with an ellipsis so long titles can't overlap in the middle.
+    # width with an ellipsis so long titles can't overlap in the middle. A
+    # small style swatch sits inside that same strip, right next to the
+    # text it labels (no extra height reserved) -- see _draw_style_swatch.
     if title_h:
         half = w // 2
+        swatch_span = _STYLE_SWATCH_W + _STYLE_SWATCH_GAP
+        primary_series = next((s for s in series if s.axis == 'primary'), None)
+        secondary_series = next((s for s in series if s.axis == 'secondary'), None)
         if primary_title:
-            ctx.draw_text((x0, y0), size=(half, title_h), text=primary_title,
-                          alignment='lt', font=label_font, color=accent, ellipsis='...')
+            text_x = x0 + swatch_span if primary_series else x0
+            ctx.draw_text((text_x, y0), size=(half - (swatch_span if primary_series else 0), title_h),
+                          text=primary_title, alignment='lt', font=label_font, color=accent, ellipsis='...')
+            if primary_series:
+                _draw_style_swatch(ctx, x0, y0, title_h, primary_series.kind, primary_series.line_style, accent)
         if secondary_title:
-            ctx.draw_text((x0 + w - half, y0), size=(half, title_h), text=secondary_title,
+            text_w = half - (swatch_span if secondary_series else 0)
+            ctx.draw_text((x0 + w - half, y0), size=(text_w, title_h), text=secondary_title,
                           alignment='rt', font=label_font, ellipsis='...')
+            if secondary_series:
+                _draw_style_swatch(ctx, x0 + w - _STYLE_SWATCH_W, y0, title_h,
+                                   secondary_series.kind, secondary_series.line_style, ctx.color_primary)

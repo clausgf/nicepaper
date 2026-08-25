@@ -6,7 +6,6 @@ from PIL import ImageColor
 
 from extensions.epaper.bookingsystem.backend import read_booking_system
 from extensions.epaper.bookingsystem.models import BookingSystemModel
-from extensions.epaper.catalog.backend import nearest_palette_color
 from extensions.epaper.catalog.models import Palette
 from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.room.backend import get_room_events
@@ -24,15 +23,20 @@ _PLACEHOLDER_ROOM_NUMBER = "101"
 _PLACEHOLDER_ROOM_NAME = "Example Room"
 
 
+_UNSUPPORTED_COLOR_FALLBACK = '#000000'
+
+
 def _event_category_color(item: dict, booking_system: BookingSystemModel,
                           palette: Optional[Palette]) -> Optional[str]:
     """The drawing color for item's card: the first of its categories (see
     ical.py's `categories`, a comma-separated string per the iCal spec) that
-    has a mapped color in booking_system.category_colors, snapped to the
-    nearest color in the active palette (skipping white) so it renders as a
-    flat, undithered color rather than whatever the final whole-image
-    quantize() (core/imagecache.py) would make of an arbitrary hex. None
-    (-> the caller's default color) when there is no match."""
+    has a mapped color in booking_system.category_colors. The picker offers
+    only the 6-color display's own colors (bookingsystem/ui.py), so on a
+    panel that has that exact color it's drawn as-is; a panel that doesn't
+    (e.g. bw/bwr/gs4 have no blue/green) falls back to black rather than a
+    fuzzy nearest-color guess -- a booking system isn't tied to one panel, so
+    there's no single "closest" that would be right for all of them. None
+    (-> the caller's default color) when there is no category match at all."""
     if not booking_system.category_colors:
         return None
     for category in item['categories'].split(','):
@@ -44,8 +48,7 @@ def _event_category_color(item: dict, booking_system: BookingSystemModel,
             continue
         if palette is None:
             return hex_color
-        rgb = nearest_palette_color(ImageColor.getrgb(hex_color), palette)
-        return '#%02x%02x%02x' % rgb
+        return hex_color if ImageColor.getrgb(hex_color) in palette.palette else _UNSUPPORTED_COLOR_FALLBACK
     return None
 
 
