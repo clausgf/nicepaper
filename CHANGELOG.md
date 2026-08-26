@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.26.2 — 2026-08-26
+
+### Fixed
+
+- **Simplified UI page content wasn't stretching to the full width of its
+  column.** `layout.py`'s `ui.sub_pages(...)` didn't inherit the `w-full`
+  of its parent `ui.column()`, leaving routed page content narrower than
+  the header/sidebar area. Added `.classes('w-full')` directly to the
+  `sub_pages` element.
+
 ## 0.26.1 — 2026-08-25
 
 ### Fixed

@@ -207,7 +207,7 @@ def build_page(project_name: str, paths: EpaperPaths, nav: list[NavItem],
         routes['/'] = routes[landing_path]
         if extra_routes is not None:
             routes.update(extra_routes(shell))
-        ui.sub_pages(routes, root_path=root_path)
+        ui.sub_pages(routes, root_path=root_path).classes('w-full')
 
     def _resync_sidebar(_: str) -> None:
         sidebar.refresh()
