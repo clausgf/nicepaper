@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.26.6 — 2026-08-26
+
+### Fixed
+
+- **A NaN/inf battery or RSSI reading silently broke the Displays list**: a
+  non-finite `battery_voltage` crashed `_battery_icon`'s bar-index math
+  (`int(nan)` raises `ValueError`), dropping just that row's battery icon
+  (the WiFi icon rendered just before it stayed, matching the reported
+  symptom of a display row with a WiFi icon but no battery icon); a
+  non-finite `rssi` would have crashed `round()` in `display/backend.py`,
+  taking out the *entire* list. `display_rows()` now treats a non-finite
+  reading as no reading at all (`None`), same as a genuinely absent one.
+
+### Added
+
+- **Displays list: WiFi/battery icons now show a tooltip** with the exact
+  RSSI (dBm) / battery voltage (V), matching the text already shown next to
+  them in the Display detail view (`display/simplified_ui.py`, new
+  `_rssi_text`/`_battery_text` helpers shared by both views).
+
+### Changed
+
+- **RoomCalendar widget: room notes render in a larger font** (16pt → 24pt,
+  `core/widgets/roomcalendar.py`), for better readability on the panel.
+
 ## 0.26.5 — 2026-08-26
 
 ### Changed

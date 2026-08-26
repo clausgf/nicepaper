@@ -65,9 +65,9 @@ def _render_list_item(key: str, item: RoomDisplayRow, select) -> None:
                 ui.item_label(subtitle).props('caption')
         with ui.item_section().props('side'):
             with ui.row().classes('items-center gap-2 no-wrap'):
-                ui.icon(_wifi_icon(item.rssi), color='grey-7').props('size=sm')
+                ui.icon(_wifi_icon(item.rssi), color='grey-7').props('size=sm').tooltip(_rssi_text(item.rssi))
                 ui.icon(_battery_icon(item.battery_voltage), color=_battery_color(item.battery_voltage)) \
-                    .props('size=sm')
+                    .props('size=sm').tooltip(_battery_text(item.battery_voltage))
         with ui.item_section().props('side'):
             ui.icon('chevron_right').classes('text-grey')
 
@@ -106,12 +106,11 @@ def _render_detail(paths: EpaperPaths, image_base_url: str,
 
         with ui.row().classes('items-center gap-2'):
             ui.icon(_wifi_icon(item.rssi), color='grey-7').props('size=sm')
-            ui.label(f'{item.rssi} dBm' if item.rssi is not None else 'No signal data yet').classes('text-grey-7')
+            ui.label(_rssi_text(item.rssi)).classes('text-grey-7')
 
         with ui.row().classes('items-center gap-2'):
             ui.icon(_battery_icon(item.battery_voltage), color=_battery_color(item.battery_voltage)).props('size=sm')
-            ui.label(f'{item.battery_voltage:.2f} V' if item.battery_voltage is not None
-                     else 'No battery data yet').classes('text-grey-7')
+            ui.label(_battery_text(item.battery_voltage)).classes('text-grey-7')
 
         if item.device_url:
             ui.separator()
@@ -121,6 +120,14 @@ def _render_detail(paths: EpaperPaths, image_base_url: str,
 def _status_icon(item: RoomDisplayRow) -> ui.icon:
     return ui.icon('circle', color='positive' if item.online else 'grey-5') \
         .tooltip('Online' if item.online else 'Offline')
+
+
+def _rssi_text(rssi: Optional[int]) -> str:
+    return f'{rssi} dBm' if rssi is not None else 'No signal data yet'
+
+
+def _battery_text(voltage: Optional[float]) -> str:
+    return f'{voltage:.2f} V' if voltage is not None else 'No battery data yet'
 
 
 # RSSI (dBm) -> a 0-4 bar icon. Classic Material Icons (the font nicegui

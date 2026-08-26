@@ -132,7 +132,7 @@ class RoomCalendarWidget(Widget):
         if notes:
             notes_height = h - y_inset - h_card - h_card_gap - 8 - 24 - y_notes
             if notes_height > 0:
-                font_notes = ctx.get_font("Ubuntu-Regular.ttf", 16)
+                font_notes = ctx.get_font("Ubuntu-Regular.ttf", 24)
                 ctx.draw_text((10, y_notes), size=(2*w, notes_height), text=notes,
                               font=font_notes, multiline=True, ellipsis='...')
 

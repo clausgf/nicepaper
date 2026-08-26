@@ -11,7 +11,10 @@ empty rather than breaking. Tests monkeypatch `_project_devices`. rssi/
 battery_voltage come from `_device_runtime`'s DeviceRuntime (its last
 system-telemetry push); alarm_count from the device's own `active_alarms`
 property (a live alarm-backend query) -- both None/absent outside nice4iot,
-same degrade-to-empty pattern.
+same degrade-to-empty pattern. A non-finite reading (NaN/inf -- a bad sensor
+sample) is treated the same as no reading at all: passing it through would
+crash the simplified UI's bar-index arithmetic later (int() has no NaN/inf
+representation).
 
 RoomDisplaysAdapter is a niceview CollectionAdapter: edits to screen_id persist
 via update() -> set_device_binding; delete() unassigns the device from its
@@ -19,6 +22,7 @@ room (it does not delete the nice4iot device); rename() reassigns a row to a
 different device (see its own docstring).
 """
 import datetime
+import math
 from typing import Iterator, Optional
 
 from extensions.epaper.devicebinding.backend import get_device_bindings, set_device_binding
@@ -88,6 +92,7 @@ def display_rows(paths: EpaperPaths, project_name: str,
         room = read_room(paths, bound_room_id) if bound_room_id else None
         runtime = _device_runtime(project_name, device.name)
         rssi = getattr(runtime, 'rssi', None)
+        battery_voltage = getattr(runtime, 'battery_voltage', None)
         rows.append(RoomDisplayRow(
             device_name=device.name,
             screen_id=(binding.screen_id if binding else None) or '',
@@ -98,8 +103,8 @@ def display_rows(paths: EpaperPaths, project_name: str,
             online=_is_online(device),
             last_seen_at=getattr(device, 'last_seen_at', None),
             firmware_version=getattr(device, 'firmware_version', '') or '',
-            rssi=round(rssi) if rssi is not None else None,
-            battery_voltage=getattr(runtime, 'battery_voltage', None),
+            rssi=round(rssi) if rssi is not None and math.isfinite(rssi) else None,
+            battery_voltage=battery_voltage if battery_voltage is not None and math.isfinite(battery_voltage) else None,
             alarm_count=getattr(device, 'active_alarms', None),
             device_url=_device_url(project_name, device.name),
         ))

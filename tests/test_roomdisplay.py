@@ -73,6 +73,21 @@ def test_display_rows_read_telemetry_and_alarms_from_runtime(tmp_path, monkeypat
     assert row.battery_voltage == 3.81
 
 
+def test_display_rows_treats_nonfinite_telemetry_as_no_reading(tmp_path, monkeypatch):
+    """A NaN/inf sample (a bad sensor read) must not reach round()/the UI's
+    bar-index math as a real value -- round(nan) raises ValueError, which
+    would otherwise take down the whole row (rssi) or crash a single icon's
+    render (battery_voltage, display/simplified_ui.py's _battery_icon)."""
+    paths = _paths(tmp_path)
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(types.SimpleNamespace(name="d", last_seen_at=NOW)))
+    monkeypatch.setattr(rd, "_device_runtime", lambda project, name:
+                        types.SimpleNamespace(rssi=float("nan"), battery_voltage=float("inf")))
+
+    row = rd.display_rows(paths, "proj")[0]
+    assert row.rssi is None
+    assert row.battery_voltage is None
+
+
 def test_display_rows_room_filter(tmp_path, monkeypatch):
     paths = _paths(tmp_path)
     room = create_room(paths)
