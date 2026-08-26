@@ -45,6 +45,18 @@
     "color_background": "#ffffff",
     "color_primary": "#000000",
     "color_accent": "#ff0000",
+    "gxepd2_class": "GxEPD2_730c_ACeP_730"
+  },
+  {
+    "id": "gooddisplay_7in3_acep",
+    "name": "Good Display 7.3\" ACeP (800x480, 7 colors)",
+    "vendor": "Good Display",
+    "width": 800,
+    "height": 480,
+    "palette_id": "c7",
+    "color_background": "#ffffff",
+    "color_primary": "#000000",
+    "color_accent": "#ff0000",
     "gxepd2_class": "GxEPD2_730c_GDEY073D46"
   },
   {

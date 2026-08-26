@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.26.5 — 2026-08-26
+
+### Changed
+
+- **Organizer names (Settings › Organizer names) are now edited directly**
+  in a `w-full` textarea, saved on blur — no more read-only list plus a
+  separate Edit dialog/button (`organizer/simplified_ui.py`).
+- **Fixed a mislabeled panel-type preset**: `waveshare_7in3f` carried the
+  Good Display ACeP board's GxEPD2 class (`GxEPD2_730c_GDEY073D46`) instead
+  of Waveshare's own (`GxEPD2_730c_ACeP_730`). Corrected it and added a new
+  `gooddisplay_7in3_acep` preset for the Good Display board
+  (`resources/panel_types.json`).
+
+### Added
+
+- **Info-level logging for organizer-name extraction**
+  (`core/datasources/ical.py`): logs how many organizer names were loaded
+  from `organizer_names_file`, and per event whether an organizer came from
+  the feed's own `ORGANIZER` field (extraction skipped), was matched from
+  the summary, or matched nothing — to diagnose why a configured name isn't
+  taking effect.
+
 ## 0.26.4 — 2026-08-26
 
 ### Added

@@ -68,9 +68,9 @@ only folds it). Current sections:
 - **Settings › Global settings** — the same project-independent fields as
   nice4iot's "E-Paper" global settings card, embedded for convenience;
   editing here changes the setting for every project.
-- **Settings › Organizer names** — a read-only list plus an Edit dialog for
-  `organizer_names_file` (one name per line), previously admin-only/hand-placed
-  on disk.
+- **Settings › Organizer names** — a directly editable textarea for
+  `organizer_names_file` (one name per line, saved on blur), previously
+  admin-only/hand-placed on disk.
 
 Switching is **real, bookmarkable URL routing** (`ui/simplified_ui/layout.py`,
 `nicegui.ui.sub_pages`): each section has its own path relative to the page's

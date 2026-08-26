@@ -29,7 +29,8 @@ def _get_session() -> aiohttp.ClientSession:
 
 
 def _extract_events(ical_text: str, start_date: datetime.datetime, end_date: datetime.datetime,
-                    organizer_names: list, extract_organizer_from_summary: bool, max_days: int) -> list:
+                    organizer_names: list, extract_organizer_from_summary: bool, max_days: int,
+                    feed_id: str = "") -> list:
     """
     Parse an iCal feed and extract the events between start_date and end_date
     as serializable dicts, sorted by start time. CPU bound, intended to run
@@ -74,11 +75,19 @@ def _extract_events(ical_text: str, start_date: datetime.datetime, end_date: dat
             continue
         if max_days > 0 and dtstart > end_date:
             continue
-        if organizer is None and extract_organizer_from_summary and len(organizer_names) > 0:
+        if organizer is not None:
+            if extract_organizer_from_summary and organizer_names:
+                logger.info(f"Ical {feed_id}: event {summary!r} already has ORGANIZER {str(organizer)!r} "
+                           "-- organizer-name extraction skipped")
+        elif extract_organizer_from_summary and organizer_names:
             contained = [name for name in organizer_names if summary.startswith(name)]
             if contained:
                 summary = summary.replace(contained[0], "")
                 organizer = contained[0]
+                logger.info(f"Ical {feed_id}: matched organizer name {organizer!r} in summary")
+            else:
+                logger.info(f"Ical {feed_id}: no organizer name matched summary {summary!r} "
+                           f"(candidates: {organizer_names})")
 
         result.append({
             "dtstart": dtstart.isoformat(),
@@ -136,10 +145,12 @@ async def get_from_ical(ical_dir: Path, organizer_names_file: Optional[Path], id
     if organizer_names_file and os.path.exists(organizer_names_file) and extract_organizer_from_summary:
         async with aiofiles.open(organizer_names_file, "r") as org_file:
             organizer_names = json.loads(await org_file.read())
+    logger.info(f"Ical {id}: {len(organizer_names)} organizer name(s) loaded for summary extraction: "
+               f"{organizer_names}")
 
     events = await asyncio.to_thread(
         _extract_events, response_text, start_date, end_date,
-        organizer_names, extract_organizer_from_summary, max_days)
+        organizer_names, extract_organizer_from_summary, max_days, id)
 
     data = {
         'last_update': start_date.isoformat(),

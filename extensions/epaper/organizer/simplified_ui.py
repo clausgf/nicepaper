@@ -1,9 +1,8 @@
 """
-Preferences > Organizer names: edit dialog for organizer_names_file, the flat
-list core/datasources/ical.py falls back to when an event has no ORGANIZER
-field. A read-only list plus an "Edit" button opening a dialog (title,
-description, one textarea, one name per line) -- same list/Add shape as
-bookingsystem/ui.py's header/category-color editors, minus the per-row add.
+Preferences > Organizer names: direct editor for organizer_names_file, the
+flat list core/datasources/ical.py falls back to when an event has no
+ORGANIZER field. A single textarea (one name per line), saved on blur --
+no separate edit dialog/button, since the textarea IS the editor.
 """
 from nicegui import ui
 
@@ -20,33 +19,13 @@ _DESCRIPTION = (
 
 
 def render_organizer_names(shell: Shell) -> None:
-    @ui.refreshable
-    def body() -> None:
-        names = read_organizer_names(shell.paths)
-        with ui.list().props('bordered separator').classes('w-full'):
-            if not names:
-                with ui.item():
-                    ui.item_label('No organizer names configured.').classes('italic text-grey')
-            for name in names:
-                with ui.item():
-                    ui.item_label(name)
+    def handle_blur() -> None:
+        names = [line.strip() for line in textarea.value.splitlines() if line.strip()]
+        save_organizer_names(shell.paths, names)
+        ui.notify('Saved', type='positive')
 
-    with view_header('Organizer names', action='Edit',
-                     on_action=lambda: _edit_dialog(shell, body.refresh)):
+    with view_header('Organizer names'):
         pass
-    body()
-
-
-async def _edit_dialog(shell: Shell, on_saved) -> None:
-    names = read_organizer_names(shell.paths)
-    with ui.dialog() as dialog, ui.card().classes('min-w-96 gap-2'):
-        ui.label('Organizer names').classes('text-subtitle1')
-        ui.label(_DESCRIPTION).classes('text-caption text-grey')
-        textarea = ui.textarea(value='\n'.join(names)).props('outlined').classes('w-full')
-        with ui.row().classes('w-full justify-end'):
-            ui.button('Cancel', on_click=lambda: dialog.submit(False)).props('flat')
-            ui.button('Save', on_click=lambda: dialog.submit(True)).props('unelevated')
-    if not await dialog:
-        return
-    save_organizer_names(shell.paths, [line.strip() for line in textarea.value.splitlines() if line.strip()])
-    on_saved()
+    ui.label(_DESCRIPTION).classes('text-caption text-grey')
+    textarea = ui.textarea(value='\n'.join(read_organizer_names(shell.paths))) \
+        .props('outlined').classes('w-full').on('blur', handle_blur)
