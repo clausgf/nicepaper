@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.26.4 — 2026-08-26
+
+### Added
+
+- **Displays now show firmware version, RSSI, battery voltage and alarm
+  count from real nice4iot data**, no longer stubbed to `None`:
+  `display/backend.py`'s `_device_runtime` reads nice4iot's `DeviceRuntime`
+  (its `rssi`/`battery_voltage` properties over the last system-telemetry
+  push) and `alarm_count`/`firmware_version` come straight off the device
+  object (`active_alarms`, `firmware_version`) — see the updated
+  `docs/nice4iot-extension-wishlist.md`. The room's own Displays tab
+  (`room/simplified_ui.py`) now also shows firmware version in each
+  device row's subtitle, alongside the screen.
+
 ## 0.26.3 — 2026-08-26
 
 ### Changed

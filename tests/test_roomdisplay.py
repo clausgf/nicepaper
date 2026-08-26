@@ -55,6 +55,24 @@ def test_display_rows_join_room_and_online(tmp_path, monkeypatch):
     assert rows["d-online"].rssi is None and rows["d-online"].battery_voltage is None
 
 
+def test_display_rows_read_telemetry_and_alarms_from_runtime(tmp_path, monkeypatch):
+    """rssi/battery_voltage come from _device_runtime (nice4iot's DeviceRuntime),
+    alarm_count/firmware_version straight off the device object."""
+    paths = _paths(tmp_path)
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(
+        types.SimpleNamespace(name="d", last_seen_at=NOW, firmware_version="1.4.2",
+                              active_alarms=2),
+    ))
+    monkeypatch.setattr(rd, "_device_runtime", lambda project, name:
+                        types.SimpleNamespace(rssi=-65.7, battery_voltage=3.81))
+
+    row = rd.display_rows(paths, "proj")[0]
+    assert row.firmware_version == "1.4.2"
+    assert row.alarm_count == 2
+    assert row.rssi == -66  # rounded
+    assert row.battery_voltage == 3.81
+
+
 def test_display_rows_room_filter(tmp_path, monkeypatch):
     paths = _paths(tmp_path)
     room = create_room(paths)

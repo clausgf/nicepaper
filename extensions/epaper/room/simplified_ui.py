@@ -216,7 +216,7 @@ def _displays_panel(shell: Shell, room_id: str) -> None:
         RoomDisplayRow, adapter,
         title='Displays',
         item_title_field='device_name',
-        item_subtitle_fields=['screen_id'],
+        item_subtitle_fields=['screen_id', 'firmware_version'],
         on_add=handle_add,
         # cast: DrillDownWrapper's render_detail is typed over the generic
         # CollectionAdapter protocol, but it always calls back with the exact

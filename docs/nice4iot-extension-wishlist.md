@@ -18,17 +18,18 @@ each item below says what it currently does instead.
   `Device.last_seen_at` + a threshold, computed in the extension
   (`display/backend._is_online`). — *Wanted:* a documented online/last-seen
   accessor (or `is_device_online` promoted to the extension API).
-- **Latest device telemetry: RSSI and battery.** The grid has RSSI and Battery
-  columns but **no data source**: `wifi_rssi`/`battery_V` are push-only
-  telemetry (Prometheus/Influx), not stored readably per device (`DeviceRuntime`
-  holds only `last_seen_at`/`firmware_*`). The columns stay empty. — *Wanted:*
-  nice4iot records the last-reported `wifi_rssi`/`battery_V` in the runtime
-  sidecar (like `last_seen_at`) and exposes them per device.
-- **Per-device alarm count.** The grid has an "Alarms" column with no source
-  yet. — *Wanted:* a per-device active-alarm count via the extension API.
 
 ## Done
 
+- **Latest device telemetry: RSSI and battery** — nice4iot's `DeviceRuntime`
+  now caches the last system-telemetry push's `wifi_rssi`/`battery_V` as its
+  `rssi`/`battery_voltage` properties; `display/backend._device_runtime`
+  reaches in via `app.core.device.backend.read_runtime` (still no sanctioned
+  getter, so still an in-process reach-in, just no longer blocked on missing
+  data).
+- **Per-device alarm count** — `Device.active_alarms` (a live query against
+  the alarm backend) is used directly; still no sanctioned extension-API
+  accessor.
 - **User menu** — `app.extensions.render_user_menu()` now lets an extension's
   own page chrome host nice4iot's standard user menu.
 - **Deep-linkable extension sub-paths** — nice4iot now routes an extension

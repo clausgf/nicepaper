@@ -412,7 +412,7 @@ def test_room_occupancy_upcoming_lists_events_with_organizer():
 def test_room_displays_panel_shows_summary_and_bound_devices(tmp_path, monkeypatch):
     """The Displays tab leads with a room summary (room_label + type, then
     building/floor) and lists every device bound to the room, titled by
-    device name with the screen as subtitle."""
+    device name with screen and firmware version as subtitle."""
     import datetime
     import types
 
@@ -434,7 +434,8 @@ def test_room_displays_panel_shows_summary_and_bound_devices(tmp_path, monkeypat
     set_device_binding(paths, "sign-1", room_id=room.id, screen_id="weather")
 
     monkeypatch.setattr(display_backend, "_project_devices", lambda project: [
-        types.SimpleNamespace(name="sign-1", last_seen_at=datetime.datetime.now(datetime.timezone.utc)),
+        types.SimpleNamespace(name="sign-1", last_seen_at=datetime.datetime.now(datetime.timezone.utc),
+                              firmware_version="1.4.2"),
     ])
 
     shell = Shell("demo-project", paths)
@@ -446,7 +447,7 @@ def test_room_displays_panel_shows_summary_and_bound_devices(tmp_path, monkeypat
     assert "A-101 (North Conference) · Meeting room" in labels
     assert "Main, 2" in labels
     assert "sign-1" in labels  # list row title (device_name)
-    assert "weather" in labels  # list row subtitle (screen_id)
+    assert "weather · 1.4.2" in labels  # list row subtitle (screen_id, firmware_version)
 
 
 def test_displays_top_level_lists_devices_and_shows_room_and_status(tmp_path, monkeypatch):

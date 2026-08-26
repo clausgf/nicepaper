@@ -6,10 +6,7 @@ everything else is read-only and joined together by display/backend.py from
 the nice4iot device (name, online, last_seen_at) and the room the device is
 bound to (building/floor/room number/room_label).
 
-RSSI, battery voltage and alarm count have no per-device source in nice4iot
-today (RSSI/battery are push-only telemetry, not stored readably), so they
-stay empty until the extension interface exposes them -- see
-docs/nice4iot-extension-wishlist.md. Fields are declared in display order;
+Fields are declared in display order;
 their labels/sort/filter/editability ride each field's niceview FieldInfo
 (used where a field is still rendered via ModelForm/ModelGrid; the simplified
 UI's own display/simplified_ui.py mostly renders these by hand).
@@ -64,18 +61,25 @@ class RoomDisplayRow(BaseModel):
             niceview.Field(label='Last seen', editable=False, table_sortable=True)
         ] = None
 
+    firmware_version: Annotated[str,
+            Field(description='Firmware version the device last reported. Empty if it never has.'),
+            niceview.Field(label='Firmware', editable=False, table_sortable=True, table_filterable=True)
+        ] = ''
+
     rssi: Annotated[Optional[int],
-            Field(description='WiFi signal strength (dBm). Empty until nice4iot exposes it.'),
+            Field(description='WiFi signal strength (dBm) from the last system-telemetry push. '
+                              'Empty if the device never reported one.'),
             niceview.Field(label='RSSI', editable=False, table_sortable=True)
         ] = None
 
     battery_voltage: Annotated[Optional[float],
-            Field(description='Battery voltage (V). Empty until nice4iot exposes it.'),
+            Field(description='Battery voltage (V) from the last system-telemetry push. '
+                              'Empty if the device never reported one.'),
             niceview.Field(label='Battery V', editable=False, table_sortable=True)
         ] = None
 
     alarm_count: Annotated[Optional[int],
-            Field(description='Number of active alarms. Empty until nice4iot exposes it.'),
+            Field(description='Number of active alarms.'),
             niceview.Field(label='Alarms', editable=False, table_sortable=True)
         ] = None
 

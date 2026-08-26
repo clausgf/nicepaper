@@ -7,7 +7,11 @@ nice4iot owns devices; we only reference them by name. `_project_devices`
 reaches into nice4iot's device backend (in-process; there is no sanctioned
 extension getter yet -- see docs/nice4iot-extension-wishlist.md) and returns
 [] outside nice4iot (standalone/tests), so any UI built on this degrades to
-empty rather than breaking. Tests monkeypatch `_project_devices`.
+empty rather than breaking. Tests monkeypatch `_project_devices`. rssi/
+battery_voltage come from `_device_runtime`'s DeviceRuntime (its last
+system-telemetry push); alarm_count from the device's own `active_alarms`
+property (a live alarm-backend query) -- both None/absent outside nice4iot,
+same degrade-to-empty pattern.
 
 RoomDisplaysAdapter is a niceview CollectionAdapter: edits to screen_id persist
 via update() -> set_device_binding; delete() unassigns the device from its
@@ -48,6 +52,20 @@ def _device_url(project_name: str, device_name: str) -> str:
     return device_url(project_name, device_name)
 
 
+def _device_runtime(project_name: str, device_name: str):
+    """nice4iot's DeviceRuntime for this device (rssi/battery_voltage
+    properties over its last system-telemetry push), or None outside
+    nice4iot/on error -- same in-process reach-in as _project_devices."""
+    try:
+        from app.core.device.backend import read_runtime
+    except ImportError:
+        return None
+    try:
+        return read_runtime(project_name, device_name)
+    except Exception:
+        return None
+
+
 def _is_online(device) -> bool:
     last_seen = getattr(device, 'last_seen_at', None)
     if last_seen is None:
@@ -68,6 +86,8 @@ def display_rows(paths: EpaperPaths, project_name: str,
         if room_id is not None and bound_room_id != room_id:
             continue
         room = read_room(paths, bound_room_id) if bound_room_id else None
+        runtime = _device_runtime(project_name, device.name)
+        rssi = getattr(runtime, 'rssi', None)
         rows.append(RoomDisplayRow(
             device_name=device.name,
             screen_id=(binding.screen_id if binding else None) or '',
@@ -77,7 +97,10 @@ def display_rows(paths: EpaperPaths, project_name: str,
             room_number=(room.room_number if room else None) or '',
             online=_is_online(device),
             last_seen_at=getattr(device, 'last_seen_at', None),
-            rssi=None, battery_voltage=None, alarm_count=None,  # no source yet
+            firmware_version=getattr(device, 'firmware_version', '') or '',
+            rssi=round(rssi) if rssi is not None else None,
+            battery_voltage=getattr(runtime, 'battery_voltage', None),
+            alarm_count=getattr(device, 'active_alarms', None),
             device_url=_device_url(project_name, device.name),
         ))
     return sorted(rows, key=lambda r: r.device_name)
