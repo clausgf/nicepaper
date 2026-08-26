@@ -45,11 +45,13 @@ class RoomModel(BaseModel):
         ]
 
     room_number: Annotated[str,
-            Field(description="Room number shown on the sign, e.g. 'A-101'.")
+            Field(description="Room number shown on the sign, e.g. 'A-101'."),
+            niceview.Field(table_label='Number')
         ] = '000'
 
     room_name: Annotated[str,
-            Field(description="Human-readable room name, e.g. 'North Conference'.")
+            Field(description="Human-readable room name, e.g. 'North Conference'."),
+            niceview.Field(table_label='Name')
         ] = 'Room'
 
     building: Annotated[Optional[str],
@@ -62,7 +64,7 @@ class RoomModel(BaseModel):
 
     room_type: Annotated[RoomType,
             Field(description='Kind of room.'),
-            niceview.Field(widget_type='ui.select', options=ROOM_TYPE_LABELS)
+            niceview.Field(widget_type='ui.select', options=ROOM_TYPE_LABELS, table_label='Type')
         ] = 'meeting'
 
     capacity: Annotated[Optional[int],

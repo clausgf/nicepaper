@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.26.3 — 2026-08-26
+
+### Changed
+
+- **Rooms project tab grid (`room/ui.py`) now auto-sizes its columns and
+  shows a focused set**: room number, name, type, capacity and booking
+  system, instead of every `RoomModel` field. `room_number`/`room_name`/
+  `room_type` get shorter table headers ("Number"/"Name"/"Type") via
+  `niceview.Field(table_label=...)` in `room/models.py`.
+
 ## 0.26.2 — 2026-08-26
 
 ### Fixed
