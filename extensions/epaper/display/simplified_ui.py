@@ -102,7 +102,7 @@ def _render_detail(paths: EpaperPaths, image_base_url: str,
         with ui.row().classes('items-center gap-2'):
             _status_icon(item).props('size=sm')
             now = datetime.datetime.now(datetime.timezone.utc)
-            ui.label(f'{"Online" if item.online else "Offline"} · last seen {humanize_age(item.last_seen_at, now)}')
+            ui.label(f'{_STATUS_LABELS[_status_key(item)]} · last seen {humanize_age(item.last_seen_at, now)}')
 
         with ui.row().classes('items-center gap-2'):
             ui.icon(_wifi_icon(item.rssi), color='grey-7').props('size=sm')
@@ -117,9 +117,31 @@ def _render_detail(paths: EpaperPaths, image_base_url: str,
             ui.link('Open in nice4iot ↗', item.device_url, new_tab=True).classes('text-caption text-grey')
 
 
+# Combined active/provisioning/online state -> (icon, color, tooltip), mirroring
+# nice4iot's own project Devices grid status dot (app/core/device/ui.py) for a
+# consistent status vocabulary across both UIs. Inactive beats everything else,
+# then pending provisioning approval, then plain online/offline.
+_STATUS_ICONS: dict[str, tuple[str, str, str]] = {
+    'online': ('circle', 'positive', 'Active, provisioned, online'),
+    'offline': ('circle', 'orange', 'Active, provisioned, offline'),
+    'pending': ('pending', 'purple', 'Active, pending provisioning approval'),
+    'inactive': ('circle', 'grey-5', 'Inactive'),
+}
+_STATUS_LABELS = {'online': 'Online', 'offline': 'Offline',
+                  'pending': 'Pending provisioning approval', 'inactive': 'Inactive'}
+
+
+def _status_key(item: RoomDisplayRow) -> str:
+    if not item.is_active:
+        return 'inactive'
+    if not item.is_provisioning_approved:
+        return 'pending'
+    return 'online' if item.online else 'offline'
+
+
 def _status_icon(item: RoomDisplayRow) -> ui.icon:
-    return ui.icon('circle', color='positive' if item.online else 'grey-5') \
-        .tooltip('Online' if item.online else 'Offline')
+    icon, color, tooltip = _STATUS_ICONS[_status_key(item)]
+    return ui.icon(icon, color=color).tooltip(tooltip)
 
 
 def _rssi_text(rssi: Optional[int]) -> str:
@@ -130,31 +152,32 @@ def _battery_text(voltage: Optional[float]) -> str:
     return f'{voltage:.2f} V' if voltage is not None else 'No battery data yet'
 
 
-# RSSI (dBm) -> a 0-4 bar icon. Classic Material Icons (the font nicegui
-# bundles) oddly splits these five icons across two name prefixes --
-# signal_wifi_{zero,four}_bar for the endpoints, network_wifi_{one,two,
-# three}_bar for the middle three -- verified against the actual bundled
-# font (nicegui/static/fonts.css), not guessed from the newer Material
-# Symbols naming, which uses different names.
+# A previous version of this scaled through a 0-4 bar icon per name
+# ('signal_wifi_{zero,four}_bar' for the endpoints, 'network_wifi_{one,two,
+# three}_bar' for the middle three) on the theory that classic Material Icons
+# (the font nicegui bundles) "oddly splits" wifi-bar icons across those two
+# name prefixes. Rendering every candidate name against the actual bundled
+# font (a temporary debug overlay injected into a live page, screenshotted)
+# showed that theory was wrong on both counts: 'signal_wifi_zero_bar'/
+# 'four_bar' don't exist as ligatures in the bundled font at all (empty,
+# invisible), and the ones that did render ('network_wifi_one/two/three_bar')
+# come from a visibly different glyph design than 'signal_wifi_off'/'wifi' --
+# different internal bearings, so swapping between them shifted the visible
+# icon left/right within its fixed-size box from row to row. Three states,
+# not five, but all confirmed to render and to share consistent bearings.
 def _wifi_icon(rssi: Optional[int]) -> str:
-    """Typical WiFi signal bands in dBm (excellent/good/fair/weak/very weak).
-    signal_wifi_off when there's no reading at all (nice4iot doesn't expose
-    RSSI yet, see docs/nice4iot-extension-wishlist.md)."""
+    """No-data / weak / good WiFi signal icon name."""
     if rssi is None:
         return 'signal_wifi_off'
-    if rssi >= -60:
-        return 'signal_wifi_four_bar'
     if rssi >= -70:
-        return 'network_wifi_three_bar'
-    if rssi >= -80:
-        return 'network_wifi_two_bar'
-    if rssi >= -90:
-        return 'network_wifi_one_bar'
-    return 'signal_wifi_zero_bar'
+        return 'wifi'
+    return 'signal_wifi_bad'
 
 
-_BATTERY_BARS = ('battery_zero_bar', 'battery_one_bar', 'battery_two_bar', 'battery_three_bar',
-                 'battery_four_bar', 'battery_five_bar', 'battery_six_bar')
+# Numeric 'battery_N_bar' names -- not the word-form ('battery_six_bar', ...)
+# this used before, which doesn't exist as a ligature in the bundled font at
+# all (see the _wifi_icon comment above for how that was verified).
+_BATTERY_BARS = tuple(f'battery_{i}_bar' for i in range(7))
 _BATTERY_EMPTY_V = 3.0   # single-cell Li-ion/LiPo cutoff -- adjust once real hardware data arrives
 _BATTERY_FULL_V = 4.15
 

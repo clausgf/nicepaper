@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.26.7 — 2026-08-27
+
+### Added
+
+- **Rooms list is now searchable**: the Rooms grid gained a free-text search box
+  (filtering across all columns as you type), via `niceview` 0.26.4's new
+  `EditGridWrapper(search=True)`.
+- `niceview` bumped 0.26.3 → 0.26.5 (search box above, plus `ModelGrid`
+  `html_fields` for icon/HTML cells — not used by nicepaper itself yet).
+
+### Changed
+
+- **Displays list status dot now reflects active/provisioning state, not just
+  online/offline** (`display/simplified_ui.py`, `display/backend.py`,
+  `display/models.py`): `RoomDisplayRow` gained `is_active`/
+  `is_provisioning_approved`, and the status dot (front of each list item, and
+  the detail view) is now one of four states — green "online" (active,
+  provisioned, seen recently), orange "offline" (active, provisioned, not seen
+  recently), purple "pending" (active, not yet provisioning-approved), or grey
+  "inactive" — each with a tooltip, mirroring nice4iot's own project Devices
+  grid status dot (`app/core/device/ui.py`, `app/core/device/backend.py`'s
+  `device_status_key()`) for a consistent status vocabulary across both UIs.
+- **Fixed the WiFi/battery icon visibly jumping left/right between rows**
+  (`display/simplified_ui.py`): `_wifi_icon`/`_battery_icon` used names
+  (`signal_wifi_zero_bar`/`four_bar`, word-form `battery_*_bar`) that turned
+  out not to exist as ligatures in nicegui's bundled Material Icons font at
+  all — confirmed by rendering every candidate against the actual font (a
+  temporary debug overlay on a live page, screenshotted) rather than by
+  further guessing. WiFi is now a 3-state icon (no-data / weak / good,
+  `signal_wifi_off` / `signal_wifi_bad` / `wifi`) and battery uses the
+  numeric `battery_N_bar` names — both confirmed to render, and to share
+  consistent glyph bearings within their own group, in that same probe.
+
 ## 0.26.6 — 2026-08-26
 
 ### Fixed

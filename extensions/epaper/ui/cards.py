@@ -82,7 +82,7 @@ def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
             # nice4iot's home_page()) and shows its own 404. client.open() forces a real
             # browser navigation instead, bypassing that router.
             ui.button(icon='open_in_new').props('dense flat size=sm') \
-                .tooltip('Open the screens').on_click(lambda: context.client.open(open_url))
+                .tooltip(f'Dedicate Epaper UI {open_url}').on_click(lambda: context.client.open(open_url))
         ui.label(f'{num_screens} screen(s), {num_schedules} schedule(s)').classes('text-caption text-grey-7')
         for status in weather_statuses:
             _datasource_row(status, now, ('cloud_done', 'cloud_off'),

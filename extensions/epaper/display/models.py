@@ -50,6 +50,17 @@ class RoomDisplayRow(BaseModel):
             niceview.Field(label='Room number', editable=False, table_sortable=True, table_filterable=True)
         ] = ''
 
+    is_active: Annotated[bool,
+            Field(description='Whether the nice4iot device is active (inactive devices are '
+                              'rejected at the API regardless of provisioning/online state).'),
+            niceview.Field(label='Active', editable=False, table_sortable=True)
+        ] = True
+
+    is_provisioning_approved: Annotated[bool,
+            Field(description='Whether the device is allowed to obtain bearer tokens.'),
+            niceview.Field(label='Provisioning approved', editable=False, table_sortable=True)
+        ] = False
+
     online: Annotated[bool,
             Field(description='Whether the device was seen recently.'),
             niceview.Field(label='Online', editable=False, table_sortable=True)

@@ -475,8 +475,10 @@ def test_displays_top_level_lists_devices_and_shows_room_and_status(tmp_path, mo
     set_device_binding(paths, "sign-1", room_id=room.id, screen_id="weather")
 
     monkeypatch.setattr(display_backend, "_project_devices", lambda project: [
-        types.SimpleNamespace(name="sign-1", last_seen_at=datetime.datetime.now(datetime.timezone.utc)),
-        types.SimpleNamespace(name="sign-2", last_seen_at=None),
+        types.SimpleNamespace(name="sign-1", last_seen_at=datetime.datetime.now(datetime.timezone.utc),
+                              is_active=True, is_provisioning_approved=True),
+        types.SimpleNamespace(name="sign-2", last_seen_at=None,
+                              is_active=True, is_provisioning_approved=True),
     ])
     monkeypatch.setattr(display_backend, "_device_url",
                         lambda project, name: f"https://nice4iot.example/{project}/devices/{name}")
@@ -509,6 +511,24 @@ def test_displays_top_level_lists_devices_and_shows_room_and_status(tmp_path, mo
         texts = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
     assert "Not assigned to a room" in texts
     assert any("Offline" in t and "never" in t for t in texts)
+
+
+def test_display_status_key_combines_active_provisioning_and_online():
+    """_status_key (display/simplified_ui.py) mirrors nice4iot's own project
+    Devices grid status dot (app.core.device.backend.device_status_key):
+    inactive beats everything, then pending provisioning approval, then
+    plain online/offline."""
+    from extensions.epaper.display.models import RoomDisplayRow
+    from extensions.epaper.display.simplified_ui import _status_key
+
+    def row(**kwargs):
+        return RoomDisplayRow(device_name="d", **kwargs)
+
+    assert _status_key(row(is_active=False, is_provisioning_approved=True, online=True)) == "inactive"
+    assert _status_key(row(is_active=True, is_provisioning_approved=False, online=True)) == "pending"
+    assert _status_key(row(is_active=True, is_provisioning_approved=False, online=False)) == "pending"
+    assert _status_key(row(is_active=True, is_provisioning_approved=True, online=True)) == "online"
+    assert _status_key(row(is_active=True, is_provisioning_approved=True, online=False)) == "offline"
 
 
 def test_device_preview_with_no_screen_shows_only_the_fallback_label(tmp_path):

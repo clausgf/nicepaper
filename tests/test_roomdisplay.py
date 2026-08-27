@@ -73,6 +73,29 @@ def test_display_rows_read_telemetry_and_alarms_from_runtime(tmp_path, monkeypat
     assert row.battery_voltage == 3.81
 
 
+def test_display_rows_reads_active_and_provisioning_from_device(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(
+        types.SimpleNamespace(name="d", last_seen_at=NOW,
+                              is_active=False, is_provisioning_approved=True),
+    ))
+
+    row = rd.display_rows(paths, "proj")[0]
+    assert row.is_active is False
+    assert row.is_provisioning_approved is True
+
+
+def test_display_rows_defaults_active_true_provisioning_false_when_absent(tmp_path, monkeypatch):
+    # _dev() fake devices carry neither attribute -- display_rows() must not crash,
+    # and should default the same way nice4iot's own Device model does.
+    paths = _paths(tmp_path)
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(_dev("d")))
+
+    row = rd.display_rows(paths, "proj")[0]
+    assert row.is_active is True
+    assert row.is_provisioning_approved is False
+
+
 def test_display_rows_treats_nonfinite_telemetry_as_no_reading(tmp_path, monkeypatch):
     """A NaN/inf sample (a bad sensor read) must not reach round()/the UI's
     bar-index math as a real value -- round(nan) raises ValueError, which
