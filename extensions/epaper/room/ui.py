@@ -20,7 +20,7 @@ def rooms_wrapper(paths: EpaperPaths, project_name: str) -> EditGridWrapper:
     from extensions.epaper.bookingsystem.models import BookingSystemModel
     from extensions.epaper.bookingsystem.backend import booking_systems_adapter, list_booking_systems
     grid = ModelGrid(RoomModel, adapter, auto_size_columns=True,
-                     include=['room_number', 'room_name', 'room_type', 'capacity', 'booking_system_id', 'booking_ical_url'])
+                     include=['room_number', 'room_name', 'room_type', 'capacity', 'notes', 'booking_system_id'])
     wrapper = EditGridWrapper(grid, search=True)
     # niceview's modelselect resolves an empty repository to options={}, which its own
     # select widget then treats as "no options defined" and raises -- so only register the

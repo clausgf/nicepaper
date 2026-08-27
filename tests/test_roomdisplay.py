@@ -218,12 +218,12 @@ def test_adapter_rename_moves_a_device_from_another_room(tmp_path, monkeypatch):
 def test_available_screen_ids_matches_real_screen_by_resolution_and_palette(tmp_path):
     paths = _paths(tmp_path)
     (paths.screen_dir / "matching.json").write_text(json.dumps({
-        "width": 400, "height": 300, "palette_id": "bw", "widgets": [],
-    }))
-    (paths.screen_dir / "mismatched.json").write_text(json.dumps({
         "width": 800, "height": 480, "palette_id": "bw", "widgets": [],
     }))
-    set_device_binding(paths, "d1", panel_type_id="waveshare_4in2")  # 400x300 bw
+    (paths.screen_dir / "mismatched.json").write_text(json.dumps({
+        "width": 800, "height": 480, "palette_id": "bwr", "widgets": [],
+    }))
+    set_device_binding(paths, "d1", panel_type_id="waveshare_7in5_v2")  # 800x480 bw
 
     ids = rd.available_screen_ids(paths, "d1")
     assert "matching" in ids
@@ -232,7 +232,7 @@ def test_available_screen_ids_matches_real_screen_by_resolution_and_palette(tmp_
 
 def test_available_screen_ids_keeps_a_dangling_assignment_visible(tmp_path):
     paths = _paths(tmp_path)
-    set_device_binding(paths, "d1", panel_type_id="waveshare_4in2", screen_id="does-not-match")
+    set_device_binding(paths, "d1", panel_type_id="waveshare_7in5_v2", screen_id="does-not-match")
     (paths.screen_dir / "does-not-match.json").write_text(json.dumps({
         "width": 800, "height": 480, "widgets": [],
     }))

@@ -119,7 +119,7 @@ def test_black_and_white_presets_do_not_ask_for_a_red_accent():
 def test_diverges_from_panel_type_only_after_a_preset_field_actually_changes():
     from extensions.epaper.screen.ui import _apply_panel_type, _diverges_from_panel_type
 
-    panel_type = catalog.get_panel_type("waveshare_4in2")
+    panel_type = catalog.get_panel_type("waveshare_7in5_v2")
     screen = ScreenModel(width=1, height=1)
     _apply_panel_type(screen, panel_type)
     assert not _diverges_from_panel_type(screen, panel_type), \
@@ -132,7 +132,7 @@ def test_diverges_from_panel_type_only_after_a_preset_field_actually_changes():
 # --- panel_label ------------------------------------------------------------
 
 def test_panel_label_uses_the_resolved_panel_type_name_and_class(paths):
-    panel_type = catalog.get_panel_type("waveshare_4in2")
+    panel_type = catalog.get_panel_type("waveshare_7in5_v2")
     _write_screen(paths, "p", panel_type_id=panel_type.id,
                  palette_id=panel_type.palette_id, width=panel_type.width, height=panel_type.height)
     screen = asyncio.run(get_screen_by_id(paths, "p"))
@@ -186,7 +186,7 @@ def test_picking_a_display_applies_the_preset(tmp_path, monkeypatch):
         screen_editor_content(paths, "s.json", "/api/screen")
         select = next(e for e in client.elements.values()
                       if type(e).__name__ == "Select" and e._props.get("label") == "Panel type")
-        option = next(o for o in select._props["options"] if o["label"].startswith("Waveshare 4.2"))
+        option = next(o for o in select._props["options"] if o["label"].startswith("Waveshare 7.5\" V2/V3"))
         # dispatch the way NiceGUI does: every listener for the event, through
         # handle_event (which is what adapts the handler's signature)
         for listener in select._event_listeners.values():
@@ -195,7 +195,7 @@ def test_picking_a_display_applies_the_preset(tmp_path, monkeypatch):
                     sender=select, client=client, args=option))
 
     written = json.loads((paths.screen_dir / "s.json").read_text())
-    display = catalog.get_panel_type("waveshare_4in2")
+    display = catalog.get_panel_type("waveshare_7in5_v2")
     assert written["panel_type_id"] == display.id
     assert (written["width"], written["height"]) == (display.width, display.height)
     assert written["palette_id"] == display.palette_id
@@ -219,7 +219,7 @@ def test_editing_a_preset_field_clears_panel_type_id(tmp_path, monkeypatch):
 
     paths = EpaperPaths(root=tmp_path)
     paths.ensure_dirs()
-    panel_type = catalog.get_panel_type("waveshare_4in2")
+    panel_type = catalog.get_panel_type("waveshare_7in5_v2")
     # update_schedule_id="default" (matching ScreenModel's own field default,
     # unlike _write_screen()'s None): with no schedule files in this tmp_path,
     # an unset current would leave the Update schedule select with zero

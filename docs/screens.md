@@ -200,7 +200,7 @@ its panel, e.g. a future screen list) reflects this: with a resolved
 (`panel_id`); otherwise a plain `"{width}x{height} {palette_id} {n}-color"`
 summary of the screen's own fields.
 
-The catalog ships with the package (currently Waveshare 4.2"/7.5"/7.3" and two
+The catalog ships with the package (currently Waveshare 7.5"/7.3" and two
 Seeed 7.3"/7.5" panels) and is extended per data root by an optional
 `data/panel_types.json` (`<project>/.epaper/panel_types.json` in extension mode).
 Entries are merged by `id`, the root file wins, so it can both add panels that

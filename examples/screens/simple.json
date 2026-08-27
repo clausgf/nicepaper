@@ -1,7 +1,7 @@
 {
-  "panel_type_id": "waveshare_4in2",
-  "width": 400,
-  "height": 300,
+  "panel_type_id": "waveshare_7in5_v2",
+  "width": 800,
+  "height": 480,
   "palette_id": "bw",
   "color_background": "#ffffff",
   "color_primary": "#000000",
@@ -12,7 +12,7 @@
       "widget_type": "Text",
       "position_x": 10,
       "position_y": 10,
-      "size_width": 380,
+      "size_width": 780,
       "size_height": 40,
       "text": "Welcome!",
       "font_name": "Ubuntu-Bold.ttf",
@@ -22,7 +22,7 @@
       "widget_type": "Date",
       "position_x": 10,
       "position_y": 60,
-      "size_width": 380,
+      "size_width": 780,
       "size_height": 30,
       "date_format": "EEEE, dd. MMMM yyyy"
     }

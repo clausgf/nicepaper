@@ -1,17 +1,5 @@
 [
   {
-    "id": "waveshare_4in2",
-    "name": "Waveshare 4.2\" (400x300 b/w)",
-    "vendor": "Waveshare",
-    "width": 400,
-    "height": 300,
-    "palette_id": "bw",
-    "color_background": "#ffffff",
-    "color_primary": "#000000",
-    "color_accent": "#000000",
-    "panel_id": "GDEW042T2"
-  },
-  {
     "id": "waveshare_7in5_v2",
     "name": "Waveshare 7.5\" V2/V3 (800x480 b/w)",
     "vendor": "Waveshare",

@@ -722,10 +722,13 @@ def test_simplified_ui_booking_form_lays_out_fields():
 
 def test_booking_system_header_editor_lists_entries_with_round_add_and_delete(tmp_path):
     """Booking system detail's header editor (bookingsystem/ui.py):
-    a two-column list (header, value) with a delete icon per row, and an Add
-    button matching DrillDownWrapper's own toolbar style (dense round --
-    see main.py's niceview.set_chrome_style(toolbar_icon_button_props=...))."""
+    an inline-editable list -- every row a live Header/Value ui.input pair
+    (not static text), no dialog to add or change one -- with a delete icon
+    per row and an Add button matching DrillDownWrapper's own toolbar style
+    (dense round -- see main.py's niceview.set_chrome_style(
+    toolbar_icon_button_props=...))."""
     from nicegui.client import Client
+    from nicegui.elements.input import Input
     from nicegui.page import page
 
     from extensions.epaper.bookingsystem.backend import booking_systems_adapter, create_booking_system
@@ -739,10 +742,12 @@ def test_booking_system_header_editor_lists_entries_with_round_add_and_delete(tm
 
     with Client(page("/test-booking-header-editor"), request=None) as client:
         _header_editor(adapter, system.id)
-        item_labels = {e.text for e in client.elements.values() if type(e).__name__ == "ItemLabel"}
+        input_values = {e.value for e in client.elements.values() if isinstance(e, Input)}
         buttons = [e for e in client.elements.values() if type(e).__name__ == "Button"]
+        dialogs = [e for e in client.elements.values() if type(e).__name__ == "Dialog"]
 
-    assert {"X-Api-Key", "secret123", "Accept", "text/calendar"} <= item_labels
+    assert {"X-Api-Key", "secret123", "Accept", "text/calendar"} <= input_values
+    assert not dialogs  # rows are live inputs -- nothing to pop open
 
     delete_buttons = [b for b in buttons if b._props.get("icon") == "delete"]
     assert len(delete_buttons) == 2
@@ -769,16 +774,18 @@ def test_booking_system_header_editor_shows_placeholder_when_empty(tmp_path):
 
     with Client(page("/test-booking-header-editor-empty"), request=None) as client:
         _header_editor(adapter, system.id)
-        item_labels = {e.text for e in client.elements.values() if type(e).__name__ == "ItemLabel"}
+        labels = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
 
-    assert "No custom headers." in item_labels
+    assert "No custom headers." in labels
 
 
 def test_booking_system_category_color_editor_lists_entries(tmp_path):
     """Booking system detail's category-color editor (bookingsystem/ui.py):
-    a swatch + category name per row, with a delete icon -- same list shape
-    as the header editor above."""
+    an inline-editable list -- every row a live Category ui.input plus a
+    swatch picker (not static text), no dialog to add or change one -- same
+    shape as the header editor above."""
     from nicegui.client import Client
+    from nicegui.elements.input import Input
     from nicegui.page import page
 
     from extensions.epaper.bookingsystem.backend import booking_systems_adapter, create_booking_system
@@ -792,16 +799,19 @@ def test_booking_system_category_color_editor_lists_entries(tmp_path):
 
     with Client(page("/test-booking-category-color-editor"), request=None) as client:
         _category_color_editor(paths, adapter, system.id)
-        item_labels = {e.text for e in client.elements.values() if type(e).__name__ == "ItemLabel"}
+        input_values = {e.value for e in client.elements.values() if isinstance(e, Input)}
         buttons = [e for e in client.elements.values() if type(e).__name__ == "Button"]
+        dialogs = [e for e in client.elements.values() if type(e).__name__ == "Dialog"]
 
-    assert {"Lecture", "Exam"} <= item_labels
+    assert {"Lecture", "Exam"} <= input_values
+    assert not dialogs  # rows are live inputs -- nothing to pop open
     delete_buttons = [b for b in buttons if b._props.get("icon") == "delete"]
     assert len(delete_buttons) == 2
 
 
 def test_booking_system_category_color_editor_shows_placeholder_when_empty(tmp_path):
     from nicegui.client import Client
+    from nicegui.elements.label import Label
     from nicegui.page import page
 
     from extensions.epaper.bookingsystem.backend import booking_systems_adapter, create_booking_system
@@ -813,9 +823,9 @@ def test_booking_system_category_color_editor_shows_placeholder_when_empty(tmp_p
 
     with Client(page("/test-booking-category-color-editor-empty"), request=None) as client:
         _category_color_editor(paths, adapter, system.id)
-        item_labels = {e.text for e in client.elements.values() if type(e).__name__ == "ItemLabel"}
+        labels = {e.text for e in client.elements.values() if isinstance(e, Label)}
 
-    assert "No category colors." in item_labels
+    assert "No category colors." in labels
 
 
 def test_six_color_palette_id_resolves_to_the_spectra_e6_colors(tmp_path):

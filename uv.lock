@@ -1058,7 +1058,7 @@ dev = [
 [[package]]
 name = "niceview"
 version = "0.26.5"
-source = { git = "https://github.com/clausgf/niceview.git#ea2bedc4795ae367c2e7ef1e48d38b13f4254f09" }
+source = { git = "https://github.com/clausgf/niceview.git#e1e35130d78eb2a210a478ea2f3f10bc8c4204bd" }
 dependencies = [
     { name = "annotated-types" },
     { name = "nicegui" },

@@ -145,10 +145,11 @@ A booking system's detail has a custom `render_detail`
 plus two hand-built editors for the fields that layout omits — `header`
 (`Dict[str, str]`, extra HTTP headers sent with every feed request) and
 `category_colors` (`Dict[str, str]`, an iCal `CATEGORIES` entry mapped to a
-card color for the `RoomCalendar` widget) — both a swatch/text list with a
+card color for the `RoomCalendar` widget) — both inline-editable lists
+(every row a live input pair, autosaving on change, no dialog) with a
 delete icon per row and an "Add" button matching DrillDownWrapper's own
-toolbar style (dense round). `category_colors`' Add dialog restricts the
-color picker to the 6-color display's own colors (the `e6` Spectra palette
+toolbar style (dense round). `category_colors`' color picker restricts
+itself to the 6-color display's own colors (the `e6` Spectra palette
 — black, white, yellow, red, blue, green): a booking system isn't tied to
 one screen/panel, so there's no single "closest" color that would be right
 for every room using it; a panel that doesn't have the chosen color exactly

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.26.9 — 2026-08-27
+
+### Changed
+
+- **Booking system `header`/`category_colors` editors are now inline**
+  (`bookingsystem/ui.py`): every row is a live input pair (Header/Value, or
+  Category/color swatch) that autosaves on change, instead of a static list
+  plus an "Add" dialog. Persist errors (`ConflictError`, `StorageError`)
+  surface via `ui.notify` instead of raising.
+- **Rooms grid swaps its `booking_ical_url` column for `notes`**
+  (`room/ui.py`): the iCal URL isn't useful at a glance in the grid; the
+  per-room notes text (also shown on the physical display) is.
+- **Panel catalog drops the `waveshare_4in2` (400×300 b/w) entry**
+  (`resources/panel_types.json`): no longer stocked/tracked. A screen still
+  referencing it keeps working — `panel_type_id` degrades gracefully to a
+  dangling reference, same as any removed/unknown preset.
+- `niceview` bumped 0.26.5 (unchanged pin) → 0.26.5 (latest commit, docs-only
+  `CLAUDE.md` fix — no functional change).
+
 ## 0.26.8 — 2026-08-27
 
 ### Changed
