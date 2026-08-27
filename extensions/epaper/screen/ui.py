@@ -115,12 +115,13 @@ def _diverges_from_panel_type(screen: ScreenModel, panel_type: PanelTypeModel) -
 
 
 def _panel_type_hint(panel_type: Optional[PanelTypeModel]) -> Optional[str]:
-    """Hint under the panel-type select: the panel's GxEPD2 class, for
-    recognising a panel by the name the firmware knows it under. Purely
-    informational -- nicepaper serves a PNG and never drives the panel."""
-    if panel_type is None or not panel_type.gxepd2_class:
+    """Hint under the panel-type select: the panel's own manufacturer
+    designation, for recognising a panel by the name its datasheet/firmware
+    knows it under. Purely informational -- nicepaper serves a PNG and never
+    drives the panel."""
+    if panel_type is None or not panel_type.panel_id:
         return None
-    return f'GxEPD2 class: {panel_type.gxepd2_class}'
+    return f'Panel: {panel_type.panel_id}'
 
 
 def _missing_schedule_message(paths: EpaperPaths, update_schedule_id: Optional[str]) -> Optional[str]:

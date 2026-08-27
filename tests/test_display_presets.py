@@ -136,7 +136,7 @@ def test_panel_label_uses_the_resolved_panel_type_name_and_class(paths):
     _write_screen(paths, "p", panel_type_id=panel_type.id,
                  palette_id=panel_type.palette_id, width=panel_type.width, height=panel_type.height)
     screen = asyncio.run(get_screen_by_id(paths, "p"))
-    assert screen.panel_label == f"{panel_type.name} {panel_type.gxepd2_class}"
+    assert screen.panel_label == f"{panel_type.name} {panel_type.panel_id}"
 
 
 def test_panel_label_falls_back_to_size_and_palette_without_a_preset(paths):

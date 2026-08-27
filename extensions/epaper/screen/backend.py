@@ -39,7 +39,7 @@ def panel_label(config: ScreenModel, paths: EpaperPaths) -> str:
     building a full, async-constructed Screen instance just for a label."""
     panel_type = get_panel_type(config.panel_type_id, paths)
     if panel_type is not None:
-        return f'{panel_type.name} {panel_type.gxepd2_class or ""}'.strip()
+        return f'{panel_type.name} {panel_type.panel_id or ""}'.strip()
     parts = [f'{config.width}x{config.height}']
     if config.palette_id:
         palette = get_palette(config.palette_id, paths)

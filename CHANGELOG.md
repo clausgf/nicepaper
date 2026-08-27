@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.26.8 — 2026-08-27
+
+### Changed
+
+- **`PanelTypeModel.gxepd2_class` renamed to `panel_id`** (`catalog/models.py`,
+  `resources/panel_types.json`): firmware is moving from GxEPD2 (Arduino
+  library) class names (e.g. `GxEPD2_750c_Z08`) to the panel's own official
+  manufacturer designation (e.g. `GDEH075Z9`) — this field tracks whatever a
+  panel is identified by elsewhere, so its value convention changes with it,
+  same purpose as before. `panel_id` is deliberately distinct from a catalog
+  entry's own `id` (a vendor+size slug, one per vendor SKU): the same
+  physical panel is often sold under different vendor names (Waveshare and
+  Seeed both rebrand Good Display panels), so those get separate `id`s that
+  now share one `panel_id` — already true for two pairs in the shipped
+  catalog (`GDEW075T7`, `GDEP073E01`). Hard rename, no alias, matching this
+  catalog's own established convention (see the `displays.json` →
+  `panel_types.json` rename below). The 8 shipped entries' values are
+  inferred from their previous GxEPD2 class names, not yet cross-checked
+  against datasheets for every entry — worth a second look before relying on
+  them for a specific order.
+
 ## 0.26.7 — 2026-08-27
 
 ### Added

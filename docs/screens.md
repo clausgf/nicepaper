@@ -196,9 +196,9 @@ describes.
 
 `Screen.panel_label` (used wherever a screen needs a one-line description of
 its panel, e.g. a future screen list) reflects this: with a resolved
-`panel_type_id` it shows that panel's own name and GxEPD2 class; otherwise a
-plain `"{width}x{height} {palette_id} {n}-color"` summary of the screen's own
-fields.
+`panel_type_id` it shows that panel's own name and manufacturer designation
+(`panel_id`); otherwise a plain `"{width}x{height} {palette_id} {n}-color"`
+summary of the screen's own fields.
 
 The catalog ships with the package (currently Waveshare 4.2"/7.5"/7.3" and two
 Seeed 7.3"/7.5" panels) and is extended per data root by an optional
@@ -212,14 +212,20 @@ aren't shipped and correct one that is:
     "id": "my-panel", "name": "My 5.83\" panel", "vendor": "Waveshare",
     "width": 648, "height": 480, "palette_id": "bw",
     "color_background": "#ffffff", "color_primary": "#000000", "color_accent": "#000000",
-    "gxepd2_class": "GxEPD2_583"
+    "panel_id": "GDEW0583T7"
   }
 ]
 ```
 
-`gxepd2_class` is informational only — nicepaper renders a PNG and never talks
-to a panel driver. It is shown under the panel-type list so a panel can be found
-by the name its firmware knows it under.
+`panel_id` — the panel's own official designation from its manufacturer's
+datasheet, e.g. `GDEH075Z9` (not a GxEPD2 class name, and not this entry's own
+`id`, which is a vendor+size slug) — is informational only; nicepaper renders
+a PNG and never talks to a panel driver. It is shown under the panel-type list
+so a panel can be found by the name its datasheet or firmware knows it under.
+The same physical panel is often sold under different vendor names (e.g.
+Waveshare and Seeed both rebrand Good Display panels) — those get separate
+catalog entries (different `id`, different `vendor`/`name`) that share the
+same `panel_id`.
 
 Palettes work the same way: an optional `data/palettes.json` adds to (or
 overrides) the shipped ones. Unlike `panel_types.json`, editing it changes what

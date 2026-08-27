@@ -55,13 +55,19 @@ class PanelTypeModel(BaseModel):
     color_accent: Optional[str] = Field(default=None, description="Accent color to apply. Empty leaves the global default.")
 
     vendor: Optional[str] = Field(default=None, description="Who sells the panel, e.g. 'Waveshare'.")
-    gxepd2_class: Optional[str] = Field(
+    panel_id: Optional[str] = Field(
         default=None,
         description=(
-            "Matching GxEPD2 display class for the panel, e.g. 'GxEPD2_750_T7'. "
-            "Purely informational -- nicepaper renders a PNG and never talks to "
-            "the panel driver; this only helps find the right preset for a panel "
-            "you know by its firmware class name. Empty when GxEPD2 has no "
-            "matching class."
+            "The panel's own official designation from its manufacturer's "
+            "datasheet, e.g. 'GDEH075Z9' -- not a GxEPD2 (Arduino library) "
+            "class name, and not this catalog entry's own `id` (which is a "
+            "vendor+size slug, one per vendor SKU). The same physical panel is "
+            "often sold under different vendor names (e.g. Waveshare and Seeed "
+            "both rebrand Good Display panels) -- those get separate catalog "
+            "entries with the same panel_id, so this is the field that "
+            "identifies the underlying hardware across vendor listings. Purely "
+            "informational -- nicepaper renders a PNG and never talks to the "
+            "panel driver; this only helps find the right preset for a panel "
+            "you know by its firmware/datasheet designation. Empty when unknown."
         ),
     )

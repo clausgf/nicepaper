@@ -9,7 +9,7 @@
     "color_background": "#ffffff",
     "color_primary": "#000000",
     "color_accent": "#000000",
-    "gxepd2_class": "GxEPD2_420"
+    "panel_id": "GDEW042T2"
   },
   {
     "id": "waveshare_7in5_v2",
@@ -21,7 +21,7 @@
     "color_background": "#ffffff",
     "color_primary": "#000000",
     "color_accent": "#000000",
-    "gxepd2_class": "GxEPD2_750_T7"
+    "panel_id": "GDEW075T7"
   },
   {
     "id": "waveshare_7in5b_v2",
@@ -33,7 +33,7 @@
     "color_background": "#ffffff",
     "color_primary": "#000000",
     "color_accent": "#ff0000",
-    "gxepd2_class": "GxEPD2_750c_Z08"
+    "panel_id": "GDEW075Z08"
   },
   {
     "id": "waveshare_7in3f",
@@ -45,7 +45,7 @@
     "color_background": "#ffffff",
     "color_primary": "#000000",
     "color_accent": "#ff0000",
-    "gxepd2_class": "GxEPD2_730c_ACeP_730"
+    "panel_id": "GDEY073D46"
   },
   {
     "id": "gooddisplay_7in3_acep",
@@ -57,7 +57,7 @@
     "color_background": "#ffffff",
     "color_primary": "#000000",
     "color_accent": "#ff0000",
-    "gxepd2_class": "GxEPD2_730c_GDEY073D46"
+    "panel_id": "GDEY073D46"
   },
   {
     "id": "waveshare_spectra6_7in3e",
@@ -69,7 +69,7 @@
     "color_background": "#ffffff",
     "color_primary": "#000000",
     "color_accent": "#ff0000",
-    "gxepd2_class": "GxEPD2_730c_GDEP073E01"
+    "panel_id": "GDEP073E01"
   },
   {
     "id": "seeed_xiao_7in5",
@@ -81,7 +81,7 @@
     "color_background": "#ffffff",
     "color_primary": "#000000",
     "color_accent": "#000000",
-    "gxepd2_class": "GxEPD2_750_T7"
+    "panel_id": "GDEW075T7"
   },
   {
     "id": "seeed_spectra6_7in3",
@@ -93,6 +93,6 @@
     "color_background": "#ffffff",
     "color_primary": "#000000",
     "color_accent": "#ff0000",
-    "gxepd2_class": "GxEPD2_730c_GDEP073E01"
+    "panel_id": "GDEP073E01"
   }
 ]

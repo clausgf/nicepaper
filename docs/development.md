@@ -119,14 +119,15 @@ only be set in the screen JSON. Adding them means naming both fields in the
 row, plus a `ui.color_input` entry each in its `_field_infos()` — once, for
 every widget type.
 
-### Getting the GxEPD2 class to the firmware
+### Getting the panel id to the firmware
 
-A panel type carries the matching GxEPD2 display class
-(`gxepd2_class`, e.g. `GxEPD2_750_T7`) purely as a hint in the UI. A device
-firmware still has to be built with the right class hard-coded. Open question
-whether nicepaper should expose it — e.g. on a per-device endpoint next to the
-image URL — so a firmware could check it against what it was built with and
-warn on a mismatch.
+A panel type carries the panel's own manufacturer designation (`panel_id`,
+e.g. `GDEH075Z9` — the panel's official part number, not a GxEPD2 (Arduino
+library) class name) purely as a hint in the UI. A device firmware still has
+to be built with the right panel driver hard-coded. Open question whether
+nicepaper should expose it — e.g. on a per-device endpoint next to the image
+URL — so a firmware could check it against what it was built with and warn on
+a mismatch.
 
 ### API keys for the display API
 
