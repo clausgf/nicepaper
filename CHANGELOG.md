@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.26.10 — 2026-08-28
+
+### Changed
+
+- `niceview` bumped 0.26.5 → 0.27.0 (latest commit): `ModelGrid`/`ModelGridInlineEdit` no
+  longer crash on a `timedelta` field and render `bool` columns as a real checkbox
+  (`cellDataType='boolean'`) instead of the text `true`/`false` — relevant to
+  `bookingsystem`'s `update_interval`/`max_days_ahead` (`timedelta`) and any `bool` column
+  shown in a grid. `Meta.field_infos` and a new `Meta.default_profile` now also apply to
+  `ModelGrid`/`ModelList`, not just `ModelForm`. No code changes needed on our side.
+
 ## 0.26.9 — 2026-08-27
 
 ### Changed
