@@ -34,6 +34,7 @@ DATE_PATTERN_HINT = 'CLDR pattern, e.g. EEEE, dd. MMMM yyyy'
 SHORT_DATE_PATTERN_HINT = 'CLDR pattern, e.g. dd.MM.yy'
 TIME_PATTERN_HINT = 'CLDR pattern, e.g. HH:mm'
 STALE_NOTICE_HINT = "'{time}' is replaced by the last successful update"
+HOMEASSISTANT_ERROR_HINT = "'{code}' short failure reason, '{entity_id}' the entity id"
 ALIGNMENT_HINT = 'Horizontal l/c/r + vertical t/c/b'
 # the fallback is all-or-nothing (see WeatherWidgetModel.resolved_location),
 # so the hint says "both", not "empty = default" per field

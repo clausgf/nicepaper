@@ -60,8 +60,9 @@ class HomeAssistantWidget(Widget):
         self._status = await get_entity(ctx.paths.homeassistant_dir, self.config.entity_id)
         value = raw_value(self._status, self.config.attribute)
         if value is None:
-            ctx.draw_text((0, 0), size=(w, h), text=app_config.homeassistant_error,
-                          font=self.font, ellipsis='...')
+            text = app_config.homeassistant_error.format(
+                entity_id=self.config.entity_id, code=self._status.error_code or '?')
+            ctx.draw_text((0, 0), size=(w, h), text=text, font=self.font, ellipsis='...')
             return
 
         label = self.config.label or entity_label(self._status, self.config.attribute)

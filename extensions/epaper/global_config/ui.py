@@ -16,8 +16,8 @@ from niceview import Field, ModelForm
 from extensions.epaper.config import resource_paths
 from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.ui.forms import (
-    COL, DATE_PATTERN_HINT, FORM_STYLE, ROW, SHORT_DATE_PATTERN_HINT, STALE_NOTICE_HINT,
-    TIME_PATTERN_HINT, hints,
+    COL, DATE_PATTERN_HINT, FORM_STYLE, HOMEASSISTANT_ERROR_HINT, ROW, SHORT_DATE_PATTERN_HINT,
+    STALE_NOTICE_HINT, TIME_PATTERN_HINT, hints,
 )
 
 _LOCATION_HINT = 'Used by weather widgets that set no location'
@@ -76,7 +76,7 @@ def _field_infos() -> dict:
         'homeassistant_update_interval_s': Field(label='Update interval s'),
         'homeassistant_retry_min_s': Field(label='Retry min s'),
         'homeassistant_retry_max_s': Field(label='Retry max s'),
-        'homeassistant_error': Field(label='Error message'),
+        'homeassistant_error': Field(label='Error message', hint=HOMEASSISTANT_ERROR_HINT),
         'homeassistant_stale_notice': Field(label='Stale notice', hint=STALE_NOTICE_HINT),
         **hints(date_format=SHORT_DATE_PATTERN_HINT, time_format=TIME_PATTERN_HINT,
                 roomcalendar_date_format_long=DATE_PATTERN_HINT,

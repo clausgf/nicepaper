@@ -53,8 +53,9 @@ same settings with humanized labels):
   During the backoff the last-known data is still shown (graceful degradation).
 - `weather_stale_notice` — the `WeatherNow` marker shown while serving cached
   data during an outage; `{time}` is the last successful update. Empty to hide.
-- `weather_error`, `ical_error`, `image_error`, `homeassistant_error` — messages
-  drawn when weather / calendar / image / Home Assistant data can't be loaded.
+- `weather_error`, `ical_error`, `image_error` — messages drawn when weather /
+  calendar / image data can't be loaded (`homeassistant_error` is documented
+  under Home Assistant below, it supports placeholders the others don't).
   (All the default message/label strings are English; edit them here for another
   language.)
 - `color_background`, `color_primary`, `color_accent` — the **default**
@@ -87,6 +88,11 @@ Optional:
   per widget per render.
 - `homeassistant_stale_notice` — marker shown while a cached value is served
   during an outage (`{time}` is the last successful update). Empty to hide.
+- `homeassistant_error` — text drawn when nothing at all is known about the
+  entity; `{code}` is a short failure reason (`401`, `timeout`, `conn`, ...),
+  `{entity_id}` the entity id. The full error (HTTP status, exception detail)
+  goes to the log and the dashboard health tooltip instead — the widget box is
+  too small for it.
 
 No Home Assistant *add-on* or custom component is needed on the HA side; the
 REST API is built in, and nicepaper only reads entity states.

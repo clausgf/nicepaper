@@ -14,6 +14,7 @@ knowledge of HA's internals, works for every domain, and returns both the
 state and the attributes (friendly_name, unit_of_measurement, ...) the
 widget needs to label a value.
 """
+import asyncio
 import datetime
 import json
 import re
@@ -49,6 +50,7 @@ class EntityStatus:
     fail_count: int = 0                              # consecutive failures
     retry_after: Optional[datetime.datetime] = None  # earliest next network attempt
     error: Optional[str] = None                      # last error message (dashboard tooltip)
+    error_code: Optional[str] = None                 # short reason for the on-screen error text
 
 
 def _cache_filename(homeassistant_dir: Path, entity_id: str) -> Path:
@@ -83,7 +85,22 @@ def _status_from_cache(entity_id: str, cache: dict, now: datetime.datetime) -> E
         state=data.get('state'), attributes=data.get('attributes') or {},
         last_update=last_update, fresh=fresh, failing=fail_count > 0, fail_count=fail_count,
         retry_after=_parse_dt(cache.get('retry_after')), error=cache.get('error'),
+        error_code=cache.get('error_code'),
     )
+
+
+def _classify_error(e: Exception) -> tuple[str, str]:
+    """Short code (fits the on-screen error text) + human-readable detail
+    (log line, dashboard tooltip) for an exception from a states fetch."""
+    if isinstance(e, aiohttp.ClientResponseError):
+        return str(e.status), f"HTTP {e.status} {e.message}"
+    if isinstance(e, asyncio.TimeoutError):
+        return "timeout", f"timed out after {FETCH_TIMEOUT_S}s"
+    if isinstance(e, aiohttp.ClientConnectorError):
+        return "conn", f"connection failed: {e}"
+    if isinstance(e, (KeyError, ValueError, TypeError)):
+        return "bad-resp", f"unexpected response ({type(e).__name__}: {e})"
+    return "error", str(e) or type(e).__name__
 
 
 def _backoff_seconds(fail_count: int) -> float:
@@ -159,12 +176,13 @@ async def get_entity(homeassistant_dir: Path, entity_id: str) -> EntityStatus:
             payload = await response.json()
         state = payload["state"]
     except Exception as e:
+        code, detail = _classify_error(e)
         fail_count = status.fail_count + 1
         retry_after = now + datetime.timedelta(seconds=_backoff_seconds(fail_count))
-        logger.error(f"Error occurred while fetching Home Assistant entity {entity_id}: {e}; "
-                     f"retrying after {retry_after.isoformat()} (attempt {fail_count})")
+        logger.error(f"Error occurred while fetching Home Assistant entity {entity_id} from {url}: "
+                     f"{detail}; retrying after {retry_after.isoformat()} (attempt {fail_count})")
         cache.update(entity_id=entity_id, fail_count=fail_count,
-                     retry_after=retry_after.isoformat(), error=str(e))
+                     retry_after=retry_after.isoformat(), error=detail, error_code=code)
         homeassistant_dir.mkdir(parents=True, exist_ok=True)
         async with aiofiles.open(cache_filename, "w") as cache_file:
             await cache_file.write(json.dumps(cache))

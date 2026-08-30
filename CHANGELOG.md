@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.26.11 — 2026-08-30
+
+### Changed
+
+- **Home Assistant fetch errors are classified** (`core/datasources/homeassistant.py`):
+  exceptions from a states fetch are now turned into a short `error_code`
+  (`401`, `timeout`, `conn`, `bad-resp`, ...) plus a detailed `error` message,
+  instead of a bare `str(exception)` that was empty/unhelpful for timeouts and
+  malformed responses. The log line now also includes the request URL.
+  `EntityStatus` gained an `error_code` field.
+- **`homeassistant_error` is now a template**: `{code}` (the new short failure
+  reason) and `{entity_id}` can be used in the `HomeAssistant` widget's error
+  text, so the screen shows *why* an entity failed (e.g. `HA error (401)`),
+  not just a generic message. Default changed from `"Error fetching Home
+  Assistant data"` to `"HA error ({code})"`.
+
 ## 0.26.10 — 2026-08-28
 
 ### Changed

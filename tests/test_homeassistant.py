@@ -3,12 +3,13 @@ import datetime
 import json
 from zoneinfo import ZoneInfo
 
+import aiohttp
 import pytest
 
 from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.core.datasources.homeassistant import (
-    EntityStatus, _cache_filename, entity_label, entity_unit, format_value, get_entity,
-    numeric_value, raw_value, read_all_entity_statuses,
+    EntityStatus, _cache_filename, _classify_error, entity_label, entity_unit, format_value,
+    get_entity, numeric_value, raw_value, read_all_entity_statuses,
 )
 
 
@@ -64,6 +65,7 @@ def test_get_entity_backs_off_and_degrades_gracefully(tmp_path, monkeypatch):
     first = asyncio.run(get_entity(tmp_path, "sensor.temp"))
     assert first.state == "9.0"                      # graceful: last-known value still rendered
     assert first.failing and first.fail_count == 1 and first.retry_after is not None
+    assert first.error_code == "error" and "Cannot connect" in first.error
 
     # inside the backoff window -> no request at all
     monkeypatch.setattr("extensions.epaper.core.datasources.homeassistant._get_session", _fail_if_called)
@@ -107,6 +109,20 @@ def test_read_all_entity_statuses(tmp_path):
     assert statuses["sensor.temp"].fresh is True
     broken = statuses["sensor.broken"]
     assert broken.failing and broken.fail_count == 2 and broken.error == "timeout"
+
+
+def test_classify_error_gives_a_short_code_and_a_readable_detail():
+    http_error = aiohttp.ClientResponseError(request_info=None, history=(), status=401, message="Unauthorized")
+    assert _classify_error(http_error) == ("401", "HTTP 401 Unauthorized")
+
+    code, detail = _classify_error(asyncio.TimeoutError())
+    assert code == "timeout" and "timed out" in detail
+
+    code, detail = _classify_error(KeyError("state"))
+    assert code == "bad-resp" and "KeyError" in detail
+
+    code, detail = _classify_error(RuntimeError("boom"))
+    assert code == "error" and detail == "boom"
 
 
 def test_raw_value_reads_state_or_attribute():
