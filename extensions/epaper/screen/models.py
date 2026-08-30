@@ -285,9 +285,6 @@ class ScreenModel(BaseModel):
     fields in the editor, but is never read back at render time -- the fields
     below are the source of truth, and stay editable afterwards.
     """
-    # Tuple[int, int] -- see the same note on WidgetModel above.
-    width: int = Field(description="Canvas width in pixels.")
-    height: int = Field(description="Canvas height in pixels.")
     panel_type_id: Optional[str] = Field(
         default=None,
         description=(
@@ -297,6 +294,9 @@ class ScreenModel(BaseModel):
             "stay editable and are what actually gets rendered."
         ),
     )
+    # Tuple[int, int] -- see the same note on WidgetModel above.
+    width: int = Field(description="Canvas width in pixels.")
+    height: int = Field(description="Canvas height in pixels.")
     palette_id: Optional[str] = Field(
         default=None,
         description=(

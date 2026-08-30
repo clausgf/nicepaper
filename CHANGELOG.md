@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.26.12 — 2026-08-30
+
+### Changed
+
+- `ScreenModel` field order: `panel_type_id` now precedes `width`/`height`,
+  matching the editor's field order. No behavior change.
+
 ## 0.26.11 — 2026-08-30
 
 ### Changed
