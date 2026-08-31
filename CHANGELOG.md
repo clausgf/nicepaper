@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.30.0 — 2026-08-31
+
+### Added
+
+- **`GlobalConfig.wakeup_margin_s`** (default 15, General section) — added to
+  a served image's `Cache-Control: max-age` on top of the time until its
+  `expires_at` (e.g. a room calendar's next appointment start/end). Real
+  device wakeups jitter around their intended time; biasing `max-age` later
+  makes a display wake at or after the intended update time rather than
+  before it, avoiding an early poll that finds the image still valid and has
+  to sleep and retry.
+
+### Changed
+
+- Settings project card title changed from "Settings" to "E-Paper".
+
+### Removed
+
+- Unused `OpenSans-*-webfont.woff` font resources (not referenced anywhere;
+  widgets use the Ubuntu/FontAwesome fonts).
+
 ## 0.29.1 — 2026-08-31
 
 ### Changed

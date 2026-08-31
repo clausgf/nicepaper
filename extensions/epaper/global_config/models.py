@@ -134,6 +134,13 @@ class GlobalConfig(BaseModel):
             Field(description="General time format."),
             niceview.Field(widget_type='ui.select', options=_TIME_FORMATS)
         ] = 'HH:mm'
+    wakeup_margin_s: Annotated[int,
+            Field(title="Wakeup margin s",
+                  description="Added to a display's sleep time (Cache-Control max-age) to "
+                              "compensate for imprecise device wakeup, so it wakes at or "
+                              "after -- not before -- the intended update time (e.g. an "
+                              "appointment's start/end)."),
+        ] = 15
 
     font_name: Annotated[str,
             Field(description="Default font file name for widgets without their own font."),

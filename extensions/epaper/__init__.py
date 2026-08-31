@@ -93,7 +93,7 @@ def register(app: FastAPI) -> None:
     def _settings_card(project_name: str) -> None:
         project_config_fields(_paths_for_project(project_name))
 
-    register_project_card('settings', _settings_card, title='Settings')
+    register_project_card('settings', _settings_card, title='E-Paper')
 
     # --- Device settings card -------------------------------------------
     # Lets a device be assigned a screen and shows the resulting

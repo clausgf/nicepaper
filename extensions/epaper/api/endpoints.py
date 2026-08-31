@@ -96,7 +96,11 @@ async def _render_screen_image(paths: EpaperPaths, id: str, if_none_match: Optio
     if expires_at:
         now = datetime.datetime.now(ZoneInfo(app_config.timezone))
         seconds_till_update = (expires_at - now).total_seconds()
-        max_age = max(60, round(seconds_till_update))
+        # wakeup_margin_s biases the display to wake at or slightly after
+        # expires_at rather than before it: an early wakeup gets served the
+        # still-valid cached image and has to poll again, an late one costs
+        # nothing since the image is re-rendered on demand anyway.
+        max_age = max(60, round(seconds_till_update) + app_config.wakeup_margin_s)
     else:
         max_age = 60
     headers = {
