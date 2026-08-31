@@ -19,10 +19,10 @@ def register(app: FastAPI) -> None:
 
     from app.config import app_config as nice4iot_app_config
     from app.extensions import (
-        mount_extension_router, 
+        mount_extension_router,
         register_global_card, register_project_page,
         register_device_card, register_project_card,
-        register_project_tab,
+        register_project_tab, register_telemetry_cache_kind,
     )
     from app.paths import extension_project_dir
     from app.routes import project_extension_url
@@ -64,6 +64,13 @@ def register(app: FastAPI) -> None:
     register_global_card('E-Paper', _global_card)
     register_project_page(simplified_ui.render)
 
+    # esp32paper reports its active/supported panel ids as 'panel'/'panels'
+    # labels on a kind='epaper' telemetry push (never 'system', which is
+    # nice4iot-reserved) -- cache the latest push in the runtime sidecar
+    # for O(1) reads, same mechanism as nice4iot's own 'system' snapshot.
+    # See display/backend.py's _device_epaper_labels() and devicebinding/ui.py.
+    register_telemetry_cache_kind('epaper')
+
     # --- REST -----------------------------------------------------------
     router = build_extension_router(_paths_for_project)
     mount_extension_router(app, router)
@@ -102,7 +109,7 @@ def register(app: FastAPI) -> None:
     # see device_config_card()'s docstring in ui/cards.py).
     def _device_card(project_name: str, device_name: str):
         paths = _paths_for_project(project_name)
-        return device_config_card(paths, device_name, f'/api/ext/epaper/{project_name}/screens')
+        return device_config_card(paths, project_name, device_name, f'/api/ext/epaper/{project_name}/screens')
 
     register_device_card('settings', _device_card, title='E-Paper')
 

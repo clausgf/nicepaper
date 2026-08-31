@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.31.0 — 2026-08-31
+
+### Added
+
+- **Firmware-reported panel reconciliation** — esp32paper reports its active/
+  supported panel ids (`panel`/`panels`, matching `PanelTypeModel.panel_id`)
+  on a `kind='epaper'` telemetry push. `register()` now calls nice4iot's
+  `register_telemetry_cache_kind('epaper')` so the latest push is cached
+  O(1)-readable in the device runtime sidecar (needs nice4iot with
+  `app.extensions.register_telemetry_cache_kind`, unreleased as of this
+  writing). New `display/backend.py: device_epaper_labels()` reads it
+  ({} outside nice4iot, same degrade-to-empty pattern as `_device_runtime()`).
+  The device settings card (`devicebinding/ui.py`) shows a warning when the
+  selected panel type doesn't match what the firmware reports, or when none
+  is selected but the catalog has (or lacks) a matching entry — informational
+  only, nothing is changed automatically.
+
+### Changed
+
+- **`devicebinding.ui.device_config_card()` takes a new required
+  `project_name` parameter** (between `paths` and `device_name`) to read the
+  above. Both call sites (`extensions/epaper/__init__.py`,
+  `ui/standalone.py`) updated; standalone passes `'standalone'`, matching
+  the existing convention elsewhere in that module.
+- **`resources/panel_types.json` corrected to match esp32paper's current
+  panel ids** (`panel_id`, the manufacturer designation the firmware itself
+  reports): `waveshare_7in5b_v2` was `GDEW075Z08`, now `GDEY075Z08`;
+  `waveshare_7in3f` was `GDEY073D46` (colliding with `gooddisplay_7in3_acep`,
+  a distinct panel/driver), now its own `ACeP730`.
+
 ## 0.30.0 — 2026-08-31
 
 ### Added

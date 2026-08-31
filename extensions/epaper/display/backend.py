@@ -70,6 +70,17 @@ def _device_runtime(project_name: str, device_name: str):
         return None
 
 
+def device_epaper_labels(project_name: str, device_name: str) -> dict:
+    """Firmware-reported 'panel' (active) / 'panels' (compiled-in, comma-
+    separated) labels from esp32paper's kind='epaper' telemetry push,
+    cached in nice4iot's runtime sidecar via register_telemetry_cache_kind
+    ('epaper') in extensions/epaper/__init__.py. {} outside nice4iot/on
+    error, or if the device never sent one -- same degrade-to-empty
+    pattern as _device_runtime()."""
+    runtime = _device_runtime(project_name, device_name)
+    return getattr(runtime, 'kind_labels', {}).get('epaper', {}) if runtime else {}
+
+
 def _is_online(device) -> bool:
     last_seen = getattr(device, 'last_seen_at', None)
     if last_seen is None:

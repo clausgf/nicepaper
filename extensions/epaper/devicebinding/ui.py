@@ -10,12 +10,13 @@ from nicegui import context, ui
 
 from extensions.epaper.catalog.backend import get_panel_type, get_panel_types
 from extensions.epaper.devicebinding.backend import get_device_binding, set_device_binding
+from extensions.epaper.display.backend import device_epaper_labels
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.room.backend import list_rooms
 from extensions.epaper.screen.backend import screens_matching_panel_type, synthetic_roomcalendar_screens
 
 
-def device_config_card(paths: EpaperPaths, device_name: str, image_base_url: str) -> None:
+def device_config_card(paths: EpaperPaths, project_name: str, device_name: str, image_base_url: str) -> None:
     """
     'settings' device settings card content.
 
@@ -35,6 +36,13 @@ def device_config_card(paths: EpaperPaths, device_name: str, image_base_url: str
     simplified UI reads back as "the displays in a room" (see
     devicebinding.backend.devices_in_room), so a device is navigable from a room
     and vice versa.
+
+    Below the Panel type select, a hint compares it against what the
+    firmware itself last reported (device_epaper_labels()'s 'panel', keyed
+    to a catalog entry by PanelTypeModel.panel_id -- the manufacturer
+    designation, not this catalog's own vendor+size id) -- purely
+    informational, same as panel_type_id itself; nothing here overwrites
+    the operator's choice automatically.
     """
     # real screen files plus the auto-generated Room Calendar templates
     # (see screen/backend.py) -- both are valid ids a device can be bound to
@@ -42,8 +50,10 @@ def device_config_card(paths: EpaperPaths, device_name: str, image_base_url: str
                                *synthetic_roomcalendar_screens(paths)})
     # {id: label} so the select shows the room's label, not its surrogate id
     room_options = {r.id: r.room_label for r in list_rooms(paths)}
-    panel_type_options = {pt.id: pt.name for pt in get_panel_types(paths).values()}
+    panel_types = get_panel_types(paths)
+    panel_type_options = {pt.id: pt.name for pt in panel_types.values()}
     binding = get_device_binding(paths, device_name)
+    reported_panel = device_epaper_labels(project_name, device_name).get('panel', '')
 
     base_url = str(context.client.request.base_url).rstrip('/')
     image_url = f'{base_url}{image_base_url}/{device_name}/image.png'
@@ -91,6 +101,17 @@ def device_config_card(paths: EpaperPaths, device_name: str, image_base_url: str
         clearable=True,
         on_change=on_panel_type_change,
     ).classes('w-full').props('outlined dense')
+
+    if reported_panel:
+        selected_panel_type = get_panel_type(binding.panel_type_id, paths)
+        if selected_panel_type is not None and selected_panel_type.panel_id != reported_panel:
+            ui.label(f'Firmware reports panel "{reported_panel}", which does not match the '
+                     f'selected panel type ("{selected_panel_type.panel_id or "—"}").') \
+                .classes('text-caption text-negative')
+        elif selected_panel_type is None:
+            matches = sorted(pt.name for pt in panel_types.values() if pt.panel_id == reported_panel)
+            hint = f' Matches: {", ".join(matches)}.' if matches else ' No catalog entry for it yet.'
+            ui.label(f'Firmware reports panel "{reported_panel}".{hint}').classes('text-caption text-negative')
 
     screen_select = ui.select(
         screen_options_for(binding.panel_type_id),

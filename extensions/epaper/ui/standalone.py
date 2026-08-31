@@ -130,7 +130,7 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
     @ui.page('/device')
     def page_device():
         with frame('Device'):
-            device_config_card(paths, device_name='standalone', image_base_url=image_base_url)
+            device_config_card(paths, project_name='standalone', device_name='standalone', image_base_url=image_base_url)
 
     @ui.page('/rooms')
     def page_rooms():

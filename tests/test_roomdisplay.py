@@ -73,6 +73,25 @@ def test_display_rows_read_telemetry_and_alarms_from_runtime(tmp_path, monkeypat
     assert row.battery_voltage == 3.81
 
 
+def test_device_epaper_labels_outside_nice4iot(tmp_path):
+    # _device_runtime can't import app.* here -> None, degrades to {}
+    assert rd.device_epaper_labels("proj", "dev") == {}
+
+
+def test_device_epaper_labels_reads_kind_labels(monkeypatch):
+    monkeypatch.setattr(rd, "_device_runtime", lambda project, name:
+                        types.SimpleNamespace(kind_labels={"epaper": {"panel": "GDEW075T7",
+                                                                      "panels": "GDEW075T7,GDEP073E01"}}))
+    assert rd.device_epaper_labels("proj", "dev") == {"panel": "GDEW075T7",
+                                                       "panels": "GDEW075T7,GDEP073E01"}
+
+
+def test_device_epaper_labels_missing_kind_is_empty(monkeypatch):
+    monkeypatch.setattr(rd, "_device_runtime", lambda project, name:
+                        types.SimpleNamespace(kind_labels={}))
+    assert rd.device_epaper_labels("proj", "dev") == {}
+
+
 def test_display_rows_reads_active_and_provisioning_from_device(tmp_path, monkeypatch):
     paths = _paths(tmp_path)
     monkeypatch.setattr(rd, "_project_devices", _fake_devices(
