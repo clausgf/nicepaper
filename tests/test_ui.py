@@ -64,7 +64,7 @@ def test_every_widget_type_renders_its_form(tmp_path):
             f"{widget_type} rendered sections {headings}"
 
 
-def _new_widget_form(tmp_path, widget_type, *, screen=None, palette=None):
+def _new_widget_form(tmp_path, widget_type, *, palette=None):
     """render_widget_form() for a fresh widget of widget_type, returning the
     client's elements for inspection. Shared by the compact-appearance-field
     tests below."""
@@ -84,7 +84,7 @@ def _new_widget_form(tmp_path, widget_type, *, screen=None, palette=None):
     key = adapter.key_from_item(widget)
     with Client(page(f"/test-widget-appearance-{widget_type}"), request=None) as client:
         render_widget_form(widget, adapter, key, paths, lambda: None, lambda: None,
-                           screen=screen, palette=palette)
+                           palette=palette)
         elements = list(client.elements.values())
     return elements
 
@@ -117,7 +117,7 @@ def test_widget_appearance_extras_fall_back_without_a_palette(tmp_path):
     color fields fall back to a plain, unrestricted ui.color_input."""
     elements = _new_widget_form(tmp_path, "Text", palette=None)
     color_inputs = [e for e in elements if type(e).__name__ == "ColorInput"]
-    assert len(color_inputs) == 2, "expected one color_input per color field (primary, accent)"
+    assert len(color_inputs) == 2, "expected one color_input per color field (primary, background)"
 
 
 def test_image_widget_has_no_appearance_extras(tmp_path):
@@ -205,7 +205,7 @@ def test_global_config_card_renders_every_field():
         labels = {e._props.get("label") for e in client.elements.values()}
 
     # a field from each section, so a silently dropped group is noticed too
-    for expected in ("Locale", "Font name", "Color accent",
+    for expected in ("Locale", "Font name", "iCal retry min s",
                      "Weather error", "Update interval s"):
         assert expected in labels, f"{expected!r} missing from the global settings card"
 

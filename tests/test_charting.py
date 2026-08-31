@@ -150,6 +150,32 @@ def test_secondary_only_chart_renders_without_a_primary_series():
               for x in range(200, 300) for y in range(0, 14))
 
 
+def _has_pixel(image, color: tuple) -> bool:
+    w, h = image.size
+    return any(image.getpixel((x, y)) == color for x in range(w) for y in range(h))
+
+
+def test_primary_and_secondary_color_reach_their_own_series():
+    """primary_color/secondary_color (WeatherChartWidgetModel.
+    color_primary_series/color_secondary_series) must actually reach the
+    drawn bars/lines, not just ctx.color_primary regardless of what's
+    passed."""
+    values = [5, 10, 3, 8]
+    image = _render(
+        [ChartSeries(values, kind="bar", axis="primary"),
+         ChartSeries([1, 2, 1, 2], kind="line", axis="secondary")],
+        size=(300, 150), primary_color="#ff0000", secondary_color="#00ff00")
+    assert _has_pixel(image, (255, 0, 0)), "primary series must draw in primary_color"
+    assert _has_pixel(image, (0, 255, 0)), "secondary series must draw in secondary_color"
+
+
+def test_series_colors_default_to_ctx_color_primary():
+    values = [5, 10, 3, 8]
+    image = _render([ChartSeries(values, kind="bar", axis="primary")], size=(300, 150))
+    assert not _has_pixel(image, (255, 0, 0)) and not _has_pixel(image, (0, 255, 0)), \
+        "with no primary_color/secondary_color given, nothing should draw in an arbitrary color"
+
+
 def test_axis_title_swatch_reflects_its_series_line_style():
     """The style swatch next to an axis title (_draw_style_swatch) must
     match that series' own line_style -- solid/dashed/dotted must draw

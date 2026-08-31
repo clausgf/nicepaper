@@ -228,4 +228,5 @@ class WeatherChartWidget(_WeatherWidgetBase):
         charting.draw_chart(
             ctx, (0, 0), (w, h), series, font=self.font, labels=labels,
             primary_title=metric_title(self.config.primary_metric) if self.config.primary_metric else None,
-            secondary_title=metric_title(self.config.secondary_metric) if self.config.secondary_metric else None)
+            secondary_title=metric_title(self.config.secondary_metric) if self.config.secondary_metric else None,
+            primary_color=self.config.color_primary_series, secondary_color=self.config.color_secondary_series)

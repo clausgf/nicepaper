@@ -28,9 +28,7 @@ _TIME_FORMATS = ['HH:mm', 'HH:mm:ss', 'hh:mm a', 'h:mm a']
 
 _LAYOUT = [
     ['## General', COL, [ROW, 'locale', 'timezone'], [ROW, 'date_format', 'time_format']],
-    ['## Font & Colors', COL,
-     [ROW, 'font_name', 'font_size'],
-     [ROW, 'color_background', 'color_primary', 'color_accent']],
+    ['## Font', COL, [ROW, 'font_name', 'font_size']],
     ['## iCal (Room Calendar)', COL,
      'ical_error',
      [ROW, 'ical_retry_min_s', 'ical_retry_max_s'],
@@ -60,9 +58,6 @@ def _field_infos() -> dict:
         'roomcalendar_date_format_long': Field(widget_type='ui.select', options=_LONG_DATE_FORMATS, with_input=True),
         'roomcalendar_date_format_short': Field(widget_type='ui.select', options=_SHORT_DATE_FORMATS, with_input=True),
         'roomcalendar_time_format': Field(widget_type='ui.select', options=_TIME_FORMATS, with_input=True),
-        'color_background': Field(widget_type='ui.color_input'),
-        'color_primary': Field(widget_type='ui.color_input'),
-        'color_accent': Field(widget_type='ui.color_input'),
         # explicit labels: the humanized field names would all read
         # "Homeassistant ..." (one word, wrong spelling) and repeat the
         # section heading in every field

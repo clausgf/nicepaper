@@ -4,8 +4,6 @@
   "height": 480,
   "palette_id": "bwr",
   "color_background": "#ffffff",
-  "color_primary": "#000000",
-  "color_accent": "#ff0000",
   "update_schedule_id": "default",
   "widgets": [
     {
@@ -37,7 +35,8 @@
       "longitude": 13.405,
       "primary_metric": "temperature",
       "secondary_metric": "precipitation",
-      "forecast_hours": 24
+      "forecast_hours": 24,
+      "color_primary_series": "#ff0000"
     }
   ]
 }

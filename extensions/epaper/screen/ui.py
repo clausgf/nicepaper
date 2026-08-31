@@ -60,7 +60,7 @@ class _EditorState(TypedDict):
 # duplicated name raises ValueError naming its position.
 _SCREEN_LAYOUT = [
     ['## Panel', COL, 'panel_type_id', [ROW, 'width', 'height'], 'palette_id'],
-    ['## Colors', COL, [ROW, 'color_background', 'color_primary', 'color_accent']],
+    ['## Colors', COL, 'color_background'],
     ['## Schedule', COL, 'update_schedule_id'],
 ]
 
@@ -90,7 +90,7 @@ def _keep_current(options, current):
 # still match it for panel_type_id to stay trustworthy afterward (see
 # _diverges_from_panel_type(), used by on_field_change() to clear it once
 # the screen has been edited past what the preset actually describes).
-_PANEL_TYPE_FIELDS = ('width', 'height', 'palette_id', 'color_background', 'color_primary', 'color_accent')
+_PANEL_TYPE_FIELDS = ('width', 'height', 'palette_id', 'color_background')
 
 
 def _apply_panel_type(screen: ScreenModel, panel_type: PanelTypeModel) -> None:
@@ -283,11 +283,7 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
         field_infos = {
             'panel_type_id': Field(**panel_type_field_kwargs),
             'palette_id': Field(label='Palette', widget_type='ui.select', options=palette_options, clearable=True),
-            # all three colors clearable: an empty field falls back to the
-            # global setting, the same per-aspect override the fonts use
-            'color_background': Field(widget_type='ui.color_input', clearable=True),
-            'color_primary': Field(widget_type='ui.color_input', clearable=True),
-            'color_accent': Field(widget_type='ui.color_input', clearable=True),
+            'color_background': Field(widget_type='ui.color_input'),
             'update_schedule_id': Field(widget_type='ui.select', options=schedule_options, clearable=True),
         }
 
@@ -361,7 +357,7 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
 
             render_widget_form(widget, widgets_adapter, key, paths,
                                persist_screen, _refresh_editor_area,
-                               screen=screen, palette=get_palette(screen.palette_id, paths))
+                               palette=get_palette(screen.palette_id, paths))
 
     def _open_detail(key: str) -> None:
         state.update({'view': 'detail', 'key': key, 'direction': 'right'})

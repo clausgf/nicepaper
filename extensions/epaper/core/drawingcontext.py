@@ -66,21 +66,21 @@ icon_resource_manager = IconResourceManager(resource_paths.icon_path)
 class DrawingContext:
 
     def __init__(self, image, color_background: str, color_primary: str, font_model,
-                 color_accent: Optional[str] = None, paths=None,
-                 room: 'Optional[RoomModel]' = None, palette: 'Optional[Palette]' = None):
+                 paths=None, room: 'Optional[RoomModel]' = None, palette: 'Optional[Palette]' = None):
         self.img = image
         self.draw = ImageDraw.Draw(image)
         self.font_provider = font_resource_manager
         self.icon_provider = icon_resource_manager
+        # color_background/color_primary are re-pointed at the current
+        # widget's own fields before each draw() (Screen._create_image(),
+        # the same way origin is), so a widget's own colors need no
+        # plumbing of their own -- ctx.color_primary is simply always "the
+        # color to draw in right here". There is no ctx.color_accent: a
+        # widget that needs a second color (WeatherChart, HomeAssistant's
+        # gauge) reads it from its own config field instead, since only
+        # those two types need one at all.
         self.color_background = color_background
-        # color_primary/color_accent are the screen's colors when the
-        # context is built and are re-pointed at the current widget's
-        # overrides before each draw() (Screen._create_image(), the same
-        # way origin is), so a widget's own colors need no plumbing of
-        # their own -- ctx.color_primary is simply always "the color to
-        # draw in right here"
         self.color_primary = color_primary
-        self.color_accent = color_accent or color_primary
         self.font_model = font_model
         self.font = self.get_font(font_model[0], font_model[1])
         self.origin = (0,0)

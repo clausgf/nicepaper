@@ -174,6 +174,28 @@ def test_widget_resolved_font_falls_back_per_aspect():
     assert both.resolved_font(*default) == ("Ubuntu-Bold.ttf", 30)
 
 
+def test_widget_colors_are_concrete_with_no_fallback():
+    """color_primary/color_background are plain fields with a static default
+    (black ink on a white box) -- no Optional, no resolution against a
+    screen or global setting, unlike font_name/font_size above."""
+    widget = TextWidgetModel(position_x=0, position_y=0, text="x")
+    assert widget.color_primary == "#000000"
+    assert widget.color_background == "#ffffff"
+    assert widget.init_background is False
+
+    tinted = TextWidgetModel(position_x=0, position_y=0, text="x",
+                             color_primary="#123456", color_background="#abcdef")
+    assert (tinted.color_primary, tinted.color_background) == ("#123456", "#abcdef")
+
+
+def test_weather_chart_and_homeassistant_series_colors_default_to_black():
+    chart = WeatherChartWidgetModel(position_x=0, position_y=0, latitude=52.52, longitude=13.405)
+    assert (chart.color_primary_series, chart.color_secondary_series) == ("#000000", "#000000")
+
+    entity = HomeAssistantWidgetModel(position_x=0, position_y=0, entity_id="sensor.temp")
+    assert entity.color_fill == "#000000"
+
+
 def test_widget_alignment_pattern():
     base = {
         "widget_type": "Text",

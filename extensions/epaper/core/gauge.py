@@ -8,12 +8,11 @@ into noise the way an anti-aliased gauge image (or a screenshot of a
 browser-rendered gauge) would.
 
 Color follows the same convention as charting.py: the scale/outline/labels
-use ctx.color_primary (black, an exact member of every palette), the filled
-value uses ctx.color_accent (red by default, but a display preset for a
-black/white panel sets it to black). On a bw display the
-fill and the outline are the same color, so the *shape* has to carry the
-information: the empty part of the scale stays an outline, the filled part
-is solid.
+use ctx.color_primary, the filled value uses `draw_gauge`'s `fill_color`
+(sourced from HomeAssistantWidgetModel.color_fill, black by default,
+matching most panels). On a bw display the fill and the outline are the
+same color by default, so the *shape* has to carry the information: the
+empty part of the scale stays an outline, the filled part is solid.
 
 Text: callers pass their widget's configured font (`font`) for the labels
 plus an optional larger `value_font` for the readout; every measurement is
@@ -149,7 +148,8 @@ def _draw_bar_gauge(ctx, x0: int, y0: int, w: int, h: int, *, fraction: Optional
 def draw_gauge(ctx, position: Tuple[int, int], size: Tuple[int, int], *,
                value: Optional[float], min_value: float, max_value: float,
                style: GaugeStyle = 'arc', font=None, value_font=None,
-               label: Optional[str] = None, value_text: Optional[str] = None) -> None:
+               label: Optional[str] = None, value_text: Optional[str] = None,
+               fill_color: Optional[str] = None) -> None:
     """
     Draw `value` on the [min_value, max_value] scale into the given box.
 
@@ -159,6 +159,8 @@ def draw_gauge(ctx, position: Tuple[int, int], size: Tuple[int, int], *,
     also what gets drawn when `value` is None (a non-numeric state like
     'unavailable': the scale is then drawn empty rather than as 0).
     `label` is drawn below the arc / next to the bar readout; None omits it.
+    `fill_color` is the filled part of the scale (see HomeAssistantWidgetModel.
+    color_fill); falls back to ctx.color_primary if not given.
     """
     x0, y0 = position
     w, h = size
@@ -166,7 +168,7 @@ def draw_gauge(ctx, position: Tuple[int, int], size: Tuple[int, int], *,
         return
     font = font or ctx.font
     value_font = value_font or font
-    accent = ctx.color_accent or ctx.color_primary
+    accent = fill_color or ctx.color_primary
     fraction = None if value is None else value_fraction(value, min_value, max_value)
     if value_text is None:
         value_text = _format_scale_value(value) if value is not None else ''

@@ -9,7 +9,8 @@
   `Weather*`), color models, display bindings, and update schedules, with the
   ready-to-copy `examples/` files.
 - **[Configuration](configuration.md)** — process-level settings (`Config` /
-  environment variables): locale, timezone, update intervals, accent color.
+  environment variables): locale, timezone, update intervals, project
+  settings (Home Assistant, default weather location).
 - **[Simplified UI](simplified-ui.md)** — the room-focused, e-paper-only
   extension page: its page frame, two-level sidebar navigation, and sections
   (Rooms, Displays, Booking systems).

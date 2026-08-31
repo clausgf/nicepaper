@@ -87,6 +87,9 @@ def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
             ui.button(icon='open_in_new').props('dense flat size=sm') \
                 .tooltip(f'Dedicate Epaper UI {open_url}').on_click(lambda: context.client.open(open_url))
         ui.label(f'{num_screens} screen(s), {num_schedules} schedule(s)').classes('text-caption text-grey-7')
+        for feed in ical_statuses:
+            _datasource_row(feed, now, ('event_available', 'event_busy'),
+                            f'iCal {feed.id}', feed.events is not None)
         for status in weather_statuses:
             _datasource_row(status, now, ('cloud_done', 'cloud_off'),
                             f'Weather {status.latitude:.2f},{status.longitude:.2f}',
@@ -94,9 +97,6 @@ def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
         for entity in homeassistant_statuses:
             _datasource_row(entity, now, ('sensors', 'sensors_off'),
                             f'HA {entity.entity_id}', entity.state is not None)
-        for feed in ical_statuses:
-            _datasource_row(feed, now, ('event_available', 'event_busy'),
-                            f'iCal {feed.id}', feed.events is not None)
         for image in image_statuses:
             _datasource_row(image, now, ('image', 'broken_image'),
                             f'Image {image.source or image.key}', image.last_update is not None)

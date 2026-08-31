@@ -46,13 +46,7 @@ class PanelTypeModel(BaseModel):
     height: int = Field(description="Panel height in pixels.")
     palette_id: str = Field(default="bw", description="Id of the palette this panel can show (see palettes.json).")
 
-    # a preset exists to give a combination that actually works on that
-    # panel, so it carries colors rather than leaving them to the global
-    # defaults: on a bw panel a red accent would quantize to black anyway,
-    # and saying so explicitly beats letting it happen by accident
-    color_background: Optional[str] = Field(default=None, description="Screen background color to apply. Empty leaves the global default.")
-    color_primary: Optional[str] = Field(default=None, description="Default text/drawing color to apply. Empty leaves the global default.")
-    color_accent: Optional[str] = Field(default=None, description="Accent color to apply. Empty leaves the global default.")
+    color_background: str = Field(default="#ffffff", description="Screen background color to apply.")
 
     vendor: Optional[str] = Field(default=None, description="Who sells the panel, e.g. 'Waveshare'.")
     panel_id: Optional[str] = Field(

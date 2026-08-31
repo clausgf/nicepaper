@@ -109,16 +109,6 @@ uv run python -m extensions.epaper.wire.huffman_de
 
 ## Roadmap / open points
 
-### Per-widget colors in the editor
-
-`WidgetModel` has `color_primary`/`color_accent`, and rendering honours them
-(each falling back to the screen's color independently, like `font_name`/
-`font_size`), but the widget detail form doesn't render them yet — they can
-only be set in the screen JSON. Adding them means naming both fields in the
-*Appearance* section of `ui/widget_types.py`'s `_layout()`, next to the font
-row, plus a `ui.color_input` entry each in its `_field_infos()` — once, for
-every widget type.
-
 ### Getting the panel id to the firmware
 
 A panel type carries the panel's own manufacturer designation (`panel_id`,

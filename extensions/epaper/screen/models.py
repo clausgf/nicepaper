@@ -60,12 +60,12 @@ class WidgetModel(BaseModel):
     position_y: int = Field(description="Vertical position in pixels from the top edge.")
     size_width: Optional[int] = Field(default=None, description="Widget width in pixels. Width and height only take effect together; leave both empty (or 0) for automatic sizing.")
     size_height: Optional[int] = Field(default=None, description="Widget height in pixels. Width and height only take effect together; leave both empty (or 0) for automatic sizing.")
-    init_background: Optional[bool] = True
+    init_background: Optional[bool] = Field(default=False, description="Fill this widget's box with color_background before drawing. Off draws directly onto whatever is already there (the screen background, or an earlier, overlapping widget) -- e.g. a highlighted panel behind the widget's content needs this on.")
     clipping: Optional[bool] = Field(default=False, description="Cut off content that overflows this widget's size instead of letting it bleed into neighboring widgets.")
     font_name: Optional[str] = Field(default=None, description="Font file name. Leave empty to use the screen's default font name (independent of font size).")
     font_size: Optional[int] = Field(default=None, description="Font size in points. 0 or empty to use the screen's default font size (independent of font name).")
-    color_primary: Optional[str] = Field(default=None, description="Text/drawing color for this widget. Leave empty to use the screen's primary color.")
-    color_accent: Optional[str] = Field(default=None, description="Accent color for this widget (chart series, gauge fill). Leave empty to use the screen's accent color.")
+    color_primary: str = Field(default="#000000", description="Text/drawing color for this widget.")
+    color_background: str = Field(default="#ffffff", description="Background color for this widget's box. Only visible when init_background is set.")
 
     # widgets that give a lone width/height a meaning (Image: scale to that
     # dimension, keep aspect ratio) set this True to opt out of the
@@ -115,12 +115,6 @@ class WidgetModel(BaseModel):
         cleared ui.number round-trips as) takes the default, so a widget can
         override just the name, just the size, or both."""
         return (self.font_name or default_name, self.font_size or default_size)
-
-    def resolved_colors(self, default_primary: str, default_accent: str) -> Tuple[str, str]:
-        """This widget's (primary, accent) color, each falling back to the
-        screen's independently -- the same per-aspect override as
-        resolved_font()."""
-        return (self.color_primary or default_primary, self.color_accent or default_accent)
 
 
 class TextWidgetModel(WidgetModel):
@@ -195,11 +189,11 @@ WeatherMetric = Literal["temperature", "precipitation", "humidity", "pressure", 
 
 class WeatherChartWidgetModel(WeatherWidgetModel):
     """One configurable chart instead of separate precipitation/temperature
-    widgets: primary_metric (solid, accent-colored, its own left Y axis) and
-    secondary_metric (dashed, black, its own right Y axis) -- e.g.
-    temperature + precipitation combined in one chart. Either can be empty;
-    an empty one simply draws no trace, so a single-metric chart is just
-    the other one left unset. Which metric renders as bars vs. a line is
+    widgets: primary_metric (its own left Y axis, color_primary_series) and
+    secondary_metric (dashed, its own right Y axis, color_secondary_series) --
+    e.g. temperature + precipitation combined in one chart. Either can be
+    empty; an empty one simply draws no trace, so a single-metric chart is
+    just the other one left unset. Which metric renders as bars vs. a line is
     fixed per metric (only precipitation is bursty/mostly-zero enough to
     read better as bars), not separately configurable."""
     widget_type: Literal["WeatherChart"] = "WeatherChart"
@@ -209,6 +203,8 @@ class WeatherChartWidgetModel(WeatherWidgetModel):
     line_style: Literal["solid", "dashed", "dotted"] = Field(
         default="solid", description="Line style of primary_metric, if it renders as a line "
                                     "(bar metrics ignore this). secondary_metric always stays dashed.")
+    color_primary_series: str = Field(default="#000000", description="Color of primary_metric's trace and axis title. On a bwr/c7/e6 panel, set this to the panel's accent (e.g. red) to highlight it.")
+    color_secondary_series: str = Field(default="#000000", description="Color of secondary_metric's trace and axis title. Distinguished from the primary trace by its dashed line style even when this is the same color.")
 
 ImageSourceType = Literal["url", "file"]
 
@@ -260,6 +256,7 @@ class HomeAssistantWidgetModel(WidgetModel):
     gauge_style: GaugeStyle = Field(default="arc", description="Gauge shape: a 240° dial ('arc') or a horizontal bar. Only used when display is 'gauge'.")
     min_value: float = Field(default=0.0, description="Start of the gauge scale. Values below it are clamped.")
     max_value: float = Field(default=100.0, description="End of the gauge scale. Values above it are clamped.")
+    color_fill: str = Field(default="#000000", description="Fill color of the filled part of the gauge. Only used when display is 'gauge'.")
 
 
 # discriminated union: widget_type selects the concrete model and a
@@ -305,9 +302,7 @@ class ScreenModel(BaseModel):
             "RGB image (the display then has to quantize it itself)."
         ),
     )
-    color_background: Optional[str] = Field(default=None, description="Background color of this screen. Leave empty to use the global default.")
-    color_primary: Optional[str] = Field(default=None, description="Default text/drawing color of this screen. Leave empty to use the global default.")
-    color_accent: Optional[str] = Field(default=None, description="Accent color of this screen (chart series, gauge fill). Leave empty to use the global default.")
+    color_background: str = Field(default="#ffffff", description="Background color of this screen's canvas.")
     update_schedule_id: Optional[str] = Field(
         default="default",
         description=(
@@ -322,13 +317,3 @@ class ScreenModel(BaseModel):
     @property
     def size(self) -> Tuple[int, int]:
         return (self.width, self.height)
-
-    def resolved_colors(self, default_background: str, default_primary: str,
-                        default_accent: str) -> Tuple[str, str, str]:
-        """This screen's (background, primary, accent) color, each falling
-        back to the global default independently -- the same per-aspect
-        override WidgetModel.resolved_colors() then applies once more on
-        top, for a single widget."""
-        return (self.color_background or default_background,
-                self.color_primary or default_primary,
-                self.color_accent or default_accent)

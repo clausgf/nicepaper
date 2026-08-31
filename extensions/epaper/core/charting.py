@@ -10,18 +10,18 @@ typical plotting library produces) would dither into visual noise once
 quantized down to a 2-3 color palette, so this helper snaps every
 coordinate to an int and never anti-aliases.
 
-Color handling: axes/gridlines/labels use ctx.color_primary (black, an
-exact member of every configured palette). The primary-axis series uses
-ctx.color_accent (pure red by default) -- the only accent bwr has besides
-black/white, and an exact palette member of c7/e6 too, so it never dithers
-on those; a display preset for a black/white panel sets the accent to
-black instead, since red could only quantize there. The secondary-axis
-series is drawn dashed in ctx.color_primary instead of a second color,
-since bw/bwr can't tell two accent colors apart -- line style stays the
-primary signal, color is a bonus on richer palettes. Each axis title (see
-draw_chart's primary_title/secondary_title) carries a short style swatch of
-its own series (_draw_style_swatch) for the same reason: a bwr panel can't
-lean on color alone to tell the two traces apart in the legend either.
+Color handling: axes/gridlines/labels always use ctx.color_primary. Each
+series draws in its own primary_color/secondary_color (draw_chart params,
+sourced from WeatherChartWidgetModel.color_primary_series/
+color_secondary_series -- both default to black, matching the widget's own
+color_primary, since most panels only have black/white anyway; a bwr/c7/e6
+panel can set either to the panel's accent by hand). The secondary-axis
+series stays dashed regardless of color, since a bw/bwr panel can't tell
+two colors apart at all -- line style is the signal that survives every
+palette, color is a bonus on richer ones. Each axis title (see draw_chart's
+primary_title/secondary_title) carries a short style swatch of its own
+series (_draw_style_swatch) for the same reason: a bwr panel can't lean on
+color alone to tell the two traces apart in the legend either.
 
 Y-axis gridlines/labels use "nice" round numbers (Heckbert's classic
 algorithm), not raw data min/max, so labels read as round figures instead
@@ -158,7 +158,8 @@ def _format_axis_value(value: float) -> str:
 
 def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Sequence[ChartSeries], *,
                font=None, labels: Optional[Sequence[str]] = None,
-               primary_title: Optional[str] = None, secondary_title: Optional[str] = None) -> None:
+               primary_title: Optional[str] = None, secondary_title: Optional[str] = None,
+               primary_color: Optional[str] = None, secondary_color: Optional[str] = None) -> None:
     """
     Draws all `series` (each 'bar' or 'line', on the 'primary' or
     'secondary' Y axis) sharing one X axis (data point index). Either axis
@@ -178,6 +179,10 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
     two traces stay distinguishable without relying on color. They consume
     a strip at the top (so the plot gets a little shorter, not narrower),
     keeping the numeric axis labels on the sides where they are.
+
+    `primary_color`/`secondary_color` are each series' own color (its trace,
+    axis title and swatch); both fall back to ctx.color_primary if not
+    given. Axes/gridlines/labels always use ctx.color_primary regardless.
     """
     x0, y0 = position
     w, h = size
@@ -186,6 +191,8 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
         return
 
     label_font = font or ctx.font
+    primary_color = primary_color or ctx.color_primary
+    secondary_color = secondary_color or ctx.color_primary
 
     def axis_range(axis: Axis) -> tuple[float, float, float]:
         axis_series = [s for s in series if s.axis == axis]
@@ -289,11 +296,10 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
             ctx.draw_text((int(right_x), int(box_y)), size=(right_margin - label_gap, row_h),
                           text=secondary_labels[i], alignment=align_r, font=label_font)
 
-    accent = ctx.color_accent or ctx.color_primary
     bar_gap = 2
     for s in series:
         is_primary = s.axis == 'primary'
-        color = accent if is_primary else ctx.color_primary
+        color = primary_color if is_primary else secondary_color
         if s.kind == 'bar':
             zero_y = to_y(0, s.axis)
             for i, v in enumerate(s.values):
@@ -313,11 +319,11 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
         ctx.draw_text((int(px - 20), int(plot_y0 + plot_h + 2)), size=(40, label_h), text=labels[i],
                       alignment='ct', font=label_font)
 
-    # axis titles in the reserved top strip: primary left-aligned (accent,
-    # matching its series), secondary right-aligned. Each gets half the
-    # width with an ellipsis so long titles can't overlap in the middle. A
-    # small style swatch sits inside that same strip, right next to the
-    # text it labels (no extra height reserved) -- see _draw_style_swatch.
+    # axis titles in the reserved top strip: primary left-aligned, secondary
+    # right-aligned, each in its own series' color. Each gets half the width
+    # with an ellipsis so long titles can't overlap in the middle. A small
+    # style swatch sits inside that same strip, right next to the text it
+    # labels (no extra height reserved) -- see _draw_style_swatch.
     if title_h:
         half = w // 2
         swatch_span = _STYLE_SWATCH_W + _STYLE_SWATCH_GAP
@@ -326,13 +332,13 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
         if primary_title:
             text_x = x0 + swatch_span if primary_series else x0
             ctx.draw_text((text_x, y0), size=(half - (swatch_span if primary_series else 0), title_h),
-                          text=primary_title, alignment='lt', font=label_font, color=accent, ellipsis='...')
+                          text=primary_title, alignment='lt', font=label_font, color=primary_color, ellipsis='...')
             if primary_series:
-                _draw_style_swatch(ctx, x0, y0, title_h, primary_series.kind, primary_series.line_style, accent)
+                _draw_style_swatch(ctx, x0, y0, title_h, primary_series.kind, primary_series.line_style, primary_color)
         if secondary_title:
             text_w = half - (swatch_span if secondary_series else 0)
             ctx.draw_text((x0 + w - half, y0), size=(text_w, title_h), text=secondary_title,
-                          alignment='rt', font=label_font, ellipsis='...')
+                          alignment='rt', font=label_font, color=secondary_color, ellipsis='...')
             if secondary_series:
                 _draw_style_swatch(ctx, x0 + w - _STYLE_SWATCH_W, y0, title_h,
-                                   secondary_series.kind, secondary_series.line_style, ctx.color_primary)
+                                   secondary_series.kind, secondary_series.line_style, secondary_color)

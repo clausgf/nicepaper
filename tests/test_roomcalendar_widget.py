@@ -53,7 +53,7 @@ def _render(paths, room, palette=None) -> Image.Image:
     widget = RoomCalendarWidget("0", config)
     image = Image.new("RGB", (800, 480), color=(255, 255, 255))
     ctx = DrawingContext(image, "#ffffff", "#000000", ("Ubuntu-Regular.ttf", 14),
-                         color_accent="#000000", paths=paths, room=room, palette=palette)
+                         paths=paths, room=room, palette=palette)
     asyncio.run(widget.draw(ctx))
     return image
 

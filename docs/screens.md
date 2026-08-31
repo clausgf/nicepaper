@@ -59,8 +59,9 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   Gauges are drawn locally with Pillow (`extensions/epaper/core/gauge.py`), not
   fetched from Home Assistant: HA's own gauge cards are browser-rendered and
   can't be retrieved as an image, and a screenshot would dither on an e-paper
-  palette. The filled part is solid (in the accent color), the rest stays an
-  outline, so a gauge is still readable on a pure black/white display. An image
+  palette. The filled part is solid (`color_fill`, black by default), the rest
+  stays an outline, so a gauge is still readable on a pure black/white display
+  even without setting `color_fill` to anything else. An image
   Home Assistant *does* serve — a camera snapshot, an add-on-rendered dashboard —
   can be shown with the `Image` widget instead. The URL and token are project
   settings, the update interval/backoff/error text are global settings (see
@@ -83,7 +84,9 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   (`solid`/`dashed`/`dotted`) sets `primary_metric`'s line style when it
   renders as a line (bar metrics, e.g. `precipitation`, ignore it);
   `secondary_metric` always stays dashed, to keep it visually distinct from
-  the primary series even on a black/white/red panel. Each axis is titled
+  the primary series even where `color_primary_series`/`color_secondary_series`
+  (see [Displays, palettes and colors](#displays-palettes-and-colors)) are the
+  same color, which they are by default. Each axis is titled
   with its metric name and unit above the plot (primary left, secondary
   right) — e.g. `Temperatur (°C)`, `Wind (km/h)` — in the `LOCALE`
   language, with a short sample of that trace's own style (line or bar)
@@ -108,7 +111,11 @@ A screen's `widgets` list is made of typed widgets, each positioned with
 ### Clipping and debug outline
 
 A widget's `clipping` flag cuts off content that overflows its box instead of
-letting it bleed into neighboring widgets.
+letting it bleed into neighboring widgets. A clipped widget still composites
+onto whatever is already drawn underneath it (an earlier, overlapping widget,
+or the screen background) — `init_background: false` ("transparent", the
+widget draws nothing behind its own content) works the same whether or not
+`clipping` is set.
 
 For laying out a screen, the **outline toggle** in the preview's toolbar shows
 every widget's box at once. It renders on demand and is never cached, so the
@@ -130,7 +137,7 @@ settings — not something a display asks for per request:
 | `Name` | the screen's file name and its id in `/api/screen/<id>/…`; editing it renames the file (editor only, not a field of the screen JSON) |
 | `width`, `height` | canvas size in pixels |
 | `palette_id` | id of the palette the image is quantized to before it is served (`bw`, `bwr`, `bwy`, `gs4`, `c7`, `e6`). Empty serves the unquantized RGB image. |
-| `color_background`, `color_primary`, `color_accent` | this screen's colors; each empty field falls back to the global default (see [Configuration](configuration.md)) |
+| `color_background` | this screen's canvas background color (defaults to white) |
 | `panel_type_id` | which panel type was applied last, see below |
 
 `/api/screen/<id>/image.png` serves the image quantized to that screen's
@@ -160,21 +167,31 @@ they stay correct at whatever width the browser scales the image to. The frame
 stops growing at 48rem — a preview is for judging the layout, not for reading
 it at 1:1 — and scales down freely below that.
 
-Individual widgets can override `color_primary`/`color_accent` for
-themselves, each aspect falling back to the screen's color independently —
-the same per-aspect override `font_name`/`font_size` use. In the widget
-editor's Appearance section, both show as small, compact controls rather
-than full-width fields: a font icon opens a dialog with a Font Name/Size
-picker, and a color swatch opens a menu of the screen's palette colors
-(`palette_id`, above) — so only colors the panel can actually display are
-offered — with a "Default" entry to clear the override. A screen with no
-palette set falls back to a plain, unrestricted color picker instead.
+Every widget has its own `color_primary` (text/drawing color, default black)
+and `color_background` (default white, only drawn when `init_background` is
+set — see [Clipping and debug outline](#clipping-and-debug-outline)); neither
+falls back to the screen or to a global setting, they're plain fields edited
+directly on the widget. In the widget editor's Appearance section both show as
+small, compact controls rather than full-width fields: a font icon opens a
+dialog with a Font Name/Size picker (font *does* still fall back to the
+screen/global default, unlike colors), and a color swatch opens a menu of
+the screen's palette colors (`palette_id`, above) — so only colors the panel
+can actually display are offered. A screen with no palette set falls back to
+a plain, unrestricted color picker instead.
+
+A few widget types offer a second color of their own, named for what it's
+actually for rather than a generic "accent": `WeatherChart`'s
+`color_primary_series`/`color_secondary_series` (its two traces) and
+`HomeAssistant`'s `color_fill` (the gauge's filled part, only shown for
+`display: "gauge"`). All default to black, like `color_primary` — on a
+`bwr`/`c7`/`e6` panel, set one to the panel's accent (e.g. red) by hand to
+highlight it; most panels only have black/white anyway, so a distinct
+second color is the exception, not the default.
 
 ### Panel types
 
-Instead of typing size, palette and colors by hand, pick a panel from the
-**Panel type** list. It fills in all of the above — for a black/white panel it
-also sets the accent to black, since red could only quantize to black there anyway.
+Instead of typing size and palette by hand, pick a panel from the **Panel
+type** list. It fills in size, palette and `color_background`.
 
 Adding a screen offers the panel-type list up front, since size and palette are
 the first decisions about a screen and every widget position depends on them.
@@ -182,16 +199,16 @@ The same list is in the screen's settings, so the panel can be picked or
 changed later just as well.
 
 **No preset** is the default, and a listed choice in both — for a panel that
-isn't in the catalog, or when you'd rather set size, palette and colors
+isn't in the catalog, or when you'd rather set size, palette and background
 yourself. A new screen then starts blank at 800×480 (no palette, so it is
-served as RGB, and the global colors apply); picking it for an existing screen
-only drops the `panel_type_id` record and leaves its values untouched.
+served as RGB); picking it for an existing screen only drops the
+`panel_type_id` record and leaves its values untouched.
 
 A preset is a **template, applied once**: after that the screen's own fields are
 what renders, they stay editable, and a preset that is later changed or removed
 never alters an existing screen. `panel_type_id` only records which one was used
 — and stops recording it the moment you edit past it: editing width, height,
-palette or any of the three colors directly clears `panel_type_id` back to
+palette or the background color directly clears `panel_type_id` back to
 "No preset", since the screen no longer actually matches what that panel type
 describes.
 
@@ -212,7 +229,7 @@ aren't shipped and correct one that is:
   {
     "id": "my-panel", "name": "My 5.83\" panel", "vendor": "Waveshare",
     "width": 648, "height": 480, "palette_id": "bw",
-    "color_background": "#ffffff", "color_primary": "#000000", "color_accent": "#000000",
+    "color_background": "#ffffff",
     "panel_id": "GDEW0583T7"
   }
 ]

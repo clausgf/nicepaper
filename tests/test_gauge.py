@@ -1,20 +1,19 @@
 from PIL import Image
 
-from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.core.drawingcontext import DrawingContext
 from extensions.epaper.core.gauge import draw_gauge, value_fraction
 
 
-# the gauge fill takes its color from the drawing context (a screen or a
-# widget can override it), so the context under test has to carry one
-_ACCENT = tuple(int(app_config.color_accent.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
+# the gauge fill takes its color from draw_gauge's fill_color (a widget's own
+# color_fill), so the render under test has to pass one
+_ACCENT_HEX = "#ff0000"
+_ACCENT = (255, 0, 0)
 
 
 def _render(size=(160, 130), **kwargs):
     image = Image.new("RGB", size, color=(255, 255, 255))
-    ctx = DrawingContext(image, (255, 255, 255), (0, 0, 0), ("Ubuntu-Regular.ttf", 14),
-                         color_accent=_ACCENT)
-    draw_gauge(ctx, (0, 0), size, **kwargs)
+    ctx = DrawingContext(image, (255, 255, 255), (0, 0, 0), ("Ubuntu-Regular.ttf", 14))
+    draw_gauge(ctx, (0, 0), size, fill_color=_ACCENT_HEX, **kwargs)
     return image
 
 

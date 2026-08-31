@@ -1,5 +1,73 @@
 # Changelog
 
+## 0.28.0 — 2026-08-31
+
+### Changed
+
+- Project Dashboard card: the iCal health row now lists before Weather
+  (was Weather, HA, iCal, Image). No behavior change.
+- **Screen/widget colors no longer go through a Widget → Screen → Global
+  lookup chain — every screen and widget now carries its own concrete color
+  fields with plain defaults, edited directly in the editor.**
+  - `GlobalConfig` loses `color_background`/`color_primary`/`color_accent`
+    entirely (nothing reads them any more).
+  - `ScreenModel` keeps only `color_background: str = "#ffffff"` (the
+    canvas's actual fill color, not a fallback tier) and drops
+    `color_primary`/`color_accent`/`resolved_colors()`.
+  - `WidgetModel` gains `color_background: str = "#ffffff"` (drawn behind
+    the widget's own content, only when `init_background` is set) and turns
+    `color_primary` into a concrete `str = "#000000"` (was `Optional[str] =
+    None`, falling back to the screen). `resolved_colors()` is gone;
+    `resolved_font()` is untouched, font still falls back to the
+    screen/global default. `init_background`'s default flips from `True` to
+    `False` ("transparent" — draws nothing behind the widget, letting the
+    screen background or an earlier, overlapping widget show through), since
+    there is no longer a screen-color fallback to make `True` a safe
+    default on a non-white screen.
+  - **`color_accent` is gone from the base `WidgetModel`** -- it only ever
+    meant something to two widget types, so each now names its own color
+    for what it's actually for: `WeatherChartWidgetModel.color_primary_series`/
+    `color_secondary_series` (both default black, like most panels already
+    render), and `HomeAssistantWidgetModel.color_fill` (the gauge's filled
+    part, black by default). `core.charting.draw_chart()` and
+    `core.gauge.draw_gauge()` take the corresponding colors as explicit
+    `primary_color`/`secondary_color`/`fill_color` parameters instead of
+    reading `ctx.color_accent`, which `DrawingContext` no longer has at all.
+  - `PanelTypeModel` (the panel-type preset catalog) loses `color_primary`/
+    `color_accent` for the same reason -- only `color_background` remains,
+    applied to `ScreenModel.color_background`. A preset no longer sets a
+    panel-appropriate accent automatically (e.g. red for `bwr`/`c7`/`e6`,
+    black for `bw`); set `color_primary_series`/`color_secondary_series`/
+    `color_fill` by hand on the few widgets that use them.
+  - The compact color swatch in the widget editor (`ui/compact_fields.py`'s
+    `compact_color_field()`) drops the "resolved value vs. inherited
+    default, with a menu entry to clear back to it" machinery that only
+    made sense for optional, fallback-based fields -- it now just shows and
+    sets a concrete color.
+  - **Breaking, no migration**: an old screen/panel-type file with
+    `color_accent` (screen or panel-type level) loads fine (pydantic
+    ignores unknown fields) but the value is gone -- re-set the equivalent
+    per-widget field (`color_primary_series`/`color_secondary_series`/
+    `color_fill`) by hand where it mattered. A widget's `color_primary:
+    null` (meaning "inherit") now resolves to the field's own default
+    (`#000000`) instead of the screen's color the next time the screen is
+    read, since resolution no longer happens at all.
+
+### Fixed
+
+- **A clipped widget (`clipping: true`) with `init_background: false` now
+  correctly shows what was already drawn underneath it** instead of always
+  resetting to a flat background fill. `screen/backend.py`'s clipping path
+  built its isolated sub-image with `Image.new(color=background)`
+  regardless of the widget's own `init_background`, discarding whatever an
+  earlier, overlapping widget had drawn at that position; a non-clipped
+  widget never had this problem since it draws straight onto the shared,
+  already-populated canvas. The sub-image is now seeded from a crop of the
+  actual current canvas at the widget's box (padding any part that falls
+  outside the canvas with the background color, since `Image.crop()` pads
+  out-of-bounds pixels with black). `init_background: true` is unaffected
+  and still resets the box as before.
+
 ## 0.27.0 — 2026-08-31
 
 ### Added

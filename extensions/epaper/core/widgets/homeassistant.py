@@ -80,7 +80,8 @@ class HomeAssistantWidget(Widget):
                 value=numeric_value(value),
                 min_value=self.config.min_value, max_value=self.config.max_value,
                 style=self.config.gauge_style, font=self.font, value_font=self._value_font(ctx),
-                label=label if self.config.show_label else None, value_text=value_text)
+                label=label if self.config.show_label else None, value_text=value_text,
+                fill_color=self.config.color_fill)
         else:
             text = f"{label} {value_text}" if self.config.show_label else value_text
             ctx.draw_text((0, 0), size=(w, h), text=text, alignment=self.config.alignment,

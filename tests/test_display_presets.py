@@ -15,7 +15,6 @@ from fastapi.testclient import TestClient
 
 from extensions.epaper.catalog import backend as catalog
 from extensions.epaper.api.endpoints import build_standalone_router
-from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.screen.backend import get_screen_by_id
 from extensions.epaper.screen.models import ScreenModel
 from extensions.epaper.paths import EpaperPaths
@@ -52,38 +51,25 @@ def client(paths) -> TestClient:
 
 # --- colors ---------------------------------------------------------------
 
-def test_screen_colors_fall_back_to_the_global_defaults(paths):
+def test_screen_color_background_defaults_to_white(paths):
     _write_screen(paths, "plain")
     screen = asyncio.run(get_screen_by_id(paths, "plain"))
-    assert screen.colors == (app_config.color_background, app_config.color_primary,
-                             app_config.color_accent)
+    assert screen.config.color_background == "#ffffff"
 
 
-def test_screen_colors_override_the_global_defaults_per_aspect(paths):
-    _write_screen(paths, "tinted", color_primary="#123456")
-    screen = asyncio.run(get_screen_by_id(paths, "tinted"))
-    background, primary, accent = screen.colors
-    assert primary == "#123456"
-    assert background == app_config.color_background, "an unset color keeps the global default"
-    assert accent == app_config.color_accent
-
-
-def test_widget_colors_override_the_screen_colors(paths):
-    """A bw display preset sets the screen accent to black; a single widget
-    can still ask for something else, which is what the per-widget fields
-    are for."""
-    _write_screen(paths, "mixed", color_primary="#111111", color_accent="#222222", widgets=[
+def test_widget_colors_are_independent_concrete_fields(paths):
+    """Widget colors used to fall back to the screen's; now every widget
+    carries its own concrete fields with plain defaults, edited directly --
+    no resolution, no relation to the screen's own color_background."""
+    _write_screen(paths, "mixed", color_background="#123456", widgets=[
         {"widget_type": "Text", "position_x": 0, "position_y": 0, "text": "a"},
         {"widget_type": "Text", "position_x": 0, "position_y": 20, "text": "b",
          "color_primary": "#00ff00"},
     ])
     screen = asyncio.run(get_screen_by_id(paths, "mixed"))
-    _, primary, accent = screen.colors
-
     plain, overridden = screen.config.widgets
-    assert plain.resolved_colors(primary, accent) == ("#111111", "#222222")
-    assert overridden.resolved_colors(primary, accent) == ("#00ff00", "#222222"), \
-        "an unset aspect still falls back to the screen's color"
+    assert plain.color_primary == "#000000", "default, unrelated to the screen's own color"
+    assert overridden.color_primary == "#00ff00"
 
 
 def test_screen_background_color_is_actually_drawn(paths):
@@ -104,16 +90,7 @@ def test_applying_a_preset_fills_every_field_it_owns():
     assert (screen.width, screen.height) == (display.width, display.height)
     assert screen.panel_type_id == display.id
     assert screen.palette_id == display.palette_id
-    assert screen.resolved_colors("x", "y", "z") == (
-        display.color_background, display.color_primary, display.color_accent)
-
-
-def test_black_and_white_presets_do_not_ask_for_a_red_accent():
-    """Red would only quantize to black on a bw panel, so those presets say
-    black rather than letting it happen by accident."""
-    for display in catalog.get_panel_types().values():
-        if display.palette_id == "bw" and display.color_accent:
-            assert display.color_accent == display.color_primary, display.id
+    assert screen.color_background == display.color_background
 
 
 def test_diverges_from_panel_type_only_after_a_preset_field_actually_changes():
@@ -199,7 +176,7 @@ def test_picking_a_display_applies_the_preset(tmp_path, monkeypatch):
     assert written["panel_type_id"] == display.id
     assert (written["width"], written["height"]) == (display.width, display.height)
     assert written["palette_id"] == display.palette_id
-    assert written["color_accent"] == display.color_accent
+    assert written["color_background"] == display.color_background
 
 
 @pytest.mark.filterwarnings(

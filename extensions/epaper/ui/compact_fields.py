@@ -18,29 +18,22 @@ from nicegui import ui
 _SWATCH_SIZE = 'width:28px;height:28px;min-width:28px'
 
 
-def compact_color_field(*, label: str, value: Optional[str], resolved: str, default: str,
-                        palette_hex: Optional[List[str]],
-                        on_change: Callable[[Optional[str]], None]) -> None:
-    """A small color swatch; click opens a menu of `palette_hex` (the
-    current panel's palette -- so only colors it can actually display are
-    offered) plus a "Default" entry that clears the field. `resolved` is
-    the color in effect right now (== `value`, or the screen/global
-    `default` when `value` is None) -- shown on the swatch itself, so an
-    inherited color is never blank. `default` is the screen/global
-    fallback *regardless* of `value` -- what "Default" in the menu both
-    shows and reverts to, which must stay distinct from `resolved` or
-    clearing an already-overridden field would appear to be a no-op.
+def compact_color_field(*, label: str, value: str, palette_hex: Optional[List[str]],
+                        on_change: Callable[[str], None]) -> None:
+    """A small color swatch showing `value`; click opens a menu of
+    `palette_hex` (the current panel's palette -- so only colors it can
+    actually display are offered) to pick from.
 
     Falls back to a plain, unrestricted ui.color_input when palette_hex is
     None (no palette selected for this screen -- nothing to restrict to)."""
     if palette_hex is None:
-        ui.color_input(label, value=value, on_change=lambda e: on_change(e.value or None)) \
-            .props('outlined dense clearable').classes('w-full')
+        ui.color_input(label, value=value, on_change=lambda e: on_change(e.value or value)) \
+            .props('outlined dense').classes('w-full')
         return
 
     with ui.button().props('flat dense unelevated').style(
-            f'{_SWATCH_SIZE};background-color:{resolved};border:1px solid #8888') \
-            .tooltip(f'{label}: {value or f"default ({resolved})"}'):
+            f'{_SWATCH_SIZE};background-color:{value};border:1px solid #8888') \
+            .tooltip(f'{label}: {value}'):
         with ui.menu().props('anchor="bottom left" self="top left"'):
             with ui.row().classes('items-center gap-1 p-2 flex-wrap').style('max-width:220px'):
                 for hex_color in palette_hex:
@@ -48,8 +41,6 @@ def compact_color_field(*, label: str, value: Optional[str], resolved: str, defa
                         f'width:24px;height:24px;min-width:24px;background-color:{hex_color};'
                         'border:1px solid #8888') \
                         .tooltip(hex_color).on_click(lambda _, c=hex_color: on_change(c))
-            ui.separator()
-            ui.menu_item(f'Default ({default})', on_click=lambda: on_change(None))
 
 
 def compact_font_field(*, resolved_name: str, resolved_size: int,

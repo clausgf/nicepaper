@@ -61,6 +61,47 @@ def test_a_normal_render_has_no_outline(tmp_path):
     assert all(image.getpixel((x, 10)) == (255, 255, 255) for x in range(10, 50))
 
 
+def test_clipped_transparent_widget_shows_whats_drawn_underneath(tmp_path):
+    """A clipped widget's sub-image used to always start from a flat
+    background fill (Image.new), discarding whatever an earlier, overlapping
+    widget already drew there -- so init_background=False ("transparent")
+    only worked for non-clipped widgets. Now the sub-image is seeded from
+    the actual current canvas, so a clipped widget that draws nothing new
+    (empty text, init_background=False) leaves the earlier widget's content
+    intact underneath it."""
+    paths = EpaperPaths(root=tmp_path)
+    paths.ensure_dirs()
+    box = {"position_x": 10, "position_y": 10, "size_width": 180, "size_height": 80}
+    widgets = [
+        {"widget_type": "Text", **box, "text": "XXXXXXXX", "font_size": 40, "init_background": False},
+        {"widget_type": "Text", **box, "text": "", "font_size": 40,
+         "init_background": False, "clipping": True},
+    ]
+    config = ScreenModel(width=200, height=100, widgets=widgets)
+    screen = Screen("clip-test", config, datetime.datetime.now(datetime.timezone.utc), paths)
+    _next_update, image = asyncio.run(screen._create_image())
+    assert _has_dark_pixel(image, 10, 10, 190, 90)
+
+
+def test_clipped_init_background_still_resets_to_background(tmp_path):
+    """Unlike the transparent case above, init_background=True on a clipped
+    widget must still reset its box to the background color, same as
+    before -- the crop-based seeding only matters when nothing repaints
+    the box."""
+    paths = EpaperPaths(root=tmp_path)
+    paths.ensure_dirs()
+    box = {"position_x": 10, "position_y": 10, "size_width": 180, "size_height": 80}
+    widgets = [
+        {"widget_type": "Text", **box, "text": "XXXXXXXX", "font_size": 40, "init_background": False},
+        {"widget_type": "Text", **box, "text": "", "font_size": 40,
+         "init_background": True, "clipping": True},
+    ]
+    config = ScreenModel(width=200, height=100, widgets=widgets)
+    screen = Screen("clip-test", config, datetime.datetime.now(datetime.timezone.utc), paths)
+    _next_update, image = asyncio.run(screen._create_image())
+    assert not _has_dark_pixel(image, 10, 10, 190, 90)
+
+
 def test_outline_toggle_marks_an_auto_sized_widget(tmp_path):
     """A widget without a size has no box to outline, so its anchor --
     the position_x/position_y being edited -- gets a corner mark."""

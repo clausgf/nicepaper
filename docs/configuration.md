@@ -4,7 +4,7 @@
 
 `GlobalConfig` (`extensions/epaper/global_config/models.py`) holds the settings
 that are the same for every screen *and every project* — defaults, locale,
-color models, the default font/colors, update intervals, ... It is a plain
+the default font, update intervals, ... It is a plain
 pydantic model that is **JSON-persisted** to `data/global_config.json` and
 edited through the global settings card in the UI, *not* an
 environment-variable/`BaseSettings` config. At startup `load_global_config()`
@@ -20,8 +20,8 @@ or by editing `data/global_config.json` directly. Settings that instead
 identify one *site* — the Home Assistant instance, the default weather
 location — live in `ProjectConfig` instead (see
 [Project settings](#project-settings) below), since different projects can be
-different sites. Per-screen/per-widget settings (size, position, per-widget
-font, ...) live in the screen/schedule JSON files instead (see
+different sites. Per-screen/per-widget settings (size, position, colors,
+per-widget font, ...) live in the screen/schedule JSON files instead (see
 [Screens, widgets & schedules](screens.md)); `GlobalConfig` is only for things
 that don't vary per screen or per project.
 
@@ -64,12 +64,6 @@ same settings with humanized labels):
   `Image` widget load. Only matters for a source that fails: a `cache_once`
   image that already loaded once is never retried, and a `reload_each_time`
   image is retried on every render only while it keeps working.
-- `color_background`, `color_primary`, `color_accent` — the **default**
-  background, text/drawing and accent color (accent defaults to red, the only
-  accent the `bwr` palette has; it is used for the chart widgets' primary
-  series and the gauge fill). A screen, and within a screen a single widget,
-  can override each of them — see
-  [Screens, widgets & schedules](screens.md#displays-palettes-and-colors).
 
 ## Project settings
 

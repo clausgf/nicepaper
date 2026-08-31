@@ -150,17 +150,6 @@ class Screen:
 
 
     @property
-    def colors(self) -> tuple[str, str, str]:
-        """This screen's (background, primary, accent) color: its own
-        fields where set, the global defaults otherwise. The global accent
-        is itself optional (clearable in the settings), so a screen/widget
-        that also doesn't set one falls back to the global primary -- some
-        concrete color has to reach the renderer either way."""
-        return self.config.resolved_colors(
-            app_config.color_background, app_config.color_primary,
-            app_config.color_accent or app_config.color_primary)
-
-    @property
     def palette(self) -> Optional[Palette]:
         """The palette this screen is served in, or None to serve it
         unquantized. An unknown id resolves to None (logged in
@@ -193,12 +182,14 @@ class Screen:
 
 
     async def _create_image(self, force_bounding_box: bool = False):
-        # Draw widgets
-        background, primary, accent = self.colors
+        # Draw widgets. background is the screen's own canvas fill; the
+        # initial color_primary here is only DrawingContext's placeholder
+        # until the loop below points it at each widget's own -- nothing
+        # draws with it before then.
+        background = self.config.color_background
         image = Image.new(mode="RGB", size=self.config.size, color=background)
-        ctx = DrawingContext(image, background, primary, app_config.font,
-                             color_accent=accent, paths=self.paths,
-                             room=self.room, palette=self.palette)
+        ctx = DrawingContext(image, background, "#000000", app_config.font,
+                             paths=self.paths, room=self.room, palette=self.palette)
         ctx.force_bounding_box = force_bounding_box
 
         next_update = None
@@ -206,26 +197,36 @@ class Screen:
             next_update = self.update_schedule.get_next_update()
 
         for w in self.widgets:
-            # point the context at this widget's colors before drawing it,
-            # the same way origin is set below -- each aspect falls back to
-            # the screen's own color independently
-            w_primary, w_accent = w.config.resolved_colors(primary, accent)
             if w.config.clipping and w.config.size:
                 # draw onto an isolated, size-bounded sub-image instead of
                 # the shared canvas: PIL silently drops anything a widget
                 # draws beyond an image's own bounds, so this clips
-                # overflow instead of letting it bleed into neighbors
+                # overflow instead of letting it bleed into neighbors.
+                # Seeded from the *current* canvas content at this box
+                # (not a flat background fill) so init_background=False
+                # (transparent) shows whatever an earlier widget already
+                # drew underneath, same as the non-clipped path below --
+                # Image.crop() pads any part of the box that falls outside
+                # the canvas with black, not the screen's own background, so
+                # that part is pasted in separately rather than cropped raw.
                 sub_image = Image.new(mode="RGB", size=w.config.size, color=background)
-                sub_ctx = DrawingContext(sub_image, background, w_primary, app_config.font,
-                                         color_accent=w_accent, paths=self.paths,
+                px, py = w.config.position
+                sw, sh = w.config.size
+                src_x0, src_y0 = max(px, 0), max(py, 0)
+                src_x1, src_y1 = min(px + sw, image.width), min(py + sh, image.height)
+                if src_x1 > src_x0 and src_y1 > src_y0:
+                    sub_image.paste(image.crop((src_x0, src_y0, src_x1, src_y1)),
+                                    (src_x0 - px, src_y0 - py))
+                sub_ctx = DrawingContext(sub_image, w.config.color_background, w.config.color_primary,
+                                         app_config.font, paths=self.paths,
                                          room=self.room, palette=self.palette)
                 sub_ctx.force_bounding_box = force_bounding_box
                 widget_update = await w.draw(sub_ctx)
                 image.paste(sub_image, w.config.position)
             else:
                 ctx.origin = w.config.position
-                ctx.color_primary = w_primary
-                ctx.color_accent = w_accent
+                ctx.color_primary = w.config.color_primary
+                ctx.color_background = w.config.color_background
                 widget_update = await w.draw(ctx)
             if widget_update:
                 if next_update is None or widget_update < next_update:
@@ -295,8 +296,6 @@ def synthetic_roomcalendar_screens(paths: EpaperPaths) -> dict[str, ScreenModel]
             width=panel_type.width, height=panel_type.height,
             palette_id=panel_type.palette_id,
             color_background=panel_type.color_background,
-            color_primary=panel_type.color_primary,
-            color_accent=panel_type.color_accent,
             widgets=[widget],
         )
     return {_synthetic_roomcalendar_id(w, h, p): screen for (w, h, p), screen in seen.items()}

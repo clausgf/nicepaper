@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Tuple
 from pydantic import BaseModel, Field
 
 
@@ -17,8 +17,7 @@ class GlobalConfig(BaseModel):
     position/size/font on WidgetModel taught the same lesson already:
     niceview can't render a Tuple field (falls back to a plain ui.input
     bound to a raw string -- wrong type). `font` is flattened into
-    font_name/font_size. Colors as hex color string (ok with PIL and
-    ui.color_input.
+    font_name/font_size.
 
     The palette catalog (epaper_color_models) used to live here too and
     has moved to a package resource -- see catalog/models.py: this file
@@ -26,8 +25,13 @@ class GlobalConfig(BaseModel):
     kept here freezes at whatever an installation wrote once and never
     picks up entries added in a later release.
 
-    The three colors below stay: they are the *defaults*, applied where a
-    screen (and, within a screen, a widget) doesn't set its own.
+    Screen/widget colors used to live here too (as the bottom of a
+    Widget -> Screen -> Global lookup chain), but don't any more: every
+    screen and widget now carries its own concrete color fields with plain
+    defaults, edited directly where it's used, instead of being resolved
+    through three levels of "leave empty to inherit". See
+    ScreenModel.color_background and WidgetModel.color_primary/
+    color_background (screen/models.py).
     """
     ical_error: str = "Error fetching calendar data"
     ical_retry_min_s: int = Field(default=60, description="Backoff after a failed iCal fetch starts at this many seconds and doubles per consecutive failure.")
@@ -73,23 +77,6 @@ class GlobalConfig(BaseModel):
 
     font_name: str = Field(default="Ubuntu-Regular.ttf", description="Default font file name for widgets without their own font.")
     font_size: int = Field(default=16, description="Default font size for widgets without their own font.")
-
-    # required, unlike color_accent below: there's no "or fallback" for
-    # these two anywhere they're used (Image.new(color=...) etc.), so an
-    # emptied field must be rejected by niceview's own required-field
-    # validation rather than silently breaking every render
-    color_background: str = Field(default="#ffffff", description="Screen background color.")
-    color_primary: str = Field(default="#000000", description="Default text/drawing color.")
-    color_accent: Optional[str] = Field(
-        default="#ff0000",
-        description=(
-            "Accent color for the chart widgets' primary series and the "
-            "gauge fill. Red is the only accent the bwr palette has besides "
-            "black/white, and an exact member of c7/e6 too. A screen or a "
-            "widget can override it -- a display preset for a black/white "
-            "panel does, since red would only quantize to black there."
-        ),
-    )
 
     @property
     def font(self) -> Tuple[str, int]:
