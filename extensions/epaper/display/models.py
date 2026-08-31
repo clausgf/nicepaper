@@ -29,6 +29,25 @@ class RoomDisplayRow(BaseModel):
             niceview.Field(label='Screen', table_sortable=True, table_filterable=True)
         ] = ''
 
+    panel_type_id: Annotated[Optional[str],
+            Field(description="Id of this device's actual panel (catalog/panel_types.json), "
+                              "restricting the Screen choices to matching resolution/palette. "
+                              "Empty = no restriction."),
+            niceview.Field(label='Panel type', table_sortable=True, table_filterable=True)
+        ] = None
+
+    reported_panel: Annotated[str,
+            Field(description="Firmware-reported active panel id (esp32paper's kind='epaper' "
+                              "telemetry, matching a catalog entry's panel_id). Empty if never "
+                              "reported."),
+            niceview.Field(label='Reported panel', editable=False, table_sortable=True)
+        ] = ''
+
+    reported_panels: Annotated[str,
+            Field(description="Firmware-reported compiled-in panel ids, comma-separated."),
+            niceview.Field(label='Supported panels', editable=False)
+        ] = ''
+
     room_label: Annotated[str,
             Field(description="Compact label of the display's room ('number (name)'), "
                               "empty if it isn't bound to one -- see RoomModel.room_label."),

@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.32.1 — 2026-08-31
+
+### Added
+
+- **Panel type reconciliation reaches the simplified UI** — the Displays
+  detail (both `display/simplified_ui.py`'s project-wide list and
+  `room/simplified_ui.py`'s per-room list) now has an editable Panel type
+  select and the same firmware-mismatch hint the nice4iot cards show,
+  instead of only restricting the Screen choices with no way to see or set
+  the panel type itself. Changing it live-refreshes the Screen options.
+  `RoomDisplayRow` gained `panel_type_id` (now the second editable field
+  alongside `screen_id`), `reported_panel`/`reported_panels` (read-only,
+  from telemetry). `panel_mismatch_hint()` moved from `devicebinding/ui.py`
+  (renamed from `_panel_mismatch_hint`) to `display/backend.py` so both the
+  nice4iot cards and the simplified UI can share it without a UI-to-UI
+  import.
+
+### Changed
+
+- **`RoomDisplaysAdapter.update()` also persists `panel_type_id`**
+  (previously only `screen_id`) -- safe because the adapter always receives
+  the full row (read, then edited, then saved), never a partially
+  reconstructed one.
+
+## 0.32.0 — 2026-08-31
+
+### Added
+
+- **Device dashboard card** — a new `register_device_card('dashboard', ...)`
+  card on nice4iot's device Dashboard tab, styled like its built-in Device
+  status card's "System" snapshot section. Shows esp32paper's latest
+  `kind='epaper'` telemetry push (`display/backend.py: device_epaper_telemetry()`,
+  a new (metrics, labels, reported_at) accessor generalizing
+  `device_epaper_labels()`): panel, supported panels, image status (colored
+  negative when not 200/304), and its age. Also shows the same panel-type
+  mismatch hint the Settings card has (`devicebinding/ui.py`'s
+  `panel_mismatch_hint()`, factored out of `device_config_card()` so both
+  cards share it).
+
 ## 0.31.0 — 2026-08-31
 
 ### Added

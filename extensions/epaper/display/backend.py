@@ -70,15 +70,51 @@ def _device_runtime(project_name: str, device_name: str):
         return None
 
 
-def device_epaper_labels(project_name: str, device_name: str) -> dict:
-    """Firmware-reported 'panel' (active) / 'panels' (compiled-in, comma-
-    separated) labels from esp32paper's kind='epaper' telemetry push,
-    cached in nice4iot's runtime sidecar via register_telemetry_cache_kind
-    ('epaper') in extensions/epaper/__init__.py. {} outside nice4iot/on
-    error, or if the device never sent one -- same degrade-to-empty
-    pattern as _device_runtime()."""
+def device_epaper_telemetry(project_name: str, device_name: str
+                            ) -> tuple[dict, dict, Optional[datetime.datetime]]:
+    """(metrics, labels, reported_at) from esp32paper's latest kind='epaper'
+    telemetry push -- numerics (image_status, ...) and strings (panel,
+    panels, ...), cached in nice4iot's runtime sidecar via
+    register_telemetry_cache_kind('epaper') in extensions/epaper/__init__.py.
+    ({}, {}, None) outside nice4iot/on error, or if the device never sent
+    one -- same degrade-to-empty pattern as _device_runtime()."""
     runtime = _device_runtime(project_name, device_name)
-    return getattr(runtime, 'kind_labels', {}).get('epaper', {}) if runtime else {}
+    if runtime is None:
+        return {}, {}, None
+    metrics = getattr(runtime, 'kind_metrics', {}).get('epaper', {})
+    labels = getattr(runtime, 'kind_labels', {}).get('epaper', {})
+    reported_at = getattr(runtime, 'kind_reported_at', {}).get('epaper')
+    return metrics, labels, reported_at
+
+
+def device_epaper_labels(project_name: str, device_name: str) -> dict:
+    """Just the 'panel'/'panels' labels half of device_epaper_telemetry(),
+    for callers that don't need the numerics/timestamp too."""
+    return device_epaper_telemetry(project_name, device_name)[1]
+
+
+def panel_mismatch_hint(paths: EpaperPaths, panel_types: dict, panel_type_id: Optional[str],
+                        reported_panel: str) -> Optional[str]:
+    """Text warning when `reported_panel` (esp32paper's active-panel telemetry
+    label) doesn't line up with panel_type_id's catalog entry (`panel_types`,
+    catalog.backend.get_panel_types()'s return value), or None when there's
+    nothing to flag (no report yet, or it matches). Shared by every place
+    that shows a device's panel type: nice4iot's Settings/Dashboard cards
+    (devicebinding/ui.py) and the simplified UI's Displays detail
+    (display/simplified_ui.py, room/simplified_ui.py)."""
+    from extensions.epaper.catalog.backend import get_panel_type
+
+    if not reported_panel:
+        return None
+    selected_panel_type = get_panel_type(panel_type_id, paths)
+    if selected_panel_type is not None:
+        if selected_panel_type.panel_id == reported_panel:
+            return None
+        return (f'Firmware reports panel "{reported_panel}", which does not match the '
+                f'selected panel type ("{selected_panel_type.panel_id or "—"}").')
+    matches = sorted(pt.name for pt in panel_types.values() if pt.panel_id == reported_panel)
+    hint = f' Matches: {", ".join(matches)}.' if matches else ' No catalog entry for it yet.'
+    return f'Firmware reports panel "{reported_panel}".{hint}'
 
 
 def _is_online(device) -> bool:
@@ -104,9 +140,13 @@ def display_rows(paths: EpaperPaths, project_name: str,
         runtime = _device_runtime(project_name, device.name)
         rssi = getattr(runtime, 'rssi', None)
         battery_voltage = getattr(runtime, 'battery_voltage', None)
+        epaper_labels = getattr(runtime, 'kind_labels', {}).get('epaper', {})
         rows.append(RoomDisplayRow(
             device_name=device.name,
             screen_id=(binding.screen_id if binding else None) or '',
+            panel_type_id=binding.panel_type_id if binding else None,
+            reported_panel=epaper_labels.get('panel', ''),
+            reported_panels=epaper_labels.get('panels', ''),
             room_label=(room.room_label if room else None) or '',
             building=(room.building if room else None) or '',
             floor=(room.floor if room else None) or '',
@@ -192,8 +232,14 @@ class RoomDisplaysAdapter:
         raise KeyError(key)
 
     def update(self, item: RoomDisplayRow) -> RoomDisplayRow:
-        # only screen_id is editable; '' clears the assignment
-        set_device_binding(self._paths, item.device_name, screen_id=item.screen_id or None)
+        # screen_id/panel_type_id are the only editable fields; '' clears an
+        # assignment (screen_id/panel_type_id both persisted here even though
+        # the simplified UI currently writes panel_type_id through a plain
+        # ui.select with its own on_change instead of this generic path -- see
+        # display/simplified_ui.py, room/simplified_ui.py -- so a screen_id-only
+        # ModelForm autosave doesn't accidentally clear an already-set panel type)
+        set_device_binding(self._paths, item.device_name, screen_id=item.screen_id or None,
+                           panel_type_id=item.panel_type_id or None)
         return item
 
     def delete(self, key: str) -> None:

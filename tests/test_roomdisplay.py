@@ -73,6 +73,22 @@ def test_display_rows_read_telemetry_and_alarms_from_runtime(tmp_path, monkeypat
     assert row.battery_voltage == 3.81
 
 
+def test_display_rows_read_panel_type_and_reported_panel(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    set_device_binding(paths, "d", panel_type_id="waveshare_7in5_v2")
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(
+        types.SimpleNamespace(name="d", last_seen_at=NOW),
+    ))
+    monkeypatch.setattr(rd, "_device_runtime", lambda project, name:
+                        types.SimpleNamespace(kind_labels={"epaper": {"panel": "GDEW075T7",
+                                                                      "panels": "GDEW075T7,GDEP073E01"}}))
+
+    row = rd.display_rows(paths, "proj")[0]
+    assert row.panel_type_id == "waveshare_7in5_v2"
+    assert row.reported_panel == "GDEW075T7"
+    assert row.reported_panels == "GDEW075T7,GDEP073E01"
+
+
 def test_device_epaper_labels_outside_nice4iot(tmp_path):
     # _device_runtime can't import app.* here -> None, degrades to {}
     assert rd.device_epaper_labels("proj", "dev") == {}
@@ -90,6 +106,102 @@ def test_device_epaper_labels_missing_kind_is_empty(monkeypatch):
     monkeypatch.setattr(rd, "_device_runtime", lambda project, name:
                         types.SimpleNamespace(kind_labels={}))
     assert rd.device_epaper_labels("proj", "dev") == {}
+
+
+def test_device_epaper_telemetry_outside_nice4iot(tmp_path):
+    assert rd.device_epaper_telemetry("proj", "dev") == ({}, {}, None)
+
+
+def test_device_epaper_telemetry_reads_metrics_labels_and_timestamp(monkeypatch):
+    monkeypatch.setattr(rd, "_device_runtime", lambda project, name:
+                        types.SimpleNamespace(
+                            kind_metrics={"epaper": {"image_status": 200.0}},
+                            kind_labels={"epaper": {"panel": "GDEW075T7"}},
+                            kind_reported_at={"epaper": NOW}))
+    metrics, labels, reported_at = rd.device_epaper_telemetry("proj", "dev")
+    assert metrics == {"image_status": 200.0}
+    assert labels == {"panel": "GDEW075T7"}
+    assert reported_at == NOW
+
+
+# ---------------------------------------------------------------------------
+# panel_mismatch_hint
+# ---------------------------------------------------------------------------
+
+def _panel_types(tmp_path):
+    from extensions.epaper.catalog.backend import get_panel_types
+    return get_panel_types(_paths(tmp_path))
+
+
+def test_panel_mismatch_hint_no_report_is_none(tmp_path):
+    panel_types = _panel_types(tmp_path)
+    assert rd.panel_mismatch_hint(_paths(tmp_path), panel_types, "waveshare_7in5_v2", "") is None
+
+
+def test_panel_mismatch_hint_matching_selection_is_none(tmp_path):
+    paths = _paths(tmp_path)
+    panel_types = _panel_types(tmp_path)
+    assert rd.panel_mismatch_hint(paths, panel_types, "waveshare_7in5_v2", "GDEW075T7") is None
+
+
+def test_panel_mismatch_hint_mismatched_selection_warns(tmp_path):
+    paths = _paths(tmp_path)
+    panel_types = _panel_types(tmp_path)
+    hint = rd.panel_mismatch_hint(paths, panel_types, "waveshare_7in5_v2", "GDEP073E01")
+    assert hint is not None
+    assert "GDEP073E01" in hint and "GDEW075T7" in hint
+
+
+def test_panel_mismatch_hint_unselected_with_catalog_match(tmp_path):
+    paths = _paths(tmp_path)
+    panel_types = _panel_types(tmp_path)
+    hint = rd.panel_mismatch_hint(paths, panel_types, None, "GDEW075T7")
+    assert hint is not None
+    assert "Matches:" in hint
+
+
+def test_panel_mismatch_hint_unselected_without_catalog_match(tmp_path):
+    paths = _paths(tmp_path)
+    panel_types = _panel_types(tmp_path)
+    hint = rd.panel_mismatch_hint(paths, panel_types, None, "SOME-UNKNOWN-PANEL")
+    assert hint is not None
+    assert "No catalog entry" in hint
+
+
+# ---------------------------------------------------------------------------
+# RoomDisplaysAdapter.update() persists panel_type_id
+# ---------------------------------------------------------------------------
+
+def test_adapter_update_persists_panel_type_id(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(
+        types.SimpleNamespace(name="d", last_seen_at=NOW),
+    ))
+    adapter = rd.RoomDisplaysAdapter(paths, "proj")
+    item = adapter.read("d")
+    item.panel_type_id = "waveshare_7in5_v2"
+    adapter.update(item)
+
+    assert get_device_binding(paths, "d").panel_type_id == "waveshare_7in5_v2"
+
+
+def test_adapter_update_screen_id_preserves_panel_type_id(tmp_path, monkeypatch):
+    """A screen_id-only ModelForm autosave must not wipe an already-set
+    panel_type_id (adapter.update() receives the full row, not just the
+    changed field -- see RoomDisplaysAdapter.update()'s comment)."""
+    paths = _paths(tmp_path)
+    set_device_binding(paths, "d", panel_type_id="waveshare_7in5_v2")
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(
+        types.SimpleNamespace(name="d", last_seen_at=NOW),
+    ))
+    adapter = rd.RoomDisplaysAdapter(paths, "proj")
+    item = adapter.read("d")
+    item.screen_id = "some-screen"
+    adapter.update(item)
+
+    binding = get_device_binding(paths, "d")
+    assert binding.screen_id == "some-screen"
+    assert binding.panel_type_id == "waveshare_7in5_v2"
 
 
 def test_display_rows_reads_active_and_provisioning_from_device(tmp_path, monkeypatch):

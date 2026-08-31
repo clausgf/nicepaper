@@ -38,7 +38,7 @@ def register(app: FastAPI) -> None:
     from extensions.epaper.project_config.ui import project_config_fields
     from extensions.epaper.bookingsystem.ui import booking_systems_wrapper
     from extensions.epaper.room.ui import rooms_wrapper
-    from extensions.epaper.devicebinding.ui import device_config_card
+    from extensions.epaper.devicebinding.ui import device_config_card, device_dashboard_card
     from extensions.epaper.ui.cards import dashboard_card
     from extensions.epaper.schedule.ui import schedules_wrapper
     from extensions.epaper.screen.ui import screens_wrapper
@@ -112,6 +112,16 @@ def register(app: FastAPI) -> None:
         return device_config_card(paths, project_name, device_name, f'/api/ext/epaper/{project_name}/screens')
 
     register_device_card('settings', _device_card, title='E-Paper')
+
+    # --- Device dashboard card -------------------------------------------
+    # esp32paper's latest kind='epaper' telemetry push (panel, panels,
+    # image_status, ...) plus the same panel-type mismatch hint the
+    # Settings card shows -- see devicebinding/ui.py's device_dashboard_card().
+    def _device_dashboard_card(project_name: str, device_name: str):
+        paths = _paths_for_project(project_name)
+        return device_dashboard_card(paths, project_name, device_name)
+
+    register_device_card('dashboard', _device_dashboard_card)
 
     # --- Project tabs --------------------------------------------------
     # Tabs on nice4iot's own project page (its tab bar, not ours), each

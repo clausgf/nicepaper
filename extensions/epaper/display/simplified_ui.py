@@ -1,8 +1,9 @@
 """
 Displays: the simplified UI's flat, project-wide list of e-paper displays,
-so nice4iot devices can be assigned a screen without opening nice4iot's own
-device UI -- meant for people who shouldn't need to. A display is a nice4iot
-device (see extensions/epaper/__init__.py, register_device_card).
+so nice4iot devices can be assigned a screen and panel type without opening
+nice4iot's own device UI -- meant for people who shouldn't need to. A
+display is a nice4iot device (see extensions/epaper/__init__.py,
+register_device_card).
 
 `render_displays()` builds a niceview DrillDownWrapper over
 `RoomDisplaysAdapter(paths, project_name)` (no room_id -- every device in the
@@ -10,9 +11,9 @@ project, bound to a room or not): list, Add and Delete are all disabled here
 (a display is a nice4iot device we neither create nor unbind from this
 project-wide view; room assignment happens in the room's own Displays tab,
 room/simplified_ui.py, which has its own drill-down list instead of this
-one). Only Screen is editable; everything else is read-only, hand-rendered
-rather than through ModelForm/ModelList, so it can show icons (status, RSSI,
-battery) instead of plain field values.
+one). Screen and Panel type are the only editable fields; everything else is
+read-only, hand-rendered rather than through ModelForm/ModelList, so it can
+show icons (status, RSSI, battery) instead of plain field values.
 """
 import datetime
 from typing import Optional
@@ -21,7 +22,11 @@ import niceview
 from nicegui import ui
 from niceview import CollectionAdapter, DrillDownWrapper, ModelForm
 
-from extensions.epaper.display.backend import RoomDisplaysAdapter, available_screen_ids
+from extensions.epaper.catalog.backend import get_panel_types
+from extensions.epaper.devicebinding.backend import set_device_binding
+from extensions.epaper.display.backend import (
+    RoomDisplaysAdapter, available_screen_ids, panel_mismatch_hint,
+)
 from extensions.epaper.display.models import RoomDisplayRow
 from extensions.epaper.display.preview import render_device_preview
 from extensions.epaper.paths import EpaperPaths
@@ -75,46 +80,74 @@ def _render_list_item(key: str, item: RoomDisplayRow, select) -> None:
 def _render_detail(paths: EpaperPaths, image_base_url: str,
                    adapter: CollectionAdapter[RoomDisplayRow], key: str) -> None:
     """Device name is the wrapper's own title row (item_title_field), shown
-    in both list and detail already, so it isn't repeated here."""
-    item = adapter.read(key)
-    # filtered to the device's own panel type if it has one set (devicebinding/ui.py)
-    screen_ids = available_screen_ids(paths, item.device_name)
+    in both list and detail already, so it isn't repeated here.
 
-    with ui.column().classes('w-full gap-3'):
-        with ui.row().classes('items-center gap-1 text-grey-7'):
-            ui.icon('meeting_room').props('size=xs')
-            if item.room_label:
-                ui.label(f'{item.room_label} — {item.building or "—"} / {item.floor or "—"} / {item.room_number}')
-            else:
-                ui.label('Not assigned to a room')
+    Wrapped in a local @ui.refreshable (like room/simplified_ui.py's
+    _display_detail) so changing Panel type can redraw the whole body against
+    the freshly saved binding -- the Screen options (available_screen_ids())
+    and the mismatch hint both depend on it."""
+    panel_types = get_panel_types(paths)
+    panel_type_options = {pt.id: pt.name for pt in panel_types.values()}
 
-        # an empty options list crashes the select widget, so fall back to a
-        # plain hinted field rather than passing one.
-        screen_field = (niceview.Field(widget_type='ui.select', options=screen_ids, clearable=True)
-                       if screen_ids else niceview.Field(hint='No screens yet — add one in Templates'))
-        ModelForm.from_adapter(RoomDisplayRow, adapter, key, autosave=True,
-                               include=['screen_id'],
-                               field_infos={'screen_id': screen_field},
-                               ).render()
+    @ui.refreshable
+    def _body(current_key: str) -> None:
+        item = adapter.read(current_key)
+        # filtered to the device's own panel type if it has one set
+        screen_ids = available_screen_ids(paths, item.device_name)
 
-        render_device_preview(paths, item.device_name, item.screen_id, image_base_url)
+        def on_panel_type_change(e) -> None:
+            set_device_binding(paths, item.device_name, panel_type_id=e.value)
+            _body.refresh(current_key)
 
-        with ui.row().classes('items-center gap-2'):
-            _status_icon(item).props('size=sm')
-            now = datetime.datetime.now(datetime.timezone.utc)
-            ui.label(f'{_STATUS_LABELS[_status_key(item)]} · last seen {humanize_age(item.last_seen_at, now)}')
+        with ui.column().classes('w-full gap-3'):
+            with ui.row().classes('items-center gap-1 text-grey-7'):
+                ui.icon('meeting_room').props('size=xs')
+                if item.room_label:
+                    ui.label(f'{item.room_label} — {item.building or "—"} / {item.floor or "—"} / {item.room_number}')
+                else:
+                    ui.label('Not assigned to a room')
 
-        with ui.row().classes('items-center gap-2'):
-            ui.icon(_wifi_icon(item.rssi), color='grey-7').props('size=sm')
-            ui.label(_rssi_text(item.rssi)).classes('text-grey-7')
+            ui.select(
+                panel_type_options,
+                value=item.panel_type_id if item.panel_type_id in panel_type_options else None,
+                label='Panel type',
+                clearable=True,
+                on_change=on_panel_type_change,
+            ).classes('w-full').props('outlined dense')
 
-        with ui.row().classes('items-center gap-2'):
-            ui.icon(_battery_icon(item.battery_voltage), color=_battery_color(item.battery_voltage)).props('size=sm')
-            ui.label(_battery_text(item.battery_voltage)).classes('text-grey-7')
+            mismatch_hint = panel_mismatch_hint(paths, panel_types, item.panel_type_id, item.reported_panel)
+            if mismatch_hint:
+                ui.label(mismatch_hint).classes('text-caption text-negative')
 
-        if item.device_url:
-            ui.separator()
-            ui.link('Open in nice4iot ↗', item.device_url, new_tab=True).classes('text-caption text-grey')
+            # an empty options list crashes the select widget, so fall back to a
+            # plain hinted field rather than passing one.
+            screen_field = (niceview.Field(widget_type='ui.select', options=screen_ids, clearable=True)
+                           if screen_ids else niceview.Field(hint='No screens yet — add one in Templates'))
+            ModelForm.from_adapter(RoomDisplayRow, adapter, current_key, autosave=True,
+                                   include=['screen_id'],
+                                   field_infos={'screen_id': screen_field},
+                                   ).render()
+
+            render_device_preview(paths, item.device_name, item.screen_id, image_base_url)
+
+            with ui.row().classes('items-center gap-2'):
+                _status_icon(item).props('size=sm')
+                now = datetime.datetime.now(datetime.timezone.utc)
+                ui.label(f'{_STATUS_LABELS[_status_key(item)]} · last seen {humanize_age(item.last_seen_at, now)}')
+
+            with ui.row().classes('items-center gap-2'):
+                ui.icon(_wifi_icon(item.rssi), color='grey-7').props('size=sm')
+                ui.label(_rssi_text(item.rssi)).classes('text-grey-7')
+
+            with ui.row().classes('items-center gap-2'):
+                ui.icon(_battery_icon(item.battery_voltage), color=_battery_color(item.battery_voltage)).props('size=sm')
+                ui.label(_battery_text(item.battery_voltage)).classes('text-grey-7')
+
+            if item.device_url:
+                ui.separator()
+                ui.link('Open in nice4iot ↗', item.device_url, new_tab=True).classes('text-caption text-grey')
+
+    _body(key)
 
 
 # Combined active/provisioning/online state -> (icon, color, tooltip), mirroring

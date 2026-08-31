@@ -1,19 +1,25 @@
 """
-The per-device settings card nice4iot embeds in its own device page
-(register_device_card in extensions/epaper/__init__.py).
+The per-device settings and dashboard cards nice4iot embeds in its own
+device page (register_device_card in extensions/epaper/__init__.py).
 
-Renders content only -- no ui.card()/ui.expansion() of its own, since nice4iot
-supplies one -- so it looks like nice4iot's built-in cards (see docs/extensions.md
-in the nice4iot repo).
+device_config_card() renders content only -- no ui.card()/ui.expansion() of
+its own, since nice4iot supplies one for a 'settings' card (see
+docs/extensions.md in the nice4iot repo). device_dashboard_card() builds its
+own ui.card(), as a 'dashboard' card must.
 """
+import datetime
+
 from nicegui import context, ui
 
 from extensions.epaper.catalog.backend import get_panel_type, get_panel_types
 from extensions.epaper.devicebinding.backend import get_device_binding, set_device_binding
-from extensions.epaper.display.backend import device_epaper_labels
+from extensions.epaper.display.backend import (
+    device_epaper_labels, device_epaper_telemetry, panel_mismatch_hint,
+)
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.room.backend import list_rooms
 from extensions.epaper.screen.backend import screens_matching_panel_type, synthetic_roomcalendar_screens
+from extensions.epaper.util import humanize_age
 
 
 def device_config_card(paths: EpaperPaths, project_name: str, device_name: str, image_base_url: str) -> None:
@@ -102,16 +108,9 @@ def device_config_card(paths: EpaperPaths, project_name: str, device_name: str, 
         on_change=on_panel_type_change,
     ).classes('w-full').props('outlined dense')
 
-    if reported_panel:
-        selected_panel_type = get_panel_type(binding.panel_type_id, paths)
-        if selected_panel_type is not None and selected_panel_type.panel_id != reported_panel:
-            ui.label(f'Firmware reports panel "{reported_panel}", which does not match the '
-                     f'selected panel type ("{selected_panel_type.panel_id or "—"}").') \
-                .classes('text-caption text-negative')
-        elif selected_panel_type is None:
-            matches = sorted(pt.name for pt in panel_types.values() if pt.panel_id == reported_panel)
-            hint = f' Matches: {", ".join(matches)}.' if matches else ' No catalog entry for it yet.'
-            ui.label(f'Firmware reports panel "{reported_panel}".{hint}').classes('text-caption text-negative')
+    mismatch_hint = panel_mismatch_hint(paths, panel_types, binding.panel_type_id, reported_panel)
+    if mismatch_hint:
+        ui.label(mismatch_hint).classes('text-caption text-negative')
 
     screen_select = ui.select(
         screen_options_for(binding.panel_type_id),
@@ -133,3 +132,52 @@ def device_config_card(paths: EpaperPaths, project_name: str, device_name: str, 
         ui.input(label='Image URL', value=image_url).props('outlined dense readonly').classes('flex-grow')
         ui.button(icon='content_copy').props('dense flat') \
             .tooltip('Copy the URL').on_click(lambda: ui.clipboard.write(image_url))
+
+
+def device_dashboard_card(paths: EpaperPaths, project_name: str, device_name: str) -> None:
+    """
+    'dashboard' device dashboard card content -- builds its own ui.card(),
+    styled like nice4iot's built-in Device status card's "System" snapshot
+    section (see nice4iot's app/core/device/ui.py: _status_card()).
+
+    Shows esp32paper's latest kind='epaper' telemetry push (device_epaper_
+    telemetry() -- panel, panels, image_status, ...) with its age, plus the
+    same panel-type mismatch hint the Settings card shows
+    (panel_mismatch_hint()).
+    """
+    binding = get_device_binding(paths, device_name)
+    panel_types = get_panel_types(paths)
+    metrics, labels, reported_at = device_epaper_telemetry(project_name, device_name)
+    mismatch_hint = panel_mismatch_hint(paths, panel_types, binding.panel_type_id, labels.get('panel', ''))
+
+    with ui.card().tight().classes('w-full'):
+        with ui.card_section().props('dense').classes('w-full'):
+            ui.label('E-Paper').classes('text-subtitle1 font-bold')
+            ui.separator().classes('q-mt-xs q-mb-xs')
+
+            if not metrics and not labels:
+                ui.label('No epaper telemetry reported yet.').classes('text-caption text-grey-7')
+                return
+
+            with ui.row().classes('items-center w-full gap-1'):
+                ui.space()
+                ui.label(f'as of {humanize_age(reported_at, datetime.datetime.now(datetime.timezone.utc))}') \
+                    .classes('text-caption text-grey-7')
+
+            with ui.grid(columns='auto 1fr').classes('grid-cols-2 gap-y-1 q-mt-xs'):
+                if 'panel' in labels:
+                    ui.label('Panel').classes('text-caption text-grey-7')
+                    ui.label(labels['panel']).classes('text-body2')
+                if 'panels' in labels:
+                    ui.label('Supported panels').classes('text-caption text-grey-7')
+                    ui.label(labels['panels']).tooltip(labels['panels']) \
+                        .classes('text-body2 overflow-hidden text-ellipsis')
+                if 'image_status' in metrics:
+                    status = metrics['image_status']
+                    ok = status in (200, 304)
+                    ui.label('Image status').classes('text-caption text-grey-7')
+                    ui.label(str(int(status))).classes(f'text-body2{"" if ok else " text-negative"}')
+
+            if mismatch_hint:
+                ui.separator().classes('q-mt-xs q-mb-xs')
+                ui.label(mismatch_hint).classes('text-caption text-negative')

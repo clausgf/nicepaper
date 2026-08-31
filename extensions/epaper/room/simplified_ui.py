@@ -20,8 +20,11 @@ from niceview import CollectionAdapter, DrillDownWrapper, ModelForm
 import niceview
 
 from extensions.epaper.bookingsystem.backend import list_booking_systems
+from extensions.epaper.catalog.backend import get_panel_types
+from extensions.epaper.devicebinding.backend import set_device_binding
 from extensions.epaper.display.backend import (
-    RoomDisplaysAdapter, assignable_devices, available_screen_ids, project_device_names,
+    RoomDisplaysAdapter, assignable_devices, available_screen_ids, panel_mismatch_hint,
+    project_device_names,
 )
 from extensions.epaper.display.models import RoomDisplayRow
 from extensions.epaper.display.preview import render_device_preview
@@ -232,11 +235,14 @@ def _displays_panel(shell: Shell, room_id: str) -> None:
 def _display_detail(shell: Shell, adapter: RoomDisplaysAdapter, key: str, set_key) -> None:
     """A bound device's own detail: Device (editable -- reassigns this row to
     a different nice4iot device, keeping the same room/screen; a plain select
-    for now, over every project device -- see project_device_names()) and
-    Screen (editable, likewise a plain select over the project's screen files
-    for now -- TODO: once screens carry a richer label, e.g. panel_label,
-    show that instead of the bare id). Delete (unassign from the room) is
-    the wrapper's standard chrome.
+    for now, over every project device -- see project_device_names()), Panel
+    type (editable, restricts Screen to matching resolution/palette and
+    drives the mismatch hint against what the firmware itself reports --
+    display.backend.panel_mismatch_hint()) and Screen (editable, likewise a
+    plain select over the project's screen files for now -- TODO: once
+    screens carry a richer label, e.g. panel_label, show that instead of the
+    bare id). Delete (unassign from the room) is the wrapper's standard
+    chrome.
 
     Device identifies the row (RoomDisplaysAdapter keys by device name), so
     changing it needs an explicit rename + set_key -- like the file editors'
@@ -269,11 +275,30 @@ def _display_detail(shell: Shell, adapter: RoomDisplaysAdapter, key: str, set_ke
         ui.select(device_names, value=row.device_name, label='Device',
                  on_change=on_device_change).classes('w-full').props('outlined dense')
 
-        # filtered to the device's own panel type if it has one set
-        # (devicebinding/ui.py) -- see display.backend.available_screen_ids().
-        # an empty options list crashes the select widget, so fall back to a
-        # plain hinted field rather than passing one -- same rule as
-        # booking_system_field_infos() below.
+        panel_types = get_panel_types(paths)
+        panel_type_options = {pt.id: pt.name for pt in panel_types.values()}
+
+        def on_panel_type_change(e) -> None:
+            set_device_binding(paths, current_key, panel_type_id=e.value)
+            body.refresh(current_key)
+
+        ui.select(
+            panel_type_options,
+            value=row.panel_type_id if row.panel_type_id in panel_type_options else None,
+            label='Panel type',
+            clearable=True,
+            on_change=on_panel_type_change,
+        ).classes('w-full').props('outlined dense')
+
+        mismatch_hint = panel_mismatch_hint(paths, panel_types, row.panel_type_id, row.reported_panel)
+        if mismatch_hint:
+            ui.label(mismatch_hint).classes('text-caption text-negative')
+
+        # filtered to the device's own panel type if it has one set -- see
+        # display.backend.available_screen_ids(). an empty options list
+        # crashes the select widget, so fall back to a plain hinted field
+        # rather than passing one -- same rule as booking_system_field_infos()
+        # below.
         screen_ids = available_screen_ids(paths, current_key)
         screen_field = (niceview.Field(widget_type='ui.select', options=screen_ids, clearable=True)
                        if screen_ids else niceview.Field(hint='No screens yet — add one in Templates'))
