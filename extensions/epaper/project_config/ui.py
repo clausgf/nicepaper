@@ -23,10 +23,11 @@ def project_config_fields(paths: EpaperPaths) -> None:
 
 
 def project_config_card(paths: EpaperPaths) -> None:
-    """Card wrapper around project_config_fields(), used both by the
-    standalone Settings page and nice4iot's 'Settings' project tab --
-    register_project_tab (unlike register_global_card) supplies no card
-    chrome of its own, so every project tab owns its own ui.card()."""
+    """Card wrapper around project_config_fields(), for standalone.py's own
+    Project tab, which supplies no card chrome of its own (unlike nice4iot's
+    'settings' project card, which renders the chrome for you -- see
+    extensions/epaper/__init__.py's _settings_card(), which calls
+    project_config_fields() directly instead of this)."""
     with ui.card().classes('w-full'):
         ui.label('E-Paper Project Settings').classes('text-subtitle1')
         project_config_fields(paths)

@@ -17,7 +17,7 @@ from extensions.epaper.screen.backend import screens_matching_panel_type, synthe
 
 def device_config_card(paths: EpaperPaths, device_name: str, image_base_url: str) -> None:
     """
-    'general' device settings card content.
+    'settings' device settings card content.
 
     Lets the admin assign this device a screen (the image it renders), a
     room (where it hangs), and, optionally, its actual panel type -- which

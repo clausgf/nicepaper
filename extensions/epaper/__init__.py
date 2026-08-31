@@ -35,7 +35,7 @@ def register(app: FastAPI) -> None:
     from extensions.epaper.global_config.backend import load_global_config, save_global_config
     from extensions.epaper.global_config.ui import global_config_fields
     from extensions.epaper.paths import EpaperPaths
-    from extensions.epaper.project_config.ui import project_config_card
+    from extensions.epaper.project_config.ui import project_config_fields
     from extensions.epaper.bookingsystem.ui import booking_systems_wrapper
     from extensions.epaper.room.ui import rooms_wrapper
     from extensions.epaper.devicebinding.ui import device_config_card
@@ -85,6 +85,16 @@ def register(app: FastAPI) -> None:
 
     register_project_card('dashboard', _dashboard_card)
 
+    # --- Settings card -------------------------------------------------
+    # nice4iot renders the card chrome (foldable header, title=) for a
+    # 'settings' card, unlike a project tab -- so this calls the chrome-less
+    # project_config_fields(), not project_config_card() (that one's for
+    # standalone.py's own Project tab, which supplies no chrome of its own).
+    def _settings_card(project_name: str) -> None:
+        project_config_fields(_paths_for_project(project_name))
+
+    register_project_card('settings', _settings_card, title='Settings')
+
     # --- Device settings card -------------------------------------------
     # Lets a device be assigned a screen and shows the resulting
     # device-specific image URL (an alias, keyed by device name, resolved
@@ -94,7 +104,7 @@ def register(app: FastAPI) -> None:
         paths = _paths_for_project(project_name)
         return device_config_card(paths, device_name, f'/api/ext/epaper/{project_name}/screens')
 
-    register_device_card('general', _device_card, title='E-Paper')
+    register_device_card('settings', _device_card, title='E-Paper')
 
     # --- Project tabs --------------------------------------------------
     # Tabs on nice4iot's own project page (its tab bar, not ours), each
@@ -102,9 +112,6 @@ def register(app: FastAPI) -> None:
     # see room.ui.rooms_wrapper(), screen.ui.screens_wrapper() and
     # schedule.ui.schedules_wrapper() for the list<->editor chrome, state and
     # slide animation. Registration order is tab order: Rooms comes first.
-    def _settings_tab(project_name: str) -> None:
-        project_config_card(_paths_for_project(project_name))
-
     def _rooms_tab(project_name: str) -> None:
         rooms_wrapper(_paths_for_project(project_name), project_name).render()
 
@@ -118,7 +125,6 @@ def register(app: FastAPI) -> None:
     def _booking_systems_tab(project_name: str) -> None:
         booking_systems_wrapper(_paths_for_project(project_name)).render()
 
-    register_project_tab('Settings', _settings_tab, icon='settings')
     register_project_tab('Rooms', _rooms_tab, icon='meeting_room')
     register_project_tab('Screens', _screens_tab, icon='wallpaper')
     register_project_tab('Schedules', _schedules_tab, icon='schedule')

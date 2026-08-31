@@ -87,12 +87,14 @@ In extension mode:
   per weather location / Home Assistant entity / iCal feed / image source
   that is failing or serving stale cached data, so an outage is visible
   without opening a screen -- see `ui/cards.py`'s `dashboard_card()`) and a
-  link into the Screens tab, plus Settings/Rooms/Screens/Schedules/Booking
-  systems tabs registered via `register_project_tab` on nice4iot's own
-  project page — no separate routes of our own. No built-in login here
-  either — nice4iot's own auth and per-project activation gate access.
+  link into the Screens tab; a Settings card on nice4iot's project Settings
+  sidebar group (`register_project_card('settings', ..., title='Settings')`,
+  chrome supplied by nice4iot); and Rooms/Screens/Schedules/Booking systems
+  tabs registered via `register_project_tab` on nice4iot's own project
+  page — no separate routes of our own. No built-in login here either —
+  nice4iot's own auth and per-project activation gate access.
 - Each nice4iot **device**'s General tab gets an "E-Paper" card
-  (`register_device_card('general', ...)`) to assign the device a screen
+  (`register_device_card('settings', ...)`) to assign the device a screen
   (the image it renders) and a room (where it hangs). Both are stored in
   `<project>/.epaper/device_bindings.json` keyed by the device's own name
   (the same binding described under

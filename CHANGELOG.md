@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.29.1 — 2026-08-31
+
+### Changed
+
+- `extensions/epaper/__init__.py` now registers the Settings card and the
+  device card as `register_project_card('settings', ...)`/
+  `register_device_card('settings', ...)`, matching nice4iot's own rename
+  of that `CardSection` value from `'general'` to `'settings'`. Needs
+  nice4iot >= 0.37.10; the old `'general'` value raises `ValueError` on
+  startup against that version.
+
 ## 0.29.0 — 2026-08-31
 
 ### Added
