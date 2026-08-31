@@ -1,27 +1,13 @@
 from nicegui import ui
-from niceview import Field, ModelForm
+from niceview import ModelForm
 
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.project_config.backend import get_project_config, save_project_config
-from extensions.epaper.ui.forms import COL, FORM_STYLE, ROW, hints
-
-_LOCATION_HINT = 'Used by weather widgets that set no location of their own'
 
 _LAYOUT = [
-    ['## Weather', COL, [ROW, 'latitude', 'longitude']],
-    ['## Home Assistant', COL, 'homeassistant_url', 'homeassistant_token'],
+    ['## Weather', ['latitude', 'longitude']],
+    ['## Home Assistant', 'homeassistant_url', 'homeassistant_token'],
 ]
-
-_FIELD_INFOS = {
-    # explicit labels: the humanized field names would all read "Homeassistant
-    # ..." (one word, wrong spelling) and repeat the section heading
-    'homeassistant_url': Field(label='Home Assistant URL'),
-    # the token is a secret: masked in the field, still stored as plain text
-    # in the config file (see ProjectConfig / SECURITY.md)
-    'homeassistant_token': Field(label='Long-lived access token', props='type=password'),
-    **hints(latitude=_LOCATION_HINT, longitude=_LOCATION_HINT),
-}
-
 
 def project_config_fields(paths: EpaperPaths) -> None:
     """
@@ -32,8 +18,8 @@ def project_config_fields(paths: EpaperPaths) -> None:
     callback needed.
     """
     config = get_project_config(paths)
-    ModelForm.from_item(config, layout=_LAYOUT, field_infos=_FIELD_INFOS,
-                        on_change=lambda e: save_project_config(paths, config), **FORM_STYLE).render()
+    ModelForm.from_item(config, layout=_LAYOUT,
+                        on_change=lambda e: save_project_config(paths, config)).render()
 
 
 def project_config_card(paths: EpaperPaths) -> None:

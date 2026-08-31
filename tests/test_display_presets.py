@@ -73,11 +73,38 @@ def test_widget_colors_are_independent_concrete_fields(paths):
 
 
 def test_screen_background_color_is_actually_drawn(paths):
-    _write_screen(paths, "green", color_background="#00ff00")
+    # palette_id="": drawing, not quantization, is under test here -- the
+    # default palette ('bw') would map green to black on its way out
+    _write_screen(paths, "green", color_background="#00ff00", palette_id="")
     screen = asyncio.run(get_screen_by_id(paths, "green"))
     asyncio.run(screen.update_if_needed())
     image = asyncio.run(screen.get_image()).convert("RGB")
     assert image.getpixel((image.width - 1, image.height - 1)) == (0, 255, 0)
+
+
+def test_box_widget_draws_fill_and_border(paths):
+    _write_screen(paths, "box", palette_id="", widgets=[
+        {"widget_type": "Box", "position_x": 0, "position_y": 0,
+         "size_width": 40, "size_height": 20, "init_background": True,
+         "color_background": "#00ff00", "color_primary": "#ff0000", "line_width": 2},
+    ])
+    screen = asyncio.run(get_screen_by_id(paths, "box"))
+    asyncio.run(screen.update_if_needed())
+    image = asyncio.run(screen.get_image()).convert("RGB")
+    assert image.getpixel((20, 10)) == (0, 255, 0), "fill color at the box center"
+    assert image.getpixel((0, 10)) == (255, 0, 0), "border color at the box edge"
+
+
+def test_line_widget_draws_a_diagonal(paths):
+    _write_screen(paths, "line", palette_id="", widgets=[
+        {"widget_type": "Line", "position_x": 0, "position_y": 0,
+         "size_width": 40, "size_height": 40, "color_primary": "#ff0000", "line_width": 3},
+    ])
+    screen = asyncio.run(get_screen_by_id(paths, "line"))
+    asyncio.run(screen.update_if_needed())
+    image = asyncio.run(screen.get_image()).convert("RGB")
+    assert image.getpixel((20, 20)) == (255, 0, 0), "the diagonal passes through the box center"
+    assert image.getpixel((0, 39)) == (255, 255, 255), "off the line, background shows through"
 
 
 # --- applying a preset ----------------------------------------------------
@@ -127,7 +154,7 @@ def test_panel_label_falls_back_when_panel_type_id_is_dangling(paths):
     """A screen that outlives its preset (removed from the catalog) still
     gets a usable label -- the same 'unknown id degrades gracefully'
     treatment get_panel_type() itself already gives it."""
-    _write_screen(paths, "p", panel_type_id="no-such-panel", width=800, height=480, palette_id=None)
+    _write_screen(paths, "p", panel_type_id="no-such-panel", width=800, height=480, palette_id="")
     screen = asyncio.run(get_screen_by_id(paths, "p"))
     assert screen.panel_label == "800x480"
 
@@ -253,8 +280,20 @@ def test_screen_palette_decides_what_the_endpoint_serves(client, paths):
     assert Image.open(io.BytesIO(r.content)).mode == "P", "a screen with a palette is served quantized"
 
 
-def test_screen_without_a_palette_is_served_unquantized(client, paths):
+def test_screen_with_no_palette_id_defaults_to_bw_quantization(client, paths):
+    """A screen file with no palette_id key at all now gets the 'bw'
+    default (a deliberate change from the old None-means-unquantized
+    default) -- most displays expect a quantized image, and the editor no
+    longer offers a way to clear the select down to "no palette" either."""
     _write_screen(paths, "nopalette")
+    r = client.get("/api/screen/nopalette/image.png")
+    assert Image.open(io.BytesIO(r.content)).mode == "P"
+
+
+def test_screen_with_explicit_empty_palette_is_served_unquantized(client, paths):
+    """The remaining escape hatch: palette_id="" (hand-edited into the
+    file) still serves the raw RGB image, same as an unknown palette id."""
+    _write_screen(paths, "nopalette", palette_id="")
     r = client.get("/api/screen/nopalette/image.png")
     assert Image.open(io.BytesIO(r.content)).mode == "RGB"
 

@@ -22,8 +22,7 @@
       "size_width": 180,
       "size_height": 150,
       "entity_id": "sensor.living_room_temperature",
-      "display": "gauge",
-      "gauge_style": "arc",
+      "display": "arc",
       "min_value": -10,
       "max_value": 40,
       "color_fill": "#ff0000"
@@ -35,8 +34,7 @@
       "size_width": 180,
       "size_height": 150,
       "entity_id": "sensor.living_room_humidity",
-      "display": "gauge",
-      "gauge_style": "arc",
+      "display": "arc",
       "min_value": 0,
       "max_value": 100,
       "decimals": 0,
@@ -50,8 +48,7 @@
       "size_height": 80,
       "entity_id": "sensor.power_consumption",
       "label": "Power",
-      "display": "gauge",
-      "gauge_style": "bar",
+      "display": "bar",
       "min_value": 0,
       "max_value": 3000,
       "decimals": 0,
@@ -66,8 +63,7 @@
       "entity_id": "climate.hall",
       "attribute": "temperature",
       "label": "Hall target",
-      "unit": "°C",
-      "alignment": "lt"
+      "unit": "°C"
     },
     {
       "widget_type": "HomeAssistant",
@@ -75,8 +71,7 @@
       "position_y": 215,
       "size_width": 360,
       "size_height": 30,
-      "entity_id": "binary_sensor.front_door",
-      "alignment": "lt"
+      "entity_id": "binary_sensor.front_door"
     }
   ]
 }

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 from extensions.epaper.screen.models import (
-    ScreenModel, TextWidgetModel, RoomCalendarWidgetModel,
+    ScreenModel, TextWidgetModel, BoxWidgetModel, LineWidgetModel, RoomCalendarWidgetModel,
     WeatherNowWidgetModel, WeatherForecastWidgetModel, WeatherChartWidgetModel,
     ImageWidgetModel, HomeAssistantWidgetModel,
 )
@@ -107,8 +107,8 @@ def test_screen_model_missing_widget_type():
     assert "widget_type" in str(exc_info.value)
 
 
-def test_screen_model_textwidget_missing_text():
-    invalid_data = {
+def test_screen_model_textwidget_missing_text_uses_the_default():
+    data = {
         "width": 400,
         "height": 300,
         "widgets": [
@@ -121,9 +121,8 @@ def test_screen_model_textwidget_missing_text():
             }
         ]
     }
-    with pytest.raises(ValidationError) as exc_info:
-        ScreenModel(**invalid_data)
-    assert "field required" in str(exc_info.value).lower()
+    screen = ScreenModel(**data)
+    assert screen.widgets[0].text == "Text"
 
 
 def test_widget_size_none_when_either_dimension_missing():
@@ -203,6 +202,11 @@ def test_explicit_null_color_falls_back_to_the_default_instead_of_raising():
     screen = ScreenModel.model_validate({"width": 800, "height": 480, "color_background": None})
     assert screen.color_background == "#ffffff"
 
+    # same for palette_id: also a concrete `str` now (default 'bw'), so an
+    # explicit null must fall back too, not raise
+    screen = ScreenModel.model_validate({"width": 800, "height": 480, "palette_id": None})
+    assert screen.palette_id == "bw"
+
 
 def test_weather_chart_and_homeassistant_series_colors_default_to_black():
     chart = WeatherChartWidgetModel(position_x=0, position_y=0, latitude=52.52, longitude=13.405)
@@ -261,6 +265,10 @@ def test_weather_chart_widget_defaults():
     assert widget.primary_metric == "temperature"
     assert widget.secondary_metric is None
     assert widget.forecast_hours == 24
+    assert widget.line_style_primary == "solid"
+    # dashed by default: stays visually distinct from primary_metric's solid
+    # line even when secondary_metric is added without touching either style
+    assert widget.line_style_secondary == "dashed"
 
 
 def test_weather_chart_widget_invalid_metric_rejected():
@@ -312,6 +320,39 @@ def test_image_widget_allows_partial_size(kwargs):
     assert w.size_height == kwargs.get("size_height")
 
 
+def test_box_widget_defaults():
+    w = BoxWidgetModel(position_x=0, position_y=0)
+    assert (w.size_width, w.size_height) == (100, 60)
+    assert w.line_width == 1
+    assert w.corner_radius is None
+
+
+def test_box_widget_requires_width_and_height_together():
+    # unlike Image/Line, a box has no meaning with only one dimension set
+    with pytest.raises(ValidationError):
+        BoxWidgetModel(position_x=0, position_y=0, size_width=100, size_height=None)
+
+
+def test_line_widget_defaults():
+    w = LineWidgetModel(position_x=0, position_y=0)
+    assert (w.size_width, w.size_height) == (100, None)
+    assert w.line_width == 2
+    assert w.line_style == "solid"
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"size_width": 100},                     # horizontal
+    {"size_height": 50},                     # vertical
+    {"size_width": 100, "size_height": 50},  # diagonal
+    {"size_width": None},                    # a point
+])
+def test_line_widget_allows_partial_size(kwargs):
+    # like Image, a lone dimension is meaningful (a horizontal/vertical line)
+    w = LineWidgetModel(position_x=0, position_y=0, **kwargs)
+    assert w.size_width == kwargs.get("size_width", 100)
+    assert w.size_height == kwargs.get("size_height")
+
+
 def test_image_widget_round_trips_through_union():
     screen = ScreenModel(width=400, height=300, widgets=[
         {"widget_type": "Image", "position_x": 0, "position_y": 0,
@@ -343,36 +384,39 @@ def test_weather_widget_discriminated_union_round_trip(widget_type, model_cls, e
 
 def test_homeassistant_widget_defaults():
     w = HomeAssistantWidgetModel(position_x=0, position_y=0, entity_id="sensor.temp")
-    assert w.display == "value" and w.gauge_style == "arc"
+    assert w.display == "value"
     assert w.attribute is None and w.label is None and w.unit is None
     assert w.decimals == 1 and w.show_label is True
     assert (w.min_value, w.max_value) == (0.0, 100.0)
 
 
-def test_homeassistant_widget_requires_an_entity_id():
-    with pytest.raises(ValidationError):
-        HomeAssistantWidgetModel(position_x=0, position_y=0)
+def test_homeassistant_widget_missing_entity_id_uses_the_default():
+    widget = HomeAssistantWidgetModel(position_x=0, position_y=0)
+    assert widget.entity_id == "sensor.example"
 
 
-def test_homeassistant_widget_rejects_unknown_display_and_gauge_style():
+def test_homeassistant_widget_rejects_unknown_display():
+    """display is one merged field now ('value'/'arc'/'bar') -- a former
+    gauge_style value like 'needle' must be rejected the same as an
+    unknown display value like 'dial'."""
     with pytest.raises(ValidationError):
         HomeAssistantWidgetModel(position_x=0, position_y=0, entity_id="sensor.temp", display="dial")
     with pytest.raises(ValidationError):
-        HomeAssistantWidgetModel(position_x=0, position_y=0, entity_id="sensor.temp", gauge_style="needle")
+        HomeAssistantWidgetModel(position_x=0, position_y=0, entity_id="sensor.temp", display="needle")
 
 
 def test_homeassistant_widget_round_trips_through_union():
     screen = ScreenModel(width=400, height=300, widgets=[
         {"widget_type": "HomeAssistant", "position_x": 10, "position_y": 20,
-         "entity_id": "sensor.living_room_temperature", "display": "gauge",
-         "gauge_style": "bar", "min_value": -10, "max_value": 40, "decimals": 0},
+         "entity_id": "sensor.living_room_temperature", "display": "bar",
+         "min_value": -10, "max_value": 40, "decimals": 0},
     ])
     assert isinstance(screen.widgets[0], HomeAssistantWidgetModel)
     reloaded = ScreenModel.model_validate_json(screen.model_dump_json())
     widget = reloaded.widgets[0]
     assert isinstance(widget, HomeAssistantWidgetModel)
     assert widget.entity_id == "sensor.living_room_temperature"
-    assert (widget.display, widget.gauge_style) == ("gauge", "bar")
+    assert widget.display == "bar"
     assert (widget.min_value, widget.max_value, widget.decimals) == (-10.0, 40.0, 0)
 
 

@@ -1,3 +1,6 @@
+from typing import Annotated
+
+import niceview
 from pydantic import BaseModel, Field
 
 
@@ -12,8 +15,14 @@ class ProjectConfig(BaseModel):
     instance), and different projects on the same nice4iot install can be
     different sites.
     """
-    homeassistant_url: str = Field(default="", description="Base URL of the Home Assistant instance, e.g. 'http://homeassistant.local:8123', without the '/api' suffix which is added automatically. Empty disables the HomeAssistant widget.")
-    homeassistant_token: str = Field(default="", description="Long-lived access token, created on the Home Assistant profile page. Stored in plain text in this config file, like every other field -- see SECURITY.md; give it a read-only user's token if that matters.")
+    latitude: Annotated[float,
+                niceview.Field(hint="Default latitude for weather widgets that set no location of their own.")] = 52.52
+    longitude: Annotated[float,
+                niceview.Field(hint="Default longitude for weather widgets that set no location of their own.")] = 13.405
 
-    latitude: float = Field(default=52.52, description="Default latitude for weather widgets that set no location of their own.")
-    longitude: float = Field(default=13.405, description="Default longitude for weather widgets that set no location of their own.")
+    homeassistant_url: Annotated[str,
+                Field(title="Home Assistant URL"),
+                niceview.Field(hint="Base URL of the Home Assistant instance, e.g. 'http://homeassistant.local:8123', without the '/api' suffix which is added automatically. Empty disables the HomeAssistant widget.")] = ""
+    homeassistant_token: Annotated[str,
+                Field(title="Long-lived access token"),
+                niceview.Field(hint="Long-lived access token, created on the Home Assistant profile page. Stored in plain text in this config file, like every other field -- see SECURITY.md; give it a read-only user's token if that matters.")] = ""

@@ -32,8 +32,7 @@ class HomeAssistantWidget(Widget):
         super().__init__(id, config)
         self._status: Optional[EntityStatus] = None
         if not self.config.size:
-            style = self.config.gauge_style if self.config.display == 'gauge' else 'value'
-            self.config.size = _DEFAULT_SIZE[style]
+            self.config.size = _DEFAULT_SIZE[self.config.display]
             logger.info(f"Widget {self.id} has no size, assuming {self.config.size}")
 
     def _value_font(self, ctx: DrawingContext):
@@ -74,17 +73,17 @@ class HomeAssistantWidget(Widget):
         if unit:
             value_text = f"{value_text} {unit}"
 
-        if self.config.display == 'gauge':
+        if self.config.display == 'value':
+            text = f"{label} {value_text}" if self.config.show_label else value_text
+            ctx.draw_text((0, 0), size=(w, h), text=text, alignment='lt',
+                          font=self.font, ellipsis='...')
+        else:
             gauge.draw_gauge(
                 ctx, (0, 0), (w, h),
                 value=numeric_value(value),
                 min_value=self.config.min_value, max_value=self.config.max_value,
-                style=self.config.gauge_style, font=self.font, value_font=self._value_font(ctx),
+                style=self.config.display, font=self.font, value_font=self._value_font(ctx),
                 label=label if self.config.show_label else None, value_text=value_text,
                 fill_color=self.config.color_fill)
-        else:
-            text = f"{label} {value_text}" if self.config.show_label else value_text
-            ctx.draw_text((0, 0), size=(w, h), text=text, alignment=self.config.alignment,
-                          font=self.font, ellipsis='...')
 
         self._draw_stale_notice(ctx, (w, h))

@@ -15,6 +15,17 @@ A screen's `widgets` list is made of typed widgets, each positioned with
 
 - **`Text`** / **`Date`** — static text and a formatted current date
   (`date_format`, e.g. `EEEE, dd. MMMM yyyy`), with configurable font and size.
+- **`Box`** / **`Line`** — plain shapes for framing/dividing a layout, no
+  external dependencies. `Box` is a rectangle: `color_primary`/`line_width`
+  for the border (`line_width: 0` draws none), `color_background` (with
+  `init_background`) for the fill, and an optional `corner_radius` for
+  rounded corners — fill and border are drawn together as one shape, so a
+  rounded box never gets square-cornered fill peeking past a rounded
+  border. `size_width`/`size_height` are required (no auto-size, no shape
+  without them). `Line` draws from its position to position+size —
+  `size_height` empty gives a horizontal line, `size_width` empty a
+  vertical one, both set a diagonal — with `line_width` and `line_style`
+  (`solid`/`dashed`/`dotted`, same as `WeatherChart`'s below).
 - **`RoomCalendar`** — shows whichever room the *device* rendering the screen
   is bound to (Displays, or the device's E-Paper/general card): its number,
   name and notes (multiline, under the date), and its booking system's iCal
@@ -49,17 +60,17 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   of the state (`attribute`, e.g. `temperature` of a `climate` entity).
   `label`/`unit` default to the entity's own `friendly_name`/
   `unit_of_measurement`, `decimals` rounds numeric values, and `show_label`
-  toggles the label. `display` selects how the value is drawn:
-  - `value` — one line of text (`alignment` as for `Text`).
-  - `gauge` — a gauge on the `min_value` … `max_value` scale, either a 240° dial
-    (`gauge_style: arc`) or a horizontal bar (`bar`). Values outside the scale
-    are clamped; a non-numeric state (`on`, `unavailable`, …) leaves the scale
-    empty and just shows the text.
+  toggles the label. `display` selects how the value is drawn: `value` — one
+  line of text, drawn top-left; or a gauge on the `min_value` … `max_value`
+  scale, either a 240° dial (`arc`) or a horizontal bar (`bar`). Values
+  outside the scale are clamped; a non-numeric state (`on`, `unavailable`, …)
+  leaves the scale empty and just shows the text.
 
   Gauges are drawn locally with Pillow (`extensions/epaper/core/gauge.py`), not
   fetched from Home Assistant: HA's own gauge cards are browser-rendered and
   can't be retrieved as an image, and a screenshot would dither on an e-paper
-  palette. The filled part is solid (`color_fill`, black by default), the rest
+  palette. The filled part is solid (`color_fill`, black by default, editable
+  regardless of `display` even though only `arc`/`bar` draw it), the rest
   stays an outline, so a gauge is still readable on a pure black/white display
   even without setting `color_fill` to anything else. An image
   Home Assistant *does* serve — a camera snapshot, an add-on-rendered dashboard —
@@ -80,11 +91,12 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   its trace entirely (a chart with just one metric is the other one left
   unset); leaving both empty draws nothing. Available metrics are
   `temperature`, `precipitation`, `humidity`, `pressure` and `wind` (the
-  wind series honours `WIND_SPEED_UNIT`). `line_style`
-  (`solid`/`dashed`/`dotted`) sets `primary_metric`'s line style when it
-  renders as a line (bar metrics, e.g. `precipitation`, ignore it);
-  `secondary_metric` always stays dashed, to keep it visually distinct from
-  the primary series even where `color_primary_series`/`color_secondary_series`
+  wind series honours `WIND_SPEED_UNIT`). `line_style_primary`/
+  `line_style_secondary` (`solid`/`dashed`/`dotted`, independently
+  configurable) set each metric's line style when it renders as a line (bar
+  metrics, e.g. `precipitation`, ignore theirs); `line_style_secondary`
+  defaults to dashed, to keep it visually distinct from the primary series
+  even where `color_primary_series`/`color_secondary_series`
   (see [Displays, palettes and colors](#displays-palettes-and-colors)) are the
   same color, which they are by default. Each axis is titled
   with its metric name and unit above the plot (primary left, secondary
@@ -136,7 +148,7 @@ settings — not something a display asks for per request:
 | --- | --- |
 | `Name` | the screen's file name and its id in `/api/screen/<id>/…`; editing it renames the file (editor only, not a field of the screen JSON) |
 | `width`, `height` | canvas size in pixels |
-| `palette_id` | id of the palette the image is quantized to before it is served (`bw`, `bwr`, `bwy`, `gs4`, `c7`, `e6`). Empty serves the unquantized RGB image. |
+| `palette_id` | id of the palette the image is quantized to before it is served (`bw`, `bwr`, `bwy`, `gs4`, `c7`, `e6`); defaults to `bw`. Set it to `""` (or an unknown id) to serve the unquantized RGB image instead. |
 | `color_background` | this screen's canvas background color (defaults to white) |
 | `panel_type_id` | which panel type was applied last, see below |
 
@@ -182,11 +194,12 @@ a plain, unrestricted color picker instead.
 A few widget types offer a second color of their own, named for what it's
 actually for rather than a generic "accent": `WeatherChart`'s
 `color_primary_series`/`color_secondary_series` (its two traces) and
-`HomeAssistant`'s `color_fill` (the gauge's filled part, only shown for
-`display: "gauge"`). All default to black, like `color_primary` — on a
-`bwr`/`c7`/`e6` panel, set one to the panel's accent (e.g. red) by hand to
-highlight it; most panels only have black/white anyway, so a distinct
-second color is the exception, not the default.
+`HomeAssistant`'s `color_fill` (the gauge's filled part; only `arc`/`bar`
+actually draw it, but it's editable regardless of `display`). All default to
+black, like `color_primary` — on a `bwr`/`c7`/`e6` panel, set one to the
+panel's accent (e.g. red) by hand to highlight it; most panels only have
+black/white anyway, so a distinct second color is the exception, not the
+default.
 
 ### Panel types
 
@@ -200,9 +213,9 @@ changed later just as well.
 
 **No preset** is the default, and a listed choice in both — for a panel that
 isn't in the catalog, or when you'd rather set size, palette and background
-yourself. A new screen then starts blank at 800×480 (no palette, so it is
-served as RGB); picking it for an existing screen only drops the
-`panel_type_id` record and leaves its values untouched.
+yourself. A new screen then starts blank at 800×480 with the default `bw`
+palette; picking it for an existing screen only drops the `panel_type_id`
+record and leaves its values untouched.
 
 A preset is a **template, applied once**: after that the screen's own fields are
 what renders, they stay editable, and a preset that is later changed or removed
@@ -314,8 +327,9 @@ formats):
 - `examples/schedules/default.json` — a weekly update schedule (three times on
   weekdays, once on weekends). Screens default to `update_schedule_id:
   "default"`, so most setups need this file.
-- `examples/screens/simple.json` — a minimal screen with `Text` and `Date`
-  widgets, no external dependencies.
+- `examples/screens/simple.json` — a minimal screen with `Text`, `Date`,
+  `Box` (a rounded frame) and `Line` (a divider) widgets, no external
+  dependencies.
 - `examples/screens/roomcalendar.json` — a full-size door sign using the
   `RoomCalendar` widget (or use one of the auto-generated templates instead —
   see [Auto-generated Room Calendar templates](#auto-generated-room-calendar-templates)).

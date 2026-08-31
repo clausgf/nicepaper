@@ -1,21 +1,14 @@
 """
-Everything the editor knows about a widget *type*, one entry per type.
+Everything the editor knows about a widget *type*, one WIDGET_TYPES entry
+per type -- next to its model (screen/models.py) and drawing class
+(core/widgets/__init__.py's WIDGET_CLASSES).
 
-This used to be spread over three parallel dicts (models, icons, titles)
-and three if-chains (`_default_widget`, `_widget_label`, the per-type half
-of the detail form) in screen/ui.py, all keyed by the same eight
-strings -- so adding a widget type meant finding six places and matching
-their order. Now it is one WIDGET_TYPES entry, next to the two other
-places a type is declared: its model (screen/models.py) and its
-drawing class (core/widgets/__init__.py's WIDGET_CLASSES).
-
-A form is a niceview layout plus the field_infos that differ from the
-defaults, so most entries are declarative. `content` and `field_infos`
-may also be callables of (widget, paths) for the two types whose form
-depends on the widget's own values (Image's url/file, Home Assistant's
-gauge/value) or on the project directory (Image's file list); those name
-the deciding field in `refresh_on` so changing it rebuilds the form.
-`extra` renders what is not a field at all -- a button, a warning.
+A form is a niceview layout over the model's own fields; static per-field
+UI lives on the model (Annotated niceview.Field), not here. `content`,
+`field_infos` and `colors` may be callables of (widget, paths) for parts
+that depend on the widget's own value or the project's files; name the
+deciding field in `refresh_on` to rebuild the form on change. `extra`
+renders what isn't a field: a button, a warning.
 """
 from dataclasses import dataclass, field as dataclass_field
 from typing import Any, Callable, List, Optional, Union
@@ -29,19 +22,18 @@ from extensions.epaper.core.datasources.image import clear_cache as clear_image_
 from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.project_config.backend import get_project_config
 from extensions.epaper.screen.models import (
-    DateWidgetModel, HomeAssistantWidgetModel, ImageWidgetModel, RoomCalendarWidgetModel,
-    TextWidgetModel, WeatherChartWidgetModel, WeatherForecastWidgetModel,
+    BoxWidgetModel, DateWidgetModel, HomeAssistantWidgetModel, ImageWidgetModel, LineWidgetModel,
+    RoomCalendarWidgetModel, TextWidgetModel, WeatherChartWidgetModel, WeatherForecastWidgetModel,
     WeatherNowWidgetModel, WeatherWidgetModel, WidgetModel,
 )
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.ui.compact_fields import compact_color_field, compact_font_field
-from extensions.epaper.ui.forms import (
-    ALIGNMENT_HINT, COL, DATE_PATTERN_HINT, FORM_STYLE, LOCATION_HINT, ROW, ROW_CENTER,
-    SHORT_DATE_PATTERN_HINT, TIME_PATTERN_HINT, hints,
-)
 
 # image files selectable by the Image widget (Pillow-readable raster formats)
 IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')
+
+# Every widget has these two; types with more colors extend this dict.
+_DEFAULT_COLORS: dict[str, str] = {'color_primary': 'Primary color', 'color_background': 'Background color'}
 
 
 @dataclass(frozen=True)
@@ -51,26 +43,21 @@ class WidgetType:
     icon: str
     title: str
     summary: Callable[[Any, EpaperPaths], str]
-    """One line identifying an instance in the widget list. Takes `paths`
-    since a weather widget's summary reads the project's default location."""
+    """One line identifying an instance in the widget list."""
     content: Union[list, Callable[[Any, EpaperPaths], list]]
-    """The Content section as layout entries; the Layout and Appearance
-    sections above it are the same for every type (see _layout())."""
-    defaults: dict = dataclass_field(default_factory=dict)
-    """Values for the required fields of a newly added widget. They are
-    deliberately non-empty: niceview enforces required fields at the widget
-    level and commits an item only once it validates as a whole, so a
-    widget created with empty required strings would block every other
-    edit in its form until they are filled in."""
+    """The Content section as layout entries; Layout/Appearance are shared."""
     field_infos: Union[dict, Callable[[Any, EpaperPaths], dict]] = dataclass_field(default_factory=dict)
+    """Field customization for what can't live on the model -- only Image's
+    'file' select needs this (options depend on the project directory)."""
     extra: Optional[Callable[[ModelForm, Any, EpaperPaths, Callable[[], None]], None]] = None
     """Rendered below the form, for what is not a field: a button, a warning."""
     refresh_on: tuple[str, ...] = ()
     """Fields whose change rebuilds the form, because `content` reads them."""
     font: bool = True
     """Whether the Appearance section offers font_name/font_size."""
-    colors: bool = True
-    """Whether the Appearance section offers color_primary/color_background."""
+    colors: Union[dict[str, str], Callable[[Any, EpaperPaths], dict[str, str]]] = dataclass_field(
+        default_factory=lambda: dict(_DEFAULT_COLORS))
+    """Compact color swatches in the Appearance row: field name -> label."""
 
 
 def _resolve(value: Any, widget: WidgetModel, paths: EpaperPaths) -> Any:
@@ -79,27 +66,45 @@ def _resolve(value: Any, widget: WidgetModel, paths: EpaperPaths) -> Any:
 
 # --- summaries for the widget list ------------------------------------------
 
+def _box_summary(widget: BoxWidgetModel, paths: EpaperPaths) -> str:
+    parts = [f'{widget.line_width}px border'] if widget.line_width > 0 else []
+    if widget.init_background:
+        parts.append('filled')
+    if widget.corner_radius:
+        parts.append(f'r={widget.corner_radius}')
+    return ' · '.join(parts) if parts else '(invisible)'
+
+
+def _line_summary(widget: LineWidgetModel, paths: EpaperPaths) -> str:
+    return f'{widget.line_style} · {widget.line_width}px'
+
+
 def _location_summary(widget: WeatherWidgetModel, paths: EpaperPaths) -> str:
-    """A weather widget's location: its own coordinates, or a note that it
-    follows the project default -- which is the one thing a bare
-    '52.52, 13.41' could not tell apart."""
+    """Coordinates, or a note that it follows the project default."""
     project_config = get_project_config(paths)
     location = widget.resolved_location(project_config.latitude, project_config.longitude)
     if location is None:
         return '(no location)'
-    text = f'{location[0]:.2f}, {location[1]:.2f}'
+    text = f'lat,lon={location[0]:.2f},{location[1]:.2f}'
     return text if (widget.latitude or widget.longitude) else f'{text} (default)'
 
 
+def _forecast_summary(widget: WeatherForecastWidgetModel, paths: EpaperPaths) -> str:
+    return f'{_location_summary(widget, paths)} · hours={widget.forecast_hours}'
+
+
 def _chart_summary(widget: WeatherChartWidgetModel, paths: EpaperPaths) -> str:
-    metrics = ' + '.join(m for m in (widget.primary_metric, widget.secondary_metric) if m)
-    location = _location_summary(widget, paths)
-    return f'{location} · {metrics}' if metrics else f'{location} (no metric)'
+    metrics = ' + '.join(m for m in (widget.primary_metric, widget.secondary_metric) if m) or '(no metric)'
+    return f'{_location_summary(widget, paths)} · hours={widget.forecast_hours} · {metrics}'
 
 
 def _homeassistant_summary(widget: HomeAssistantWidgetModel, paths: EpaperPaths) -> str:
     entity = widget.entity_id or '(no entity)'
-    return f'{entity}{f".{widget.attribute}" if widget.attribute else ""} · {widget.display}'
+    # widget.label is only a manual override -- an unset one still shows a
+    # label at render time (the entity's own friendly name), so it isn't
+    # "(no label)"; only show_label=False actually draws no label at all
+    label = '(no label)' if not widget.show_label else widget.label or '(entity name)'
+    return f'{entity}{f".{widget.attribute}" if widget.attribute else ""} · {label} as {widget.display}'
 
 
 # --- the two types whose form is not a fixed list of fields -----------------
@@ -111,21 +116,13 @@ def _image_files(paths: EpaperPaths) -> list[str]:
 
 
 def _image_field_infos(widget: ImageWidgetModel, paths: EpaperPaths) -> dict:
-    # keep a now-missing file selectable/visible, like a dangling schedule
     files = _image_files(paths)
+    # keep a now-missing file selectable, like a dangling schedule
     options = files + ([widget.file] if widget.file and widget.file not in files else [])
-    # a select needs something to select: niceview rejects an empty options
-    # list outright (ValueError, i.e. no form at all), and a project simply
-    # has no image files until someone adds one
+    # an empty options list is a hard ValueError for niceview's select
     file_field = (Field(widget_type='ui.select', options=options, clearable=True) if options
                   else Field(hint='No image files in the project directory yet'))
-    return {
-        # no hand-written caption next to the toggle: niceview renders the
-        # field's own label above widgets that have no label slot
-        'source_type': Field(widget_type='ui.toggle'),
-        'file': file_field,
-        'reload_each_time': Field(label='Reload on every rendering'),
-    }
+    return {'file': file_field}
 
 
 def _image_extra(form: ModelForm, widget: ImageWidgetModel, paths: EpaperPaths,
@@ -145,131 +142,132 @@ def _homeassistant_extra(form: ModelForm, widget: HomeAssistantWidgetModel, path
                  ).classes('text-caption text-negative')
 
 
+_HOMEASSISTANT_COLORS = {**_DEFAULT_COLORS, 'color_fill': 'Fill color'}
+
+
 WIDGET_TYPES: dict[str, WidgetType] = {
     'Text': WidgetType(
         model=TextWidgetModel, icon='text_fields', title='Text Widget',
         summary=lambda w, paths: w.text or '(empty text)',
-        defaults={'text': 'Text'},
-        content=['text', 'alignment'],
+        content=[['text', 'alignment']],
     ),
     'Date': WidgetType(
         model=DateWidgetModel, icon='event', title='Date Widget',
         summary=lambda w, paths: w.date_format or 'Date',
-        content=['date_format', 'alignment'],
-        field_infos=hints(date_format=DATE_PATTERN_HINT),
+        content=[['date_format', 'alignment']],
+    ),
+    'Box': WidgetType(
+        model=BoxWidgetModel, icon='crop_square', title='Box Widget',
+        summary=_box_summary,
+        content=[['line_width', 'corner_radius']],
+        font=False,  # the Box widget has no text of its own
+        colors={'color_primary': 'Border color', 'color_background': 'Fill color'},
+    ),
+    'Line': WidgetType(
+        model=LineWidgetModel, icon='horizontal_rule', title='Line Widget',
+        summary=_line_summary,
+        content=[['line_width', 'line_style']],
+        font=False,  # the Line widget has no text of its own
+        colors={'color_primary': 'Line color'},
     ),
     'RoomCalendar': WidgetType(
         model=RoomCalendarWidgetModel, icon='calendar_month', title='Room Calendar Widget',
         summary=lambda w, paths: '(room calendar — shows the rendering device\'s own room)',
-        defaults={},
-        content=[[ROW, 'date_format_long', 'date_format', 'time_format']],
-        field_infos=hints(date_format_long=DATE_PATTERN_HINT,
-                          date_format=SHORT_DATE_PATTERN_HINT,
-                          time_format=TIME_PATTERN_HINT),
+        content=[['date_format_long', 'date_format', 'time_format']],
     ),
     'WeatherNow': WidgetType(
         model=WeatherNowWidgetModel, icon='wb_sunny', title='Weather (Now) Widget',
         summary=_location_summary,
-        content=[[ROW, 'latitude', 'longitude']],
+        content=[['latitude', 'longitude']],
     ),
     'WeatherForecast': WidgetType(
         model=WeatherForecastWidgetModel, icon='view_column', title='Weather (Forecast) Widget',
-        summary=_location_summary,
-        content=[[ROW, 'latitude', 'longitude'], 'forecast_hours'],
+        summary=_forecast_summary,
+        content=[['latitude', 'longitude', 'forecast_hours']],
     ),
     'WeatherChart': WidgetType(
         model=WeatherChartWidgetModel, icon='show_chart', title='Weather (Chart) Widget',
         summary=_chart_summary,
-        content=[[ROW, 'latitude', 'longitude'],
-                 [ROW, 'primary_metric', 'secondary_metric'], [ROW, 'forecast_hours', 'line_style'],
-                 [ROW, 'color_primary_series', 'color_secondary_series']],
-        field_infos={'line_style': Field(widget_type='ui.select', options=['solid', 'dashed', 'dotted']),
-                    # clearable: either metric can be emptied to drop its trace
-                    # (see WeatherChartWidgetModel), not just left at the default
-                    'primary_metric': Field(clearable=True), 'secondary_metric': Field(clearable=True),
-                    'color_primary_series': Field(widget_type='ui.color_input'),
-                    'color_secondary_series': Field(widget_type='ui.color_input')},
+        content=[['latitude', 'longitude', 'forecast_hours'],
+                 ['primary_metric', 'line_style_primary', 'secondary_metric', 'line_style_secondary']],
+        colors={**_DEFAULT_COLORS, 'color_primary_series': 'Primary series',
+               'color_secondary_series': 'Secondary series'},
     ),
     'Image': WidgetType(
         model=ImageWidgetModel, icon='image', title='Image Widget',
         summary=lambda w, paths: (w.url if w.source_type == 'url' else w.file) or '(no image)',
-        # only the source that is actually in use, so the other one can't be
-        # filled in and silently ignored
-        content=lambda w, paths: ['source_type', 'file' if w.source_type == 'file' else 'url',
+        # only the source in use, so the other one can't be filled in and ignored
+        content=lambda w, paths: [['source_type', 'file' if w.source_type == 'file' else 'url'],
                                   'reload_each_time'],
         field_infos=_image_field_infos,
         extra=_image_extra,
         refresh_on=('source_type',),
         font=False,  # the Image widget has no text or lines of its own
-        colors=False,
+        colors={},
     ),
     'HomeAssistant': WidgetType(
         model=HomeAssistantWidgetModel, icon='sensors', title='Home Assistant Widget',
         summary=_homeassistant_summary,
-        defaults={'entity_id': 'sensor.example'},
-        # only the fields that matter for the chosen display (gauge scale
-        # vs. text alignment)
+        # min_value/max_value only mean anything once a gauge shape is picked
         content=lambda w, paths: [
-            'entity_id', [ROW, 'attribute', 'label', 'unit'],
-            [ROW_CENTER, 'decimals', 'display', 'show_label'],
-            *([[ROW_CENTER, 'gauge_style', 'min_value', 'max_value', 'color_fill']]
-              if w.display == 'gauge' else ['alignment']),
+            ['entity_id', 'attribute'], ['show_label:shrink', 'label', 'decimals', 'unit'],
+            ['display', *(['min_value', 'max_value'] if w.display != 'value' else [])],
         ],
-        field_infos={'display': Field(widget_type='ui.toggle'),
-                     'gauge_style': Field(widget_type='ui.toggle'),
-                     'decimals': Field(classes='w-32'),
-                     'color_fill': Field(widget_type='ui.color_input')},
         extra=_homeassistant_extra,
         refresh_on=('display',),
+        colors=_HOMEASSISTANT_COLORS,
     ),
 }
 
 
 def new_widget(widget_type: str) -> WidgetModel:
-    """A new widget of the given type, its required fields pre-filled (see
-    WidgetType.defaults). Every widget starts at the top left corner; the
-    weather widgets deliberately start without coordinates so a new one
-    follows the default location from the global settings rather than the
-    0/0 in the Atlantic."""
-    entry = WIDGET_TYPES[widget_type]
-    return entry.model(position_x=0, position_y=0, **entry.defaults)
+    """A new widget, starting at the top left corner."""
+    model = WIDGET_TYPES[widget_type].model
+    # mypy only sees the type[WidgetModel] declared on WidgetType.model, not
+    # which concrete subclass -- every one of them defaults widget_type itself
+    return model(position_x=0, position_y=0)  # type: ignore[call-arg]
+
+
+def _position_summary(widget: WidgetModel) -> str:
+    """'(x,y)', or '(x,y,w,h)' once a fixed size is set."""
+    x, y = widget.position
+    if widget.size:
+        w, h = widget.size
+        return f'({x},{y},{w},{h})'
+    return f'({x},{y})'
+
+
+def widget_summary(widget: WidgetModel, paths: EpaperPaths) -> str:
+    """One line identifying a widget instance in the list: position/size
+    first (the same for every type), then WidgetType.summary's own detail."""
+    entry = WIDGET_TYPES[widget.widget_type]
+    return f'{_position_summary(widget)} · {entry.summary(widget, paths)}'
 
 
 def _layout_top(entry: WidgetType) -> list:
-    """Layout + Appearance sections shared by every widget -- position/size
-    and background/clipping. font_name/font_size and color_primary/
-    color_background render as compact controls instead (see
-    _render_appearance_extras()), between this and _layout_content()."""
+    """Layout + Appearance sections shared by every widget type."""
     return [
-        ['## Layout', COL, [ROW, 'position_x', 'position_y'], [ROW, 'size_width', 'size_height']],
-        ['## Appearance', COL, [ROW, 'init_background', 'clipping']],
+        ['## Layout', ['position_x', 'position_y', 'size_width', 'size_height']],
+        # ROW_CENTER: font/color controls join this row later, at a different height
+        ['## Appearance', ['init_background:shrink', 'clipping']],
     ]
 
 
 def _layout_content(entry: WidgetType, widget: WidgetModel, paths: EpaperPaths) -> list:
-    return [['## Content', COL, *_resolve(entry.content, widget, paths)]]
+    return [['## Content', *_resolve(entry.content, widget, paths)]]
 
 
 def _font_names() -> List[str]:
     return sorted(p.name for p in resource_paths.font_path.glob('*') if p.is_file())
 
 
-def _field_infos(entry: WidgetType, widget: WidgetModel, paths: EpaperPaths) -> dict:
-    """The shared field customizations, with the type's own merged on top."""
-    shared = {
-        'alignment': Field(hint=ALIGNMENT_HINT, classes='w-40'),
-        'latitude': Field(hint=LOCATION_HINT, clearable=True),
-        'longitude': Field(hint=LOCATION_HINT, clearable=True),
-    }
-    return {**shared, **_resolve(entry.field_infos, widget, paths)}
-
-
-def _render_appearance_extras(adapter, key: str, entry: WidgetType, palette: Optional[Palette]) -> None:
-    """The compact font/color controls between the Layout+Appearance and
-    Content sections -- see compact_fields.py for why these can't just be
-    more ModelForm fields. Font still falls back to the screen/global
-    default (resolved_font()); color_primary/color_background are concrete
-    fields with no fallback of their own, so they need no resolving here."""
+def _render_appearance_extras(adapter, key: str, entry: WidgetType, colors: dict,
+                              palette: Optional[Palette]) -> ui.element:
+    """Compact font/color controls, moved to the front of the Appearance
+    row by render_widget_form -- see compact_fields.py for why these
+    aren't plain ModelForm fields. Returns the wrapper so the caller can
+    reposition it; a plain ui.row() (not the refreshable itself) so that
+    handle stays valid across refreshes."""
     palette_hex = [f'#{r:02x}{g:02x}{b:02x}' for r, g, b in palette.palette] if palette else None
     font_options = _font_names()
 
@@ -278,60 +276,65 @@ def _render_appearance_extras(adapter, key: str, entry: WidgetType, palette: Opt
         for name, value in fields.items():
             setattr(item, name, value)
         adapter.update(item)
-        row.refresh()
+        controls.refresh()
 
     @ui.refreshable
-    def row() -> None:
+    def controls() -> None:
         item = adapter.read(key)
-        with ui.row().classes('items-center gap-3 q-px-sm q-pb-sm'):
-            if entry.font:
-                resolved_name, resolved_size = item.resolved_font(app_config.font_name, app_config.font_size)
-                compact_font_field(
-                    resolved_name=resolved_name, resolved_size=resolved_size,
-                    default_name=app_config.font_name, default_size=app_config.font_size,
-                    font_name=item.font_name, font_size=item.font_size, font_options=font_options,
-                    on_save=lambda name, size: save(font_name=name, font_size=size))
-            if entry.colors:
-                compact_color_field(
-                    label='Primary color', value=item.color_primary, palette_hex=palette_hex,
-                    on_change=lambda c: save(color_primary=c))
-                compact_color_field(
-                    label='Background color', value=item.color_background, palette_hex=palette_hex,
-                    on_change=lambda c: save(color_background=c))
+        if entry.font:
+            resolved_name, resolved_size = item.resolved_font(app_config.font_name, app_config.font_size)
+            compact_font_field(
+                resolved_name=resolved_name, resolved_size=resolved_size,
+                default_name=app_config.font_name, default_size=app_config.font_size,
+                font_name=item.font_name, font_size=item.font_size, font_options=font_options,
+                on_save=lambda name, size: save(font_name=name, font_size=size))
+        for field_name, label in colors.items():
+            def on_color_change(c: str, field_name: str = field_name) -> None:
+                save(**{field_name: c})
+            compact_color_field(
+                label=label, value=getattr(item, field_name), palette_hex=palette_hex,
+                on_change=on_color_change)
 
-    row()
+    with ui.row().classes('items-center gap-3') as wrapper:
+        controls()
+    return wrapper
 
 
 def render_widget_form(widget: WidgetModel, adapter, key: str, paths: EpaperPaths,
                        persist: Callable[[], None], refresh: Callable[[], None],
                        palette: Optional[Palette] = None) -> None:
     """The editing form for one widget, autosaving through `adapter`.
-
-    `refresh` rebuilds the detail view; it is called when a field in the
-    type's `refresh_on` changes, since those decide which fields the form
-    shows at all. `palette` (the screen's resolved Palette, see
-    catalog/backend.py::get_palette) restricts the compact color field's
-    swatch options -- optional so this can still be called without one in
-    scope (falls back to an unrestricted color picker)."""
+    `refresh` rebuilds the detail view when a `refresh_on` field changes.
+    `palette` restricts the compact color swatches to it; omit for an
+    unrestricted color picker."""
     entry = WIDGET_TYPES[widget.widget_type]
 
     def on_change(e) -> None:
         if e.field_name in entry.refresh_on:
             refresh()
 
+    field_infos = _resolve(entry.field_infos, widget, paths)
+    colors = _resolve(entry.colors, widget, paths)
+
     top_form = ModelForm.from_adapter(
         entry.model, adapter, key, autosave=True, on_change=on_change,
         layout=_layout_top(entry),
-        field_infos=_field_infos(entry, widget, paths), **FORM_STYLE)
+        field_infos=field_infos)
     top_form.render()
 
-    if entry.font or entry.colors:
-        _render_appearance_extras(adapter, key, entry, palette)
+    if entry.font or colors:
+        # reopen the toggles' row so font/colors land on the same line,
+        # then move them in front of the toggles
+        appearance_row = top_form.w('clipping', ui.switch).parent_slot
+        assert appearance_row is not None  # just rendered above
+        with appearance_row.parent:
+            extras = _render_appearance_extras(adapter, key, entry, colors, palette)
+        extras.move(target_index=0)
 
     content_form = ModelForm.from_adapter(
         entry.model, adapter, key, autosave=True, on_change=on_change,
         layout=_layout_content(entry, widget, paths),
-        field_infos=_field_infos(entry, widget, paths), **FORM_STYLE)
+        field_infos=field_infos)
     content_form.render()
     if entry.extra is not None:
         entry.extra(content_form, widget, paths, persist)

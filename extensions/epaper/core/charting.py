@@ -15,13 +15,15 @@ series draws in its own primary_color/secondary_color (draw_chart params,
 sourced from WeatherChartWidgetModel.color_primary_series/
 color_secondary_series -- both default to black, matching the widget's own
 color_primary, since most panels only have black/white anyway; a bwr/c7/e6
-panel can set either to the panel's accent by hand). The secondary-axis
-series stays dashed regardless of color, since a bw/bwr panel can't tell
-two colors apart at all -- line style is the signal that survives every
-palette, color is a bonus on richer ones. Each axis title (see draw_chart's
-primary_title/secondary_title) carries a short style swatch of its own
-series (_draw_style_swatch) for the same reason: a bwr panel can't lean on
-color alone to tell the two traces apart in the legend either.
+panel can set either to the panel's accent by hand). Each series has its
+own line_style too (WeatherChartWidgetModel.line_style_primary/
+line_style_secondary, the latter defaulting to dashed): a bw/bwr panel
+can't tell two colors apart at all, so line style is the signal that
+survives every palette, color only a bonus on richer ones. Each axis title
+(see draw_chart's primary_title/secondary_title) carries a short style
+swatch of its own series (_draw_style_swatch) for the same reason: a bwr
+panel can't lean on color alone to tell the two traces apart in the legend
+either.
 
 Y-axis gridlines/labels use "nice" round numbers (Heckbert's classic
 algorithm), not raw data min/max, so labels read as round figures instead
@@ -43,7 +45,7 @@ Kind = Literal['bar', 'line']
 LineStyle = Literal['solid', 'dashed', 'dotted']
 
 # (dash, gap) length presets for the non-solid styles, in the same units as
-# _draw_polyline's own defaults -- 'dashed' matches its previous hardcoded
+# draw_polyline's own defaults -- 'dashed' matches its previous hardcoded
 # pattern, 'dotted' reuses the gridline helpers' (_draw_dotted_hline/vline).
 _DASH_PRESETS: dict[LineStyle, tuple[int, int]] = {'dashed': (5, 4), 'dotted': (2, 3)}
 
@@ -76,8 +78,11 @@ def _draw_dotted_vline(ctx, x: float, y0: float, y1: float, fill, dash: int = 2,
         y += dash + gap
 
 
-def _draw_polyline(ctx, points: list[tuple[float, float]], fill, width: int,
+def draw_polyline(ctx, points: list[tuple[float, float]], fill, width: int,
                     style: LineStyle = 'solid') -> None:
+    """A line through `points` (ctx-relative), solid/dashed/dotted. Public
+    since core/widgets/line.py's plain Line widget draws its one segment
+    with this too, not just draw_chart()'s series."""
     if style == 'solid':
         ctx.draw.line([_abs_pt(ctx, x, y) for x, y in points], fill=fill, width=width)
         return
@@ -112,7 +117,7 @@ def _draw_style_swatch(ctx, x: float, y: float, h: float, kind: Kind, style: Lin
         ctx.draw.rectangle([_abs_pt(ctx, x, mid_y - h / 4), _abs_pt(ctx, x + _STYLE_SWATCH_W, mid_y + h / 4)],
                            fill=fill)
     else:
-        _draw_polyline(ctx, [(x, mid_y), (x + _STYLE_SWATCH_W, mid_y)], fill=fill, width=2, style=style)
+        draw_polyline(ctx, [(x, mid_y), (x + _STYLE_SWATCH_W, mid_y)], fill=fill, width=2, style=style)
 
 
 def x_label_step(count: int, width: float, min_label_width: int = 40) -> int:
@@ -311,7 +316,7 @@ def draw_chart(ctx, position: tuple[int, int], size: tuple[int, int], series: Se
                     ctx.draw.rectangle([_abs_pt(ctx, bx0, top), _abs_pt(ctx, bx1, bottom)], fill=color)
         else:
             points = [(slot_center_x(i), to_y(v, s.axis)) for i, v in enumerate(s.values)]
-            _draw_polyline(ctx, points, fill=color, width=2 if is_primary else 1, style=s.line_style)
+            draw_polyline(ctx, points, fill=color, width=2 if is_primary else 1, style=s.line_style)
 
     for i in x_indices:
         assert labels is not None  # x_indices is only ever non-empty when labels is set (see above)

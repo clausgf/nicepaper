@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.29.0 — 2026-08-31
+
+### Added
+
+- **`Box` and `Line` widgets** — plain shapes for framing/dividing a layout,
+  no external dependencies. `Box`: a rectangle with `color_primary`/
+  `line_width` for the border (`line_width: 0` for none), `color_background`
+  (with `init_background`) for the fill, and an optional `corner_radius` for
+  rounded corners -- fill and border draw as one shape so a rounded box
+  never gets a square-cornered fill peeking past the border.
+  `size_width`/`size_height` are required (both, no auto-size). `Line`:
+  draws from its position to position+size (`size_height` empty = horizontal,
+  `size_width` empty = vertical, both set = diagonal), with `line_width` and
+  `line_style` (`solid`/`dashed`/`dotted`).
+- `examples/screens/simple.json` now also shows a `Box` frame and a `Line`
+  divider.
+
+### Changed
+
+- **`WeatherChartWidgetModel.line_style` split into `line_style_primary` and
+  `line_style_secondary`** — the secondary trace's line style used to be
+  hardcoded to `dashed`; it's independently configurable now (still
+  defaulting to `dashed`, so an existing screen renders unchanged). A screen
+  file with the old `line_style` key silently loses that setting (falls back
+  to `line_style_primary`'s default, `solid`) instead of erroring.
+- **`HomeAssistantWidgetModel.display`/`gauge_style` merged into one field**:
+  `display` is now `"value"` / `"arc"` / `"bar"` directly (was `"value"` /
+  `"gauge"` + a separate `gauge_style: "arc"|"bar"`). A screen file using the
+  old two-field form loses `gauge_style` silently (pydantic drops unknown
+  keys) and falls back to the `arc` gauge if `display` was `"gauge"` --
+  re-save the widget in the editor to pick the shape again.
+- **`HomeAssistantWidgetModel.alignment` removed** — the `value` display
+  always draws top-left now. A screen file with a custom `alignment` for a
+  `HomeAssistant` widget loses it silently.
+- `HomeAssistantWidgetModel.color_fill` is always editable in the Appearance
+  row now, not only when `display` was `"gauge"`.
+- `TextWidgetModel.text`/`HomeAssistantWidgetModel.entity_id` are no longer
+  required -- both default (`"Text"`/`"sensor.example"`) so a screen file
+  that omits them loads instead of failing validation.
+- **`ScreenModel.palette_id` defaults to `"bw"`** (was `None`/unquantized) --
+  a screen with no `palette_id` key is now served quantized, matching what
+  the editor already showed by default. Set it to `""` (or an unknown id)
+  for the old unquantized-RGB behavior. An explicit `null` now falls back to
+  the default instead of failing to load (same fix as 0.28.1 gave
+  `color_primary`/`color_background`).
+- Widget list rows now lead with position/size -- `(x,y)`, or `(x,y,w,h)`
+  once a fixed size is set -- before the type-specific summary.
+  `WeatherForecast`/`WeatherChart` summaries now include `hours={forecast_hours}`.
+  `HomeAssistant`'s summary no longer prints a literal `None` when no label
+  is configured.
+- Screen editor: drilling into a widget now only swaps the Widgets card;
+  Screen Settings stays visible above it instead of being replaced too.
+- `GlobalConfig`/`ProjectConfig` field labels unified to sentence case,
+  matching niceview's own auto-generated labels; a field only carries an
+  explicit `title` where auto-generation would get it wrong (branding like
+  `iCal`, or a `homeassistant_*`/`roomcalendar_*` field name that can't be
+  split into words) or would repeat its section heading.
+
 ## 0.28.1 — 2026-08-31
 
 ### Fixed

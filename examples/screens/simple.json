@@ -7,6 +7,15 @@
   "update_schedule_id": "default",
   "widgets": [
     {
+      "widget_type": "Box",
+      "position_x": 5,
+      "position_y": 5,
+      "size_width": 790,
+      "size_height": 470,
+      "corner_radius": 12,
+      "line_width": 3
+    },
+    {
       "widget_type": "Text",
       "position_x": 10,
       "position_y": 10,
@@ -17,9 +26,16 @@
       "font_size": 28
     },
     {
+      "widget_type": "Line",
+      "position_x": 10,
+      "position_y": 55,
+      "size_width": 780,
+      "line_width": 2
+    },
+    {
       "widget_type": "Date",
       "position_x": 10,
-      "position_y": 60,
+      "position_y": 65,
       "size_width": 780,
       "size_height": 30,
       "date_format": "EEEE, dd. MMMM yyyy"

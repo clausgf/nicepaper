@@ -36,7 +36,7 @@ from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.ui.drilldown import directory_drilldown, slide_class
 from extensions.epaper.ui.forms import COL, FORM_STYLE, ROW
 from extensions.epaper.ui.preview import screen_image_view
-from extensions.epaper.ui.widget_types import WIDGET_TYPES, new_widget, render_widget_form
+from extensions.epaper.ui.widget_types import WIDGET_TYPES, new_widget, render_widget_form, widget_summary
 from extensions.epaper.util import check_filename
 
 # "no preset" is a listed choice rather than only the select's clear button:
@@ -59,8 +59,7 @@ class _EditorState(TypedDict):
 # fields are rendered -- so `widgets` needs no exclude=, and an unknown or
 # duplicated name raises ValueError naming its position.
 _SCREEN_LAYOUT = [
-    ['## Panel', COL, 'panel_type_id', [ROW, 'width', 'height'], 'palette_id'],
-    ['## Colors', COL, 'color_background'],
+    ['## Panel', COL, 'panel_type_id', [ROW, 'width', 'height', 'palette_id', 'color_background']],
     ['## Schedule', COL, 'update_schedule_id'],
 ]
 
@@ -147,13 +146,12 @@ def _screen_row_warning(paths: EpaperPaths, screen_key: str) -> Optional[str]:
 def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str,
                           render_name_field: Optional[Callable[[], None]] = None) -> None:
     """
-    Screen content: the live preview (always on top, since it reflects
-    whichever widget/setting was just edited), the screen settings, and the
-    widget list drilling down into a per-widget form. `image_base_url` is
-    the display API prefix for this screen's images (differs between
-    standalone and the nice4iot extension router). No file-level chrome
-    (back/delete) of its own -- that's screens_wrapper()'s job, via
-    DrillDownWrapper's title row.
+    Screen content: the live preview and Screen Settings stay fixed; only
+    the card below them (`editor_area`) swaps between the widget list and a
+    widget's detail form. `image_base_url` is the display API prefix for
+    this screen's images (differs between standalone and the nice4iot
+    extension router). No file-level chrome (back/delete) of its own --
+    that's screens_wrapper()'s job, via DrillDownWrapper's title row.
 
     render_name_field() is the rename field handed down by
     drilldown.directory_drilldown(). It goes into the Screen Settings, where
@@ -282,7 +280,7 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
 
         field_infos = {
             'panel_type_id': Field(**panel_type_field_kwargs),
-            'palette_id': Field(label='Palette', widget_type='ui.select', options=palette_options, clearable=True),
+            'palette_id': Field(label='Palette', widget_type='ui.select', options=palette_options),
             'color_background': Field(widget_type='ui.color_input'),
             'update_schedule_id': Field(widget_type='ui.select', options=schedule_options, clearable=True),
         }
@@ -303,10 +301,6 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
                 _widget_list()
 
     def _widget_list() -> None:
-        with ui.card().tight().classes('w-full'):
-            with ui.expansion('Screen Settings', value=False).classes('w-full q-mb-none').props('dense header-class="text-subtitle1"'):
-                _screen_settings()
-
         with ui.card().classes('w-full'):
             with ui.row().classes('w-full items-center justify-between'):
                 ui.label('Widgets').classes('text-subtitle1')
@@ -327,7 +321,7 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
                                     'click', lambda _, k=key: _open_detail(k)):
                                 ui.icon(entry.icon)
                                 ui.badge(widget.widget_type).props('outline')
-                                ui.label(entry.summary(widget, paths)).classes('text-grey-8')
+                                ui.label(widget_summary(widget, paths)).classes('text-grey-8')
             widget_list_container.make_sortable(handle='.drag-handle', on_end=_handle_reorder)
 
     def _refresh_editor_area() -> None:
@@ -400,6 +394,9 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
         editor_area.refresh()
 
     image_preview()
+    with ui.card().tight().classes('w-full'):
+        with ui.expansion('Screen Settings', value=False).classes('w-full q-mb-none').props('dense header-class="text-subtitle1"'):
+            _screen_settings()
     editor_area()
 
 

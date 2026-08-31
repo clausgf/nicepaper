@@ -1,6 +1,8 @@
 from .base import Widget
 from .text import TextWidget
 from .date import DateWidget
+from .box import BoxWidget
+from .line import LineWidget
 from .roomcalendar import RoomCalendarWidget
 from .weather import WeatherNowWidget, WeatherForecastWidget, WeatherChartWidget
 from .image import ImageWidget
@@ -16,6 +18,8 @@ from .homeassistant import HomeAssistantWidget
 WIDGET_CLASSES: dict[str, type[Widget]] = {
     "Text": TextWidget,
     "Date": DateWidget,
+    "Box": BoxWidget,
+    "Line": LineWidget,
     "RoomCalendar": RoomCalendarWidget,
     "WeatherNow": WeatherNowWidget,
     "WeatherForecast": WeatherForecastWidget,
@@ -26,7 +30,7 @@ WIDGET_CLASSES: dict[str, type[Widget]] = {
 
 __all__ = [
     "Widget", "WIDGET_CLASSES",
-    "TextWidget", "DateWidget", "RoomCalendarWidget",
+    "TextWidget", "DateWidget", "BoxWidget", "LineWidget", "RoomCalendarWidget",
     "WeatherNowWidget", "WeatherForecastWidget", "WeatherChartWidget",
     "ImageWidget", "HomeAssistantWidget",
 ]

@@ -134,12 +134,15 @@ def test_image_widget_has_no_appearance_extras(tmp_path):
 def test_weather_chart_line_style_defaults_to_solid_and_renders_as_select(tmp_path):
     from extensions.epaper.screen.models import WeatherChartWidgetModel
 
-    assert WeatherChartWidgetModel(position_x=0, position_y=0).line_style == "solid"
+    assert WeatherChartWidgetModel(position_x=0, position_y=0).line_style_primary == "solid"
 
     elements = _new_widget_form(tmp_path, "WeatherChart")
-    selects = [e for e in elements if type(e).__name__ == "Select" and e._props.get("label") == "Line style"]
-    assert len(selects) == 1
-    assert set(selects[0].options) == {"solid", "dashed", "dotted"}
+    selects = {e._props.get("label"): e for e in elements
+              if type(e).__name__ == "Select" and e._props.get("label") in ("Line style primary", "Line style secondary")}
+    assert selects.keys() == {"Line style primary", "Line style secondary"}, \
+        "secondary_metric needs its own line style select, independent of primary_metric's"
+    for select in selects.values():
+        assert set(select.options) == {"solid", "dashed", "dotted"}
 
 
 def test_widget_forms_follow_the_field_they_switch_on(tmp_path):
@@ -173,10 +176,9 @@ def test_widget_forms_follow_the_field_they_switch_on(tmp_path):
 
     entity = new_widget("HomeAssistant")
     entity.display = "value"
-    assert "Alignment" in labels_for(entity, "value")
-    entity.display = "gauge"
-    gauge_labels = labels_for(entity, "gauge")
-    assert "Min value" in gauge_labels and "Alignment" not in gauge_labels
+    assert "Min value" not in labels_for(entity, "value")
+    entity.display = "bar"
+    assert "Min value" in labels_for(entity, "bar")
 
 
 def test_new_schedule_rule_has_a_starter_time():

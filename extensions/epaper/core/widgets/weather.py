@@ -218,11 +218,11 @@ class WeatherChartWidget(_WeatherWidgetBase):
         series = []
         if self.config.primary_metric:
             series.append(_metric_series(hourly, self.config.primary_metric, start_idx, end_idx,
-                                         'primary', self.config.line_style))
+                                         'primary', self.config.line_style_primary))
         if self.config.secondary_metric:
             series.append(
                 _metric_series(hourly, self.config.secondary_metric, start_idx, end_idx,
-                               'secondary', 'dashed'))
+                               'secondary', self.config.line_style_secondary))
 
         labels = [times[i][11:16] for i in range(start_idx, end_idx)]
         charting.draw_chart(
