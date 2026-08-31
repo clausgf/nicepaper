@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.28.1 — 2026-08-31
+
+### Fixed
+
+- **0.28.0 broke loading any screen file that had `color_primary`/
+  `color_background` explicitly `null`** (from a screen saved before 0.28,
+  where `null` meant "inherit from the screen/global default") -- both are
+  concrete `str` fields now, and pydantic rejects `null` against a `str`
+  field with a hard validation error instead of falling back to the
+  field's default, unlike a genuinely *missing* key. The 0.28.0
+  CHANGELOG entry claimed this would gracefully resolve to the default;
+  it did not -- the whole screen file failed to parse. `WidgetModel`/
+  `ScreenModel` now have a `field_validator(mode='before')` that treats an
+  explicit `null` for these fields the same as the key being absent.
+
 ## 0.28.0 — 2026-08-31
 
 ### Changed

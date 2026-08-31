@@ -1,6 +1,6 @@
 import datetime
 from typing import Annotated, ClassVar, List, Optional, Tuple, Union, Literal
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 _DateFormatField = Annotated[
     Optional[str],
@@ -71,6 +71,17 @@ class WidgetModel(BaseModel):
     # dimension, keep aspect ratio) set this True to opt out of the
     # size-pair validation below
     _allows_partial_size: ClassVar[bool] = False
+
+    @field_validator('color_primary', 'color_background', mode='before')
+    @classmethod
+    def _null_uses_the_default(cls, value, info):
+        """A screen saved before 0.28 (the Widget -> Screen -> Global color
+        lookup chain) could have color_primary explicitly null, meaning
+        "inherit from the screen". Both fields are concrete now with no such
+        chain, so treat a stray null the same as the key being absent
+        entirely -- this field's own default -- instead of the hard
+        validation error a `str` field gets for `None` otherwise."""
+        return cls.model_fields[info.field_name].default if value is None else value
 
     @model_validator(mode='after')
     def _check_size_pair(self) -> 'WidgetModel':
@@ -303,6 +314,15 @@ class ScreenModel(BaseModel):
         ),
     )
     color_background: str = Field(default="#ffffff", description="Background color of this screen's canvas.")
+
+    @field_validator('color_background', mode='before')
+    @classmethod
+    def _null_uses_the_default(cls, value):
+        """See WidgetModel's own _null_uses_the_default: a screen saved
+        before 0.28 could have this explicitly null (falling back to the
+        global default). Treat it the same as the key being absent."""
+        return cls.model_fields['color_background'].default if value is None else value
+
     update_schedule_id: Optional[str] = Field(
         default="default",
         description=(

@@ -188,6 +188,22 @@ def test_widget_colors_are_concrete_with_no_fallback():
     assert (tinted.color_primary, tinted.color_background) == ("#123456", "#abcdef")
 
 
+def test_explicit_null_color_falls_back_to_the_default_instead_of_raising():
+    """Regression: a screen file saved before 0.28 (the Widget -> Screen ->
+    Global lookup chain) can have color_primary/color_background explicitly
+    null in its JSON -- these fields are concrete now (plain `str`, not
+    `Optional[str]`), so pydantic would otherwise reject the file outright
+    with a hard validation error instead of loading it with the default,
+    breaking every screen that had ever cleared one of these fields."""
+    widget = TextWidgetModel.model_validate(
+        {"widget_type": "Text", "position_x": 0, "position_y": 0, "text": "x",
+         "color_primary": None, "color_background": None})
+    assert (widget.color_primary, widget.color_background) == ("#000000", "#ffffff")
+
+    screen = ScreenModel.model_validate({"width": 800, "height": 480, "color_background": None})
+    assert screen.color_background == "#ffffff"
+
+
 def test_weather_chart_and_homeassistant_series_colors_default_to_black():
     chart = WeatherChartWidgetModel(position_x=0, position_y=0, latitude=52.52, longitude=13.405)
     assert (chart.color_primary_series, chart.color_secondary_series) == ("#000000", "#000000")
