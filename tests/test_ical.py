@@ -5,7 +5,8 @@ from zoneinfo import ZoneInfo
 
 import aiohttp
 
-from extensions.epaper.core.datasources.ical import _extract_events, get_from_ical
+from extensions.epaper.global_config.backend import app_config
+from extensions.epaper.core.datasources.ical import _extract_events, get_from_ical, read_all_ical_statuses
 
 
 ICS = """BEGIN:VCALENDAR
@@ -67,11 +68,12 @@ def test_organizer_extracted_from_summary():
 def test_get_from_ical_uses_cache_within_update_interval(tmp_path):
     now = datetime.datetime.now(ZoneInfo("Europe/Berlin"))
     (tmp_path / "room-x.json").write_text(json.dumps({
-        "last_update": now.isoformat(), "events": [{"summary": "cached"}],
+        "id": "room-x", "last_update": now.isoformat(), "events": [{"summary": "cached"}],
     }))
-    events = asyncio.run(get_from_ical(tmp_path, None, "room-x", "https://example.com/cal.ics",
+    status = asyncio.run(get_from_ical(tmp_path, None, "room-x", "https://example.com/cal.ics",
                                        update_interval_s=600, max_days=30))
-    assert events == [{"summary": "cached"}]
+    assert status.events == [{"summary": "cached"}]
+    assert status.fresh and not status.failing
 
 
 class _FakeIcalResponse:
@@ -122,3 +124,67 @@ def test_get_from_ical_omits_auth_without_username(tmp_path, monkeypatch):
     asyncio.run(get_from_ical(tmp_path, None, "room-y", "https://example.com/cal.ics",
                               update_interval_s=600, max_days=30))
     assert captured["headers"] is None
+
+
+class _FailingIcalResponse:
+    async def __aenter__(self):
+        raise RuntimeError("Cannot connect to host")
+    async def __aexit__(self, *a):
+        return False
+
+
+class _FailingIcalSession:
+    def get(self, url, headers=None):
+        return _FailingIcalResponse()
+
+
+def _fail_if_called():
+    raise AssertionError("network must not be used here")
+
+
+def test_get_from_ical_backs_off_and_degrades_gracefully(tmp_path, monkeypatch):
+    """A failing feed keeps returning the last-known events (graceful
+    degradation, matching weather/Home Assistant) and backs off instead of
+    being re-fetched on every render."""
+    monkeypatch.setattr(app_config, "ical_retry_min_s", 60)
+    monkeypatch.setattr(app_config, "ical_retry_max_s", 1800)
+    old = datetime.datetime.now(ZoneInfo("Europe/Berlin")) - datetime.timedelta(hours=2)
+    (tmp_path / "room-x.json").write_text(json.dumps({
+        "id": "room-x", "last_update": old.isoformat(), "events": [{"summary": "stale"}],
+    }))
+    monkeypatch.setattr("extensions.epaper.core.datasources.ical._get_session",
+                        lambda: _FailingIcalSession())
+
+    first = asyncio.run(get_from_ical(tmp_path, None, "room-x", "https://example.com/cal.ics",
+                                      update_interval_s=600, max_days=30))
+    assert first.events == [{"summary": "stale"}]
+    assert first.failing and first.fail_count == 1 and first.retry_after is not None
+
+    # inside the backoff window -> no request at all
+    monkeypatch.setattr("extensions.epaper.core.datasources.ical._get_session", _fail_if_called)
+    second = asyncio.run(get_from_ical(tmp_path, None, "room-x", "https://example.com/cal.ics",
+                                       update_interval_s=600, max_days=30))
+    assert second.events == [{"summary": "stale"}] and second.failing
+
+
+def test_get_from_ical_never_fetched_returns_no_events(tmp_path, monkeypatch):
+    monkeypatch.setattr("extensions.epaper.core.datasources.ical._get_session",
+                        lambda: _FailingIcalSession())
+    status = asyncio.run(get_from_ical(tmp_path, None, "room-y", "https://example.com/cal.ics",
+                                       update_interval_s=600, max_days=30))
+    assert status.events is None and status.failing
+
+
+def test_read_all_ical_statuses(tmp_path):
+    now = datetime.datetime.now(ZoneInfo("Europe/Berlin"))
+    (tmp_path / "room-a.json").write_text(json.dumps({
+        "id": "room-a", "last_update": now.isoformat(), "events": [],
+    }))
+    (tmp_path / "room-b.json").write_text(json.dumps({
+        "id": "room-b", "fail_count": 2, "error": "timeout",
+        "retry_after": (now + datetime.timedelta(minutes=5)).isoformat(),
+    }))
+    statuses = {s.id: s for s in read_all_ical_statuses(tmp_path)}
+    assert statuses["room-a"].failing is False
+    assert statuses["room-b"].failing and statuses["room-b"].fail_count == 2
+    assert statuses["room-b"].events is None

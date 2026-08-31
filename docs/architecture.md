@@ -21,6 +21,7 @@ nicepaper
 │   ├── display/                 # feature pkg: models.py (row), backend.py (device<->room<->screen join), simplified_ui.py (grid)
 │   ├── devicebinding/           # feature pkg: models.py, backend.py (device->screen/room store), ui.py (device card)
 │   ├── global_config/           # feature pkg: models.py (GlobalConfig), backend.py (app_config singleton + persist), ui.py (form)
+│   ├── project_config/          # feature pkg: models.py (ProjectConfig, per-root), backend.py (read/persist), ui.py (form)
 │   ├── ui                       # shared content-only rendering, reused by both modes
 │   │   ├── forms.py             # form vocabulary: field styling, spacing, hints
 │   │   ├── drilldown.py         # file list <-> editor chrome, inline rename
@@ -82,11 +83,14 @@ In extension mode:
   - REST: `/api/ext/epaper/<project>/screens/<id>/image.png`, gated
     by nice4iot's per-project extension activation (General tab →
     Extensions card) before the handler runs.
-- UI: a project Dashboard card (screen/schedule counts, link into the
-  Screens tab) plus Rooms/Screens/Schedules/Booking systems tabs registered
-  via `register_project_tab` on nice4iot's own project page — no separate
-  routes of our own. No built-in login here either — nice4iot's own
-  auth and per-project activation gate access.
+- UI: a project Dashboard card (screen/schedule counts, plus one health line
+  per weather location / Home Assistant entity / iCal feed / image source
+  that is failing or serving stale cached data, so an outage is visible
+  without opening a screen -- see `ui/cards.py`'s `dashboard_card()`) and a
+  link into the Screens tab, plus Settings/Rooms/Screens/Schedules/Booking
+  systems tabs registered via `register_project_tab` on nice4iot's own
+  project page — no separate routes of our own. No built-in login here
+  either — nice4iot's own auth and per-project activation gate access.
 - Each nice4iot **device**'s General tab gets an "E-Paper" card
   (`register_device_card('general', ...)`) to assign the device a screen
   (the image it renders) and a room (where it hangs). Both are stored in

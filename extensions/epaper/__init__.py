@@ -29,10 +29,13 @@ def register(app: FastAPI) -> None:
 
     from extensions.epaper.api.endpoints import build_extension_router
     from extensions.epaper.core.datasources.homeassistant import read_all_entity_statuses
+    from extensions.epaper.core.datasources.ical import read_all_ical_statuses
+    from extensions.epaper.core.datasources.image import read_all_image_statuses
     from extensions.epaper.core.datasources.weather import read_all_weather_statuses
     from extensions.epaper.global_config.backend import load_global_config, save_global_config
     from extensions.epaper.global_config.ui import global_config_fields
     from extensions.epaper.paths import EpaperPaths
+    from extensions.epaper.project_config.ui import project_config_card
     from extensions.epaper.bookingsystem.ui import booking_systems_wrapper
     from extensions.epaper.room.ui import rooms_wrapper
     from extensions.epaper.devicebinding.ui import device_config_card
@@ -72,9 +75,13 @@ def register(app: FastAPI) -> None:
         num_schedules = len(list(paths.schedule_dir.glob('*.json')))
         weather_statuses = read_all_weather_statuses(paths.weather_dir)
         homeassistant_statuses = read_all_entity_statuses(paths.homeassistant_dir)
+        ical_statuses = read_all_ical_statuses(paths.ical_dir)
+        image_statuses = read_all_image_statuses(paths.image_cache_dir)
         dashboard_card(num_screens, num_schedules, project_extension_url(project_name, 'epaper'),
                        weather_statuses=weather_statuses,
-                       homeassistant_statuses=homeassistant_statuses)
+                       homeassistant_statuses=homeassistant_statuses,
+                       ical_statuses=ical_statuses,
+                       image_statuses=image_statuses)
 
     register_project_card('dashboard', _dashboard_card)
 
@@ -95,6 +102,9 @@ def register(app: FastAPI) -> None:
     # see room.ui.rooms_wrapper(), screen.ui.screens_wrapper() and
     # schedule.ui.schedules_wrapper() for the list<->editor chrome, state and
     # slide animation. Registration order is tab order: Rooms comes first.
+    def _settings_tab(project_name: str) -> None:
+        project_config_card(_paths_for_project(project_name))
+
     def _rooms_tab(project_name: str) -> None:
         rooms_wrapper(_paths_for_project(project_name), project_name).render()
 
@@ -108,6 +118,7 @@ def register(app: FastAPI) -> None:
     def _booking_systems_tab(project_name: str) -> None:
         booking_systems_wrapper(_paths_for_project(project_name)).render()
 
+    register_project_tab('Settings', _settings_tab, icon='settings')
     register_project_tab('Rooms', _rooms_tab, icon='meeting_room')
     register_project_tab('Screens', _screens_tab, icon='wallpaper')
     register_project_tab('Schedules', _schedules_tab, icon='schedule')

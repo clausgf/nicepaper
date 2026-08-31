@@ -3,7 +3,10 @@ import io
 
 from PIL import Image
 
-from extensions.epaper.core.datasources.image import _cache_path, clear_cache, get_image
+from extensions.epaper.global_config.backend import app_config
+from extensions.epaper.core.datasources.image import (
+    _cache_path, clear_cache, get_image, read_all_image_statuses,
+)
 from extensions.epaper.core.widgets.image import target_size
 from extensions.epaper.screen.models import ImageWidgetModel
 from extensions.epaper.paths import EpaperPaths
@@ -82,3 +85,33 @@ def test_reload_each_time_never_caches(tmp_path):
 
     f.write_bytes(_png_bytes((0, 0, 255)))
     assert asyncio.run(get_image(paths, config)).getpixel((0, 0)) == (0, 0, 255)
+
+
+def test_get_image_records_status_on_success(tmp_path):
+    paths = _paths(tmp_path)
+    (paths.asset_dir / "pic.png").write_bytes(_png_bytes())
+    config = _file_config(file="pic.png")
+
+    asyncio.run(get_image(paths, config))
+    statuses = read_all_image_statuses(paths.image_cache_dir)
+    assert len(statuses) == 1
+    assert statuses[0].failing is False and statuses[0].last_update is not None
+    assert statuses[0].source == "pic.png"
+
+
+def test_get_image_backs_off_after_a_failure(tmp_path, monkeypatch):
+    """A broken reload_each_time source is retried on the configured backoff,
+    not on every single render (which would hammer it)."""
+    monkeypatch.setattr(app_config, "image_retry_min_s", 60)
+    monkeypatch.setattr(app_config, "image_retry_max_s", 1800)
+    paths = _paths(tmp_path)
+    config = _file_config(file="missing.png", reload_each_time=True)
+
+    assert asyncio.run(get_image(paths, config)) is None
+    first = read_all_image_statuses(paths.image_cache_dir)[0]
+    assert first.failing and first.fail_count == 1 and first.retry_after is not None
+
+    # inside the backoff window -> no second attempt, fail_count stays 1
+    assert asyncio.run(get_image(paths, config)) is None
+    second = read_all_image_statuses(paths.image_cache_dir)[0]
+    assert second.fail_count == 1

@@ -205,12 +205,32 @@ def test_global_config_card_renders_every_field():
         labels = {e._props.get("label") for e in client.elements.values()}
 
     # a field from each section, so a silently dropped group is noticed too
-    for expected in ("Locale", "Font name", "Color accent", "Latitude",
-                     "Weather error", "Home Assistant URL"):
+    for expected in ("Locale", "Font name", "Color accent",
+                     "Weather error", "Update interval s"):
         assert expected in labels, f"{expected!r} missing from the global settings card"
 
     # every setting should have a widget; none may be skipped silently
     assert len([e for e in labels if e]) >= len(GlobalConfig.model_fields)
+
+
+def test_project_config_card_renders_every_field(tmp_path):
+    """Same regression guard as test_global_config_card_renders_every_field,
+    for ProjectConfig's own form (project_config/ui.py)."""
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.paths import EpaperPaths
+    from extensions.epaper.project_config.models import ProjectConfig
+    from extensions.epaper.project_config.ui import project_config_fields
+
+    paths = EpaperPaths(root=tmp_path)
+    with Client(page("/test-project-config"), request=None) as client:
+        project_config_fields(paths)
+        labels = {e._props.get("label") for e in client.elements.values()}
+
+    for expected in ("Latitude", "Longitude", "Home Assistant URL", "Long-lived access token"):
+        assert expected in labels, f"{expected!r} missing from the project settings card"
+    assert len([e for e in labels if e]) >= len(ProjectConfig.model_fields)
 
 
 def _element_type_names(client) -> list:
@@ -218,20 +238,20 @@ def _element_type_names(client) -> list:
 
 
 def test_simplified_ui_nav_leaves_are_the_content_sections():
-    """The sidebar's leaves (the addressable views) are exactly the seven
+    """The sidebar's leaves (the addressable views) are exactly the eight
     content sections, Templates right after Rooms; Settings is a group and
-    never a view itself, with Schedule, Booking systems, Global settings and
-    Organizer names in that order."""
+    never a view itself, with Schedule, Booking systems, Organizer names,
+    Project settings and Global settings in that order."""
     from extensions.epaper.ui.simplified_ui import _nav
     from extensions.epaper.ui.simplified_ui.layout import _flatten
 
     nav = _nav()
     assert list(_flatten(nav)) == [
-        "rooms", "templates", "displays", "schedule", "booking", "global", "organizer",
+        "rooms", "templates", "displays", "schedule", "booking", "organizer", "project", "global",
     ]
     settings = next(i for i in nav if i.id == "settings")
     assert settings.render is None and [c.id for c in settings.children] == [
-        "schedule", "booking", "global", "organizer",
+        "schedule", "booking", "organizer", "project", "global",
     ]
 
 

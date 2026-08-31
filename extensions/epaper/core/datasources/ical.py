@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -101,63 +102,139 @@ def _extract_events(ical_text: str, start_date: datetime.datetime, end_date: dat
     return result
 
 
+@dataclass
+class IcalStatus:
+    """Outcome of an iCal fetch for one feed, for both the caller (events +
+    staleness) and the dashboard health view (failing/error/retry). Mirrors
+    WeatherStatus/EntityStatus (weather.py/homeassistant.py)."""
+    id: str
+    events: Optional[list]                            # last-known events; None if never fetched
+    last_update: Optional[datetime.datetime]          # last successful fetch
+    fresh: bool                                       # last_update within the update interval
+    failing: bool                                     # last attempt failed / currently backing off
+    fail_count: int                                   # consecutive failures
+    retry_after: Optional[datetime.datetime]          # earliest next network attempt
+    error: Optional[str]                              # last error message (dashboard tooltip)
+
+
+def _cache_filename(ical_dir: Path, id: str) -> Path:
+    return Path(ical_dir) / f"{id}.json"
+
+
+def _read_cache(cache_filename: Path) -> dict:
+    try:
+        with open(cache_filename, "r") as f:
+            cache = json.load(f)
+        return cache if isinstance(cache, dict) else {}
+    except Exception:
+        return {}
+
+
+def _parse_dt(value: Optional[str]) -> Optional[datetime.datetime]:
+    return datetime.datetime.fromisoformat(value) if value else None
+
+
+def _status_from_cache(id: str, cache: dict, now: datetime.datetime,
+                       update_interval_s: Optional[int] = None) -> IcalStatus:
+    last_update = _parse_dt(cache.get('last_update'))
+    fresh = (last_update is not None and update_interval_s is not None
+             and (now - last_update).total_seconds() < update_interval_s)
+    fail_count = int(cache.get('fail_count', 0))
+    return IcalStatus(
+        id=cache.get('id', id), events=cache.get('events'),
+        last_update=last_update, fresh=fresh, failing=fail_count > 0, fail_count=fail_count,
+        retry_after=_parse_dt(cache.get('retry_after')), error=cache.get('error'),
+    )
+
+
+def _backoff_seconds(fail_count: int) -> float:
+    """Exponential backoff (base doubling per consecutive failure), capped."""
+    base = max(1, app_config.ical_retry_min_s)
+    return float(min(base * (2 ** max(0, fail_count - 1)), app_config.ical_retry_max_s))
+
+
+def read_all_ical_statuses(ical_dir: Path) -> list[IcalStatus]:
+    """Status of every cached feed (no fetch), for the dashboard health view.
+    `update_interval_s` isn't known here (it's the caller's own config, see
+    get_from_ical()'s docstring), so `fresh` stays False -- the dashboard
+    only reads `.failing` (see ui/cards.py's _datasource_row)."""
+    now = datetime.datetime.now(ZoneInfo(app_config.timezone))
+    statuses = []
+    for path in sorted(Path(ical_dir).glob("*.json")):
+        cache = _read_cache(path)
+        if not cache.get('id'):
+            continue
+        statuses.append(_status_from_cache(cache['id'], cache, now))
+    return statuses
+
+
 async def get_from_ical(ical_dir: Path, organizer_names_file: Optional[Path], id: str, url: str,
                         update_interval_s: int, max_days: int,
                         username: str = "", password: str = "", headers: Optional[dict] = None,
-                        extract_organizer_from_summary: bool = True) -> list:
+                        extract_organizer_from_summary: bool = True) -> IcalStatus:
     """
-    Fetch and cache events from an iCal feed, `id` naming the cache file.
+    Fetch (or return cached) events from an iCal feed, as an IcalStatus.
+    `id` names the cache file. update_interval_s/max_days are the caller's
+    own config, not read from anywhere here: RoomCalendar passes its room's
+    BookingSystemModel's update_interval/max_days_ahead (room/backend.py's
+    get_room_events). username/password (HTTP Basic Auth) and headers are
+    optional, both from a BookingSystemModel when the feed needs them.
 
-    update_interval_s/max_days are the caller's own config, not read from
-    anywhere here: RoomCalendar passes its room's BookingSystemModel's
-    update_interval/max_days_ahead (room/backend.py's get_room_events).
-    username/password (HTTP Basic Auth) and headers are optional, both from a BookingSystemModel when
-    the feed needs them.
+    Never raises: on a fetch/parse failure it records the failure (fail_count,
+    exponential backoff via retry_after, last error) in the same cache file
+    and returns the last-known events with failing=True (graceful
+    degradation, matching the weather/Home Assistant datasources -- iCal used
+    to have neither, so a broken feed was retried on every single render).
+    get_room_events() (room/backend.py) adapts this back to the
+    raise-on-total-failure contract its own callers already expect.
     """
-    # load data from cache
-    data = None
-    cache_filename = os.path.join(ical_dir, f"{id}.json")
-    if os.path.exists(cache_filename):
-        async with aiofiles.open(cache_filename, "r") as cache_file:
-            data = json.loads(await cache_file.read())
-        logger.debug(f"{id} loaded {len(data.get('events', []))} events from cache")
-    if data is not None and 'last_update' in data and 'events' in data:
-        last_update = datetime.datetime.fromisoformat(data['last_update'])
-        now = datetime.datetime.now(ZoneInfo(app_config.timezone))
-        timedelta = now - last_update
-        if timedelta.total_seconds() < update_interval_s:
-            logger.info(f"Ical {id} skipping update, last update was {timedelta.total_seconds()} seconds ago")
-            return data['events']
+    cache_filename = _cache_filename(ical_dir, id)
+    now = datetime.datetime.now(ZoneInfo(app_config.timezone))
+    cache = _read_cache(cache_filename)
+    status = _status_from_cache(id, cache, now, update_interval_s)
 
-    # refresh data from ical feed
+    if status.fresh:
+        logger.info(f"Ical {id} skipping update, cached data is fresh")
+        return status
+    if status.retry_after is not None and now < status.retry_after:
+        logger.info(f"Ical {id} backing off until {status.retry_after.isoformat()}")
+        return status
+
     logger.info(f"Ical {id} updating from {url}")
     request_headers = dict(headers) if headers else {}
     if username:
         request_headers['Authorization'] = aiohttp.encode_basic_auth(username, password)
-    async with _get_session().get(url, headers=request_headers or None) as response:
-        response_text = await response.text()
-        logger.info(f"Ical {id} response status: {response.status}")
+    try:
+        async with _get_session().get(url, headers=request_headers or None) as response:
+            response_text = await response.text()
+            logger.info(f"Ical {id} response status: {response.status}")
 
-    start_date = datetime.datetime.now(ZoneInfo(app_config.timezone))
-    end_date = start_date + datetime.timedelta(days=max_days)
+        start_date = now
+        end_date = start_date + datetime.timedelta(days=max_days)
 
-    organizer_names = []
-    if organizer_names_file and os.path.exists(organizer_names_file) and extract_organizer_from_summary:
-        async with aiofiles.open(organizer_names_file, "r") as org_file:
-            organizer_names = json.loads(await org_file.read())
-    logger.info(f"Ical {id}: {len(organizer_names)} organizer name(s) loaded for summary extraction: "
-               f"{organizer_names}")
+        organizer_names = []
+        if organizer_names_file and os.path.exists(organizer_names_file) and extract_organizer_from_summary:
+            async with aiofiles.open(organizer_names_file, "r") as org_file:
+                organizer_names = json.loads(await org_file.read())
+        logger.info(f"Ical {id}: {len(organizer_names)} organizer name(s) loaded for summary extraction: "
+                   f"{organizer_names}")
 
-    events = await asyncio.to_thread(
-        _extract_events, response_text, start_date, end_date,
-        organizer_names, extract_organizer_from_summary, max_days, id)
+        events = await asyncio.to_thread(
+            _extract_events, response_text, start_date, end_date,
+            organizer_names, extract_organizer_from_summary, max_days, id)
+    except Exception as e:
+        fail_count = status.fail_count + 1
+        retry_after = now + datetime.timedelta(seconds=_backoff_seconds(fail_count))
+        logger.error(f"Error occurred while fetching ical data for {id} from {url}: {e}; "
+                     f"retrying after {retry_after.isoformat()} (attempt {fail_count})")
+        cache.update(id=id, fail_count=fail_count, retry_after=retry_after.isoformat(), error=str(e))
+        async with aiofiles.open(cache_filename, "w") as cache_file:
+            await cache_file.write(json.dumps(cache))
+        return _status_from_cache(id, cache, now, update_interval_s)
 
-    data = {
-        'last_update': start_date.isoformat(),
-        'events': events
-    }
+    cache = {'id': id, 'last_update': now.isoformat(), 'events': events}  # success clears fail/backoff state
     async with aiofiles.open(cache_filename, "w") as cache_file:
-        await cache_file.write(json.dumps(data))
+        await cache_file.write(json.dumps(cache))
 
     logger.debug(f"{id} collected {len(events)} events")
-    return events
+    return _status_from_cache(id, cache, now, update_interval_s)

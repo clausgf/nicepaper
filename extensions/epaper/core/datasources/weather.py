@@ -277,6 +277,15 @@ def read_all_weather_statuses(weather_dir: Path) -> list[WeatherStatus]:
     """Read the status of every cached weather location (no fetch), for the
     dashboard. Coordinates are recovered from the cache file names."""
     now = datetime.datetime.now(ZoneInfo(app_config.timezone))
+    # remove files older than twice the update interval (they're stale and not used by any widget)
+    cutoff = now - datetime.timedelta(seconds=app_config.weather_update_interval_s * 2)
+    for path in weather_dir.glob("*.json"):
+        if path.is_file() and datetime.datetime.fromtimestamp(path.stat().st_mtime, ZoneInfo(app_config.timezone)) < cutoff:
+            try:
+                path.unlink()
+            except Exception as e:
+                logger.warning(f"Failed to delete stale weather cache file {path}: {e}")
+    # read the remaining cache files, skipping any with invalid names
     statuses = []
     for path in sorted(Path(weather_dir).glob("*.json")):
         try:

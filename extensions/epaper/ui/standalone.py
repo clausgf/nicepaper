@@ -9,10 +9,15 @@ from contextlib import contextmanager
 from nicegui import ui
 
 from extensions.epaper.bookingsystem.ui import booking_systems_wrapper
+from extensions.epaper.core.datasources.homeassistant import read_all_entity_statuses
+from extensions.epaper.core.datasources.ical import read_all_ical_statuses
+from extensions.epaper.core.datasources.image import read_all_image_statuses
+from extensions.epaper.core.datasources.weather import read_all_weather_statuses
 from extensions.epaper.devicebinding.ui import device_config_card
 from extensions.epaper.global_config.backend import save_global_config
 from extensions.epaper.global_config.ui import global_config_card
 from extensions.epaper.paths import EpaperPaths
+from extensions.epaper.project_config.ui import project_config_card
 from extensions.epaper.room.ui import rooms_wrapper
 from extensions.epaper.ui import simplified_ui
 from extensions.epaper.ui.cards import dashboard_card
@@ -33,7 +38,7 @@ SIMPLIFIED_ROUTE = '/simplified'
 # DrillDownWrapper-based screens_wrapper()/schedules_wrapper() the nice4iot
 # extension does (see __init__.py) rather than its own /screens/{filename}
 # sub-route.
-TAB_ROUTES = {'Global': '/global', 'Project': '/project', 'Device': '/device', 'Rooms': '/rooms', 'Screens': '/screens', 'Schedules': '/schedules', 'Booking systems': '/booking-systems'}
+TAB_ROUTES = {'Global': '/global', 'Project': '/project', 'Settings': '/settings', 'Device': '/device', 'Rooms': '/rooms', 'Screens': '/screens', 'Schedules': '/schedules', 'Booking systems': '/booking-systems'}
 
 
 @contextmanager
@@ -51,6 +56,7 @@ def frame(active_tab: str):
         with ui.tabs(value=active_tab, on_change=on_tab_change).props('dense indicator-color=white').classes('text-white'):  # type: ignore[arg-type]
             ui.tab('Global')
             ui.tab('Project')
+            ui.tab('Settings')
             ui.tab('Device')
             ui.tab('Rooms')
             ui.tab('Screens')
@@ -110,7 +116,16 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
         with frame('Project'):
             dashboard_card(num_screens=len(list(paths.screen_dir.glob('*.json'))),
                            num_schedules=len(list(paths.schedule_dir.glob('*.json'))),
-                           open_url=SIMPLIFIED_ROUTE)
+                           open_url=SIMPLIFIED_ROUTE,
+                           weather_statuses=read_all_weather_statuses(paths.weather_dir),
+                           homeassistant_statuses=read_all_entity_statuses(paths.homeassistant_dir),
+                           ical_statuses=read_all_ical_statuses(paths.ical_dir),
+                           image_statuses=read_all_image_statuses(paths.image_cache_dir))
+
+    @ui.page('/settings')
+    def page_settings():
+        with frame('Settings'):
+            project_config_card(paths)
 
     @ui.page('/device')
     def page_device():

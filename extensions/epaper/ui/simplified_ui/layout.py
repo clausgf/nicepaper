@@ -199,7 +199,7 @@ def build_page(project_name: str, paths: EpaperPaths, nav: list[NavItem],
         ui.space()
         _user_menu()
 
-    with ui.column().classes('w-full p-4 gap-4'):
+    with ui.column().classes('w-full h-full p-4 gap-4'):
         routes: dict[str, Callable[..., Any]] = {}
         for leaf_id, leaf in leaves.items():
             assert leaf.render is not None
@@ -207,7 +207,7 @@ def build_page(project_name: str, paths: EpaperPaths, nav: list[NavItem],
         routes['/'] = routes[landing_path]
         if extra_routes is not None:
             routes.update(extra_routes(shell))
-        ui.sub_pages(routes, root_path=root_path).classes('w-full')
+        ui.sub_pages(routes, root_path=root_path).classes('w-full h-full')
 
     def _resync_sidebar(_: str) -> None:
         sidebar.refresh()

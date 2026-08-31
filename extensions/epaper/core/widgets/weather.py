@@ -8,6 +8,7 @@ from extensions.epaper.core.datasources.weather import (
     WeatherStatus, convert_wind_speed, format_wind_speed, get_weather, metric_title,
     weather_icon_and_description, wind_direction_label, wind_labels,
 )
+from extensions.epaper.project_config.backend import get_project_config
 from extensions.epaper.screen.models import (
     WeatherChartWidgetModel, WeatherForecastWidgetModel, WeatherNowWidgetModel,
 )
@@ -43,10 +44,11 @@ class _WeatherWidgetBase(Widget):
         backoff and never raises. self._status carries the staleness/failure
         details for _draw_stale_notice() and the dashboard."""
         w, h = self.config.size
-        location = self.config.resolved_location(app_config.latitude, app_config.longitude)
+        project_config = get_project_config(ctx.paths)
+        location = self.config.resolved_location(project_config.latitude, project_config.longitude)
         if location is None:
             logger.warning(f"Widget {self.id} has no location and no default location is "
-                           f"configured (see the latitude/longitude global settings)")
+                           f"configured (see the latitude/longitude project settings)")
             ctx.draw_text((0, 0), size=(w, h), text=app_config.weather_error, font=self.font)
             return None
         self._status = await get_weather(ctx.paths.weather_dir, *location)

@@ -9,15 +9,12 @@ import pytest
 from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.core.datasources.homeassistant import (
     EntityStatus, _cache_filename, _classify_error, entity_label, entity_unit, format_value,
-    get_entity, numeric_value, raw_value, read_all_entity_statuses,
+    get_entity, is_configured, numeric_value, raw_value, read_all_entity_statuses,
 )
 
 
-@pytest.fixture(autouse=True)
-def _configured(monkeypatch):
-    """Every test here assumes a configured instance unless it says otherwise."""
-    monkeypatch.setattr(app_config, "homeassistant_url", "http://ha.local:8123")
-    monkeypatch.setattr(app_config, "homeassistant_token", "token")
+_URL = "http://ha.local:8123"
+_TOKEN = "token"
 
 
 def _now():
@@ -44,7 +41,7 @@ def test_get_entity_uses_cache_without_network_call(tmp_path, monkeypatch):
                  data=_state("21.4", unit_of_measurement="°C", friendly_name="Living room"))
     monkeypatch.setattr("extensions.epaper.core.datasources.homeassistant._get_session", _fail_if_called)
 
-    status = asyncio.run(get_entity(tmp_path, "sensor.temp"))
+    status = asyncio.run(get_entity(tmp_path, "sensor.temp", _URL, _TOKEN))
     assert status.state == "21.4" and status.fresh and not status.failing
     assert entity_unit(status) == "°C"
     assert entity_label(status) == "Living room"
@@ -62,14 +59,14 @@ def test_get_entity_backs_off_and_degrades_gracefully(tmp_path, monkeypatch):
     monkeypatch.setattr("extensions.epaper.core.datasources.homeassistant._get_session",
                         lambda: _FakeSession(boom))
 
-    first = asyncio.run(get_entity(tmp_path, "sensor.temp"))
+    first = asyncio.run(get_entity(tmp_path, "sensor.temp", _URL, _TOKEN))
     assert first.state == "9.0"                      # graceful: last-known value still rendered
     assert first.failing and first.fail_count == 1 and first.retry_after is not None
     assert first.error_code == "error" and "Cannot connect" in first.error
 
     # inside the backoff window -> no request at all
     monkeypatch.setattr("extensions.epaper.core.datasources.homeassistant._get_session", _fail_if_called)
-    second = asyncio.run(get_entity(tmp_path, "sensor.temp"))
+    second = asyncio.run(get_entity(tmp_path, "sensor.temp", _URL, _TOKEN))
     assert second.state == "9.0" and second.failing
 
 
@@ -82,22 +79,28 @@ def test_get_entity_fetches_and_caches(tmp_path, monkeypatch):
     monkeypatch.setattr("extensions.epaper.core.datasources.homeassistant._get_session",
                         lambda: _FakeSession(ok, payload))
 
-    status = asyncio.run(get_entity(tmp_path, "sensor.temp"))
+    status = asyncio.run(get_entity(tmp_path, "sensor.temp", _URL, _TOKEN))
     assert status.state == "18.2" and status.fresh and not status.failing
     # the state is cached, so a second render doesn't need the network
     monkeypatch.setattr("extensions.epaper.core.datasources.homeassistant._get_session", _fail_if_called)
-    assert asyncio.run(get_entity(tmp_path, "sensor.temp")).state == "18.2"
+    assert asyncio.run(get_entity(tmp_path, "sensor.temp", _URL, _TOKEN)).state == "18.2"
 
 
 def test_get_entity_without_configuration_never_touches_network_or_cache(tmp_path, monkeypatch):
-    monkeypatch.setattr(app_config, "homeassistant_url", "")
     monkeypatch.setattr("extensions.epaper.core.datasources.homeassistant._get_session", _fail_if_called)
 
-    status = asyncio.run(get_entity(tmp_path, "sensor.temp"))
+    status = asyncio.run(get_entity(tmp_path, "sensor.temp", "", _TOKEN))
     assert status.failing and status.state is None
     assert "not configured" in status.error
     # no backoff state written: configuring the URL must take effect at once
     assert not list(tmp_path.glob("*.json"))
+
+
+def test_is_configured_needs_both_url_and_token():
+    assert is_configured(_URL, _TOKEN)
+    assert not is_configured("", _TOKEN)
+    assert not is_configured(_URL, "")
+    assert not is_configured("", "")
 
 
 def test_read_all_entity_statuses(tmp_path):

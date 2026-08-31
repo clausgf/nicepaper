@@ -24,8 +24,9 @@ def render_organizer_names(shell: Shell) -> None:
         save_organizer_names(shell.paths, names)
         ui.notify('Saved', type='positive')
 
-    with view_header('Organizer names'):
-        pass
-    ui.label(_DESCRIPTION).classes('text-caption text-grey')
-    textarea = ui.textarea(value='\n'.join(read_organizer_names(shell.paths))) \
-        .props('outlined').classes('w-full').on('blur', handle_blur)
+    with ui.column().classes('w-full h-full gap-4'):
+        with view_header('Organizer names'):
+            pass
+        ui.label(_DESCRIPTION).classes('text-caption text-grey')
+        textarea = ui.textarea(value='\n'.join(read_organizer_names(shell.paths))) \
+            .props('outlined').classes('w-full flex-grow').on('blur', handle_blur)

@@ -3,23 +3,27 @@
 [← Documentation](README.md)
 
 `GlobalConfig` (`extensions/epaper/global_config/models.py`) holds the settings
-that are the same for every screen — defaults, locale, color models, the
-default font/colors, update intervals, ... It is a plain pydantic model that is
-**JSON-persisted** to `data/global_config.json` and edited through the global
-settings card in the UI, *not* an environment-variable/`BaseSettings` config.
-At startup `load_global_config()` (`global_config/backend.py`) loads that file
-into the shared `app_config` singleton in place (creating it with the defaults
-if missing).
+that are the same for every screen *and every project* — defaults, locale,
+color models, the default font/colors, update intervals, ... It is a plain
+pydantic model that is **JSON-persisted** to `data/global_config.json` and
+edited through the global settings card in the UI, *not* an
+environment-variable/`BaseSettings` config. At startup `load_global_config()`
+(`global_config/backend.py`) loads that file into the shared `app_config`
+singleton in place (creating it with the defaults if missing).
 
 Edit these settings in the UI:
 
 - **Standalone:** the **Global** tab → *E-Paper Global Settings*.
 - **nice4iot:** the global **E-Paper** card.
 
-or by editing `data/global_config.json` directly. Per-screen/per-widget settings
-(size, position, per-widget font, ...) live in the screen/schedule JSON files
-instead (see [Screens, widgets & schedules](screens.md)); `GlobalConfig` is only
-for things that don't vary per screen.
+or by editing `data/global_config.json` directly. Settings that instead
+identify one *site* — the Home Assistant instance, the default weather
+location — live in `ProjectConfig` instead (see
+[Project settings](#project-settings) below), since different projects can be
+different sites. Per-screen/per-widget settings (size, position, per-widget
+font, ...) live in the screen/schedule JSON files instead (see
+[Screens, widgets & schedules](screens.md)); `GlobalConfig` is only for things
+that don't vary per screen or per project.
 
 ## Commonly adjusted settings
 
@@ -39,12 +43,6 @@ same settings with humanized labels):
   wind speed/gusts in: `kmh` (default), `ms`, `mph` or `kn` (knots). Open-Meteo
   is always fetched in km/h and converted locally, so changing this takes effect
   without a refetch.
-- `latitude`, `longitude` — the default forecast location, used by every
-  `Weather*` widget that sets no coordinates of its own (defaults to 52.52 /
-  13.405, Berlin). Most installations show the same place on every screen, so
-  this is usually the only place a location needs to be set. A widget
-  overrides it by setting **both** of its own coordinates; see
-  [Screens, widgets & schedules](screens.md).
 - `weather_update_interval_s` — Open-Meteo polling interval for the `Weather*`
   widgets.
 - `weather_retry_min_s`, `weather_retry_max_s` — after a failed Open-Meteo
@@ -58,6 +56,14 @@ same settings with humanized labels):
   under Home Assistant below, it supports placeholders the others don't).
   (All the default message/label strings are English; edit them here for another
   language.)
+- `ical_retry_min_s`, `ical_retry_max_s` — after a failed iCal fetch, the
+  feed backs off the same way weather does (doubling per consecutive
+  failure), showing the last-known events during the outage instead of
+  hammering the feed on every render.
+- `image_retry_min_s`, `image_retry_max_s` — the same backoff for a failed
+  `Image` widget load. Only matters for a source that fails: a `cache_once`
+  image that already loaded once is never retried, and a `reload_each_time`
+  image is retried on every render only while it keeps working.
 - `color_background`, `color_primary`, `color_accent` — the **default**
   background, text/drawing and accent color (accent defaults to red, the only
   accent the `bwr` palette has; it is used for the chart widgets' primary
@@ -65,20 +71,46 @@ same settings with humanized labels):
   can override each of them — see
   [Screens, widgets & schedules](screens.md#displays-palettes-and-colors).
 
-## Home Assistant
+## Project settings
 
-The `HomeAssistant` widget (see [Screens, widgets & schedules](screens.md)) needs
-two settings before it can show anything:
+`ProjectConfig` (`extensions/epaper/project_config/models.py`) holds the
+settings that identify one *site* rather than the whole installation: the
+Home Assistant instance and the default weather location. It is per-project
+(per data root), **JSON-persisted** to `project_config.json` next to
+`screens/`, `rooms/`, etc., and read fresh on every access — there is no
+shared singleton like `app_config`, since two projects can have different
+values.
 
+Edit these settings in the UI:
+
+- **Standalone:** the **Settings** tab.
+- **nice4iot:** the project's **Settings** tab.
+
+or by editing `<project>/project_config.json` (`data/project_config.json`
+standalone) directly. The file is optional — a project with none has every
+field at its default.
+
+- `latitude`, `longitude` — the default forecast location, used by every
+  `Weather*` widget in this project that sets no coordinates of its own
+  (defaults to 52.52 / 13.405, Berlin). A widget overrides it by setting
+  **both** of its own coordinates; see
+  [Screens, widgets & schedules](screens.md).
 - `homeassistant_url` — base URL of the instance, e.g.
-  `http://homeassistant.local:8123`. Empty (the default) disables the widget.
+  `http://homeassistant.local:8123`. Empty (the default) disables the widget
+  for this project.
 - `homeassistant_token` — a **long-lived access token**, created in Home
   Assistant under *your profile → Security → Long-lived access tokens*. It is
   sent as `Authorization: Bearer …` and is stored in plain text in the config
   file, so prefer a token belonging to a dedicated, least-privileged user — see
   [SECURITY.md](../SECURITY.md).
 
-Optional:
+## Home Assistant
+
+The `HomeAssistant` widget (see [Screens, widgets & schedules](screens.md))
+needs `homeassistant_url`/`homeassistant_token` (see
+[Project settings](#project-settings) above) before it can show anything.
+The rest of its settings stay in `GlobalConfig`, since they are operational
+knobs rather than something that varies per site:
 
 - `homeassistant_update_interval_s` — how long a fetched state is reused before
   Home Assistant is asked again (default 300 s). Entity states are cached per

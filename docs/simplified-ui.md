@@ -21,7 +21,8 @@ own section renderer in its package: `room/simplified_ui.py`,
 `bookingsystem/simplified_ui.py` (a thin wrapper around `bookingsystem/ui.py`,
 shared with the nice4iot "Booking systems" project tab), `schedule/simplified_ui.py`
 (Preferences > Schedule), `global_config/simplified_ui.py` (Preferences >
-Global settings), `organizer/simplified_ui.py` (Preferences > Organizer names)
+Global settings), `project_config/simplified_ui.py` (Preferences > Project
+settings), `organizer/simplified_ui.py` (Preferences > Organizer names)
 and `display/simplified_ui.py` (the top-level Displays section); room storage
 is `room/backend.py`.
 `render(project_name, paths=None)` is the entry point — the extension derives
@@ -65,18 +66,22 @@ only folds it). Current sections:
   refresh today; Exchange and others later). Also reachable as a nice4iot
   project tab ("Booking systems"), sharing the same `bookingsystem/ui.py`
   wrapper.
-- **Settings › Global settings** — the same project-independent fields as
-  nice4iot's "E-Paper" global settings card, embedded for convenience;
-  editing here changes the setting for every project.
 - **Settings › Organizer names** — a directly editable textarea for
   `organizer_names_file` (one name per line, saved on blur), previously
   admin-only/hand-placed on disk.
+- **Settings › Project settings** — Home Assistant URL/token and the default
+  weather location for *this* project only (`ProjectConfig`), the same fields
+  as nice4iot's "Settings" project tab.
+- **Settings › Global settings** — the same project-independent fields as
+  nice4iot's "E-Paper" global settings card, embedded for convenience;
+  editing here changes the setting for every project.
 
 Switching is **real, bookmarkable URL routing** (`ui/simplified_ui/layout.py`,
 `nicegui.ui.sub_pages`): each section has its own path relative to the page's
 own base URL — `/rooms`, `/templates`, `/displays`, `/settings/schedule`,
-`/settings/booking`, `/settings/global`, `/settings/organizer` (`/` aliases
-`/rooms`, the landing view) — plus `/rooms/{room_id}` to open a room's
+`/settings/booking`, `/settings/organizer`, `/settings/project`,
+`/settings/global` (`/` aliases `/rooms`, the landing view) — plus
+`/rooms/{room_id}` to open a room's
 detail directly. Clicking a sidebar row calls `ui.navigate.to()`, same as
 nice4iot's own internal navigation; the active row is recomputed from the
 browser's current path on every navigation (`sub_pages_router.on_path_changed`).

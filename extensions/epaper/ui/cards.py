@@ -13,6 +13,8 @@ from nicegui import context, ui
 
 from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.core.datasources.homeassistant import EntityStatus
+from extensions.epaper.core.datasources.ical import IcalStatus
+from extensions.epaper.core.datasources.image import ImageStatus
 from extensions.epaper.core.datasources.weather import WeatherStatus
 from extensions.epaper.util import humanize_age
 
@@ -41,11 +43,12 @@ def _datasource_row(status, now: datetime.datetime, icons: tuple[str, str], subj
                     has_value: bool) -> None:
     """One dashboard health line for a cached datasource: colour + icon by
     severity, with a tooltip carrying the last error and retry time. The
-    weather and Home Assistant caches report the same three states (fine;
-    stale but with a last-known value; nothing at all), so they share this
-    -- but they keep that value in differently named fields
-    (WeatherStatus.data, EntityStatus.state), hence `has_value` from the
-    caller rather than an attribute lookup here."""
+    weather/Home Assistant/iCal/image caches all report the same three
+    states (fine; stale but with a last-known value; nothing at all), so
+    they share this -- but they keep that value in differently named fields
+    (WeatherStatus.data, EntityStatus.state, IcalStatus.events,
+    ImageStatus.last_update), hence `has_value` from the caller rather than
+    an attribute lookup here."""
     ok_icon, bad_icon = icons
     if not status.failing:
         _health_row(ok_icon, 'positive', f'{subject}: updated {humanize_age(status.last_update, now)}', None)
@@ -60,17 +63,17 @@ def _datasource_row(status, now: datetime.datetime, icons: tuple[str, str], subj
 
 def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
                    weather_statuses: Sequence[WeatherStatus] = (),
-                   homeassistant_statuses: Sequence[EntityStatus] = ()) -> None:
+                   homeassistant_statuses: Sequence[EntityStatus] = (),
+                   ical_statuses: Sequence[IcalStatus] = (),
+                   image_statuses: Sequence[ImageStatus] = ()) -> None:
     """
     Compact always-visible summary card for nice4iot's project Dashboard
-    tab. open_url is where the "open" button navigates -- resolved by the
-    caller (project_extension_url(project_name, 'epaper'), the simplified
-    UI's own standalone page), since URL construction is nice4iot-specific
-    and doesn't belong in this UI-only module.
+    tab. open_url is where the "open" button navigates.
 
-    weather_statuses / homeassistant_statuses (read from the respective caches
-    by the caller) render one health line per location/entity, so an outage of
-    either datasource is visible here without opening a screen.
+    weather_statuses / homeassistant_statuses / ical_statuses / image_statuses
+    (read from the respective caches by the caller) render one health line
+    per location/entity/feed/source, so an outage of any datasource is
+    visible here without opening a screen.
     """
     now = datetime.datetime.now(ZoneInfo(app_config.timezone))
     with ui.card().classes('w-full'):
@@ -91,3 +94,9 @@ def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
         for entity in homeassistant_statuses:
             _datasource_row(entity, now, ('sensors', 'sensors_off'),
                             f'HA {entity.entity_id}', entity.state is not None)
+        for feed in ical_statuses:
+            _datasource_row(feed, now, ('event_available', 'event_busy'),
+                            f'iCal {feed.id}', feed.events is not None)
+        for image in image_statuses:
+            _datasource_row(image, now, ('image', 'broken_image'),
+                            f'Image {image.source or image.key}', image.last_update is not None)

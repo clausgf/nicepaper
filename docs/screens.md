@@ -62,8 +62,9 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   palette. The filled part is solid (in the accent color), the rest stays an
   outline, so a gauge is still readable on a pure black/white display. An image
   Home Assistant *does* serve — a camera snapshot, an add-on-rendered dashboard —
-  can be shown with the `Image` widget instead. The URL, token and intervals are
-  global settings (see [Configuration](configuration.md)); as with weather,
+  can be shown with the `Image` widget instead. The URL and token are project
+  settings, the update interval/backoff/error text are global settings (see
+  [Configuration](configuration.md)); as with weather,
   fetches back off on failure, the last-known value keeps being shown with the
   `homeassistant_stale_notice` marker, and the outage appears on the nice4iot
   Dashboard.
@@ -91,10 +92,10 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   [Open-Meteo](https://open-meteo.com)
   (no API key needed; the DWD ICON model for German/European locations) and
   are placed by `latitude`/`longitude` — leave **both** empty to use the
-  default location from the global settings (see
+  default location from the project settings (see
   [Configuration](configuration.md)). The fallback is all-or-nothing: filling
   in only one of the two keeps the other at 0 rather than completing it from
-  the global setting, which would put the widget somewhere neither setting
+  the project setting, which would put the widget somewhere neither setting
   describes. Icons reuse the bundled
   `fa-solid-900.ttf` (no extra font/image assets). Charts are hand-drawn with
   Pillow, not a plotting library, so they render crisply on bilevel/limited

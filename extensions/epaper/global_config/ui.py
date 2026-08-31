@@ -20,8 +20,6 @@ from extensions.epaper.ui.forms import (
     STALE_NOTICE_HINT, TIME_PATTERN_HINT, hints,
 )
 
-_LOCATION_HINT = 'Used by weather widgets that set no location'
-
 # Curated CLDR patterns for the date/time ui.select fields below --
 # with_input=True keeps them editable, so any other CLDR pattern still works.
 _SHORT_DATE_FORMATS = ['dd.MM.yy', 'dd.MM.yyyy', 'yyyy-MM-dd', 'MM/dd/yy', 'MM/dd/yyyy', 'dd/MM/yyyy']
@@ -35,18 +33,17 @@ _LAYOUT = [
      [ROW, 'color_background', 'color_primary', 'color_accent']],
     ['## iCal (Room Calendar)', COL,
      'ical_error',
+     [ROW, 'ical_retry_min_s', 'ical_retry_max_s'],
      [ROW, 'no_appointments', 'next_appointment'],
      [ROW, 'current_appointment', 'further_appointments'],
      [ROW, 'roomcalendar_date_format_long', 'roomcalendar_date_format_short',
       'roomcalendar_time_format']],
     ['## Weather', COL,
-     [ROW, 'latitude', 'longitude'],
      [ROW, 'weather_update_interval_s', 'wind_speed_unit'],
      [ROW, 'weather_retry_min_s', 'weather_retry_max_s'],
      [ROW, 'weather_error', 'weather_stale_notice']],
-    ['## Image', COL, 'image_error'],
+    ['## Image', COL, 'image_error', [ROW, 'image_retry_min_s', 'image_retry_max_s']],
     ['## Home Assistant', COL,
-     'homeassistant_url', 'homeassistant_token',
      [ROW, 'homeassistant_update_interval_s', 'homeassistant_retry_min_s',
       'homeassistant_retry_max_s'],
      [ROW, 'homeassistant_error', 'homeassistant_stale_notice']],
@@ -69,10 +66,10 @@ def _field_infos() -> dict:
         # explicit labels: the humanized field names would all read
         # "Homeassistant ..." (one word, wrong spelling) and repeat the
         # section heading in every field
-        'homeassistant_url': Field(label='Home Assistant URL'),
-        # the token is a secret: masked in the field, still stored as plain
-        # text in the config file (see GlobalConfig / SECURITY.md)
-        'homeassistant_token': Field(label='Long-lived access token', props='type=password'),
+        'ical_retry_min_s': Field(label='iCal retry min s'),
+        'ical_retry_max_s': Field(label='iCal retry max s'),
+        'image_retry_min_s': Field(label='Image retry min s'),
+        'image_retry_max_s': Field(label='Image retry max s'),
         'homeassistant_update_interval_s': Field(label='Update interval s'),
         'homeassistant_retry_min_s': Field(label='Retry min s'),
         'homeassistant_retry_max_s': Field(label='Retry max s'),
@@ -82,8 +79,7 @@ def _field_infos() -> dict:
                 roomcalendar_date_format_long=DATE_PATTERN_HINT,
                 roomcalendar_date_format_short=SHORT_DATE_PATTERN_HINT,
                 roomcalendar_time_format=TIME_PATTERN_HINT,
-                weather_stale_notice=STALE_NOTICE_HINT,
-                latitude=_LOCATION_HINT, longitude=_LOCATION_HINT),
+                weather_stale_notice=STALE_NOTICE_HINT),
     }
 
 

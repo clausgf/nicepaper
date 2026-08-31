@@ -27,6 +27,7 @@ from extensions.epaper.catalog.models import Palette
 from extensions.epaper.config import resource_paths
 from extensions.epaper.core.datasources.image import clear_cache as clear_image_cache
 from extensions.epaper.global_config.backend import app_config
+from extensions.epaper.project_config.backend import get_project_config
 from extensions.epaper.screen.models import (
     DateWidgetModel, HomeAssistantWidgetModel, ImageWidgetModel, RoomCalendarWidgetModel,
     ScreenModel, TextWidgetModel, WeatherChartWidgetModel, WeatherForecastWidgetModel,
@@ -49,8 +50,9 @@ class WidgetType:
     model: type[WidgetModel]
     icon: str
     title: str
-    summary: Callable[[Any], str]
-    """One line identifying an instance in the widget list."""
+    summary: Callable[[Any, EpaperPaths], str]
+    """One line identifying an instance in the widget list. Takes `paths`
+    since a weather widget's summary reads the project's default location."""
     content: Union[list, Callable[[Any, EpaperPaths], list]]
     """The Content section as layout entries; the Layout and Appearance
     sections above it are the same for every type (see _layout())."""
@@ -77,23 +79,25 @@ def _resolve(value: Any, widget: WidgetModel, paths: EpaperPaths) -> Any:
 
 # --- summaries for the widget list ------------------------------------------
 
-def _location_summary(widget: WeatherWidgetModel) -> str:
+def _location_summary(widget: WeatherWidgetModel, paths: EpaperPaths) -> str:
     """A weather widget's location: its own coordinates, or a note that it
-    follows the global default -- which is the one thing a bare
+    follows the project default -- which is the one thing a bare
     '52.52, 13.41' could not tell apart."""
-    location = widget.resolved_location(app_config.latitude, app_config.longitude)
+    project_config = get_project_config(paths)
+    location = widget.resolved_location(project_config.latitude, project_config.longitude)
     if location is None:
         return '(no location)'
     text = f'{location[0]:.2f}, {location[1]:.2f}'
     return text if (widget.latitude or widget.longitude) else f'{text} (default)'
 
 
-def _chart_summary(widget: WeatherChartWidgetModel) -> str:
+def _chart_summary(widget: WeatherChartWidgetModel, paths: EpaperPaths) -> str:
     metrics = ' + '.join(m for m in (widget.primary_metric, widget.secondary_metric) if m)
-    return f'{_location_summary(widget)} · {metrics}' if metrics else f'{_location_summary(widget)} (no metric)'
+    location = _location_summary(widget, paths)
+    return f'{location} · {metrics}' if metrics else f'{location} (no metric)'
 
 
-def _homeassistant_summary(widget: HomeAssistantWidgetModel) -> str:
+def _homeassistant_summary(widget: HomeAssistantWidgetModel, paths: EpaperPaths) -> str:
     entity = widget.entity_id or '(no entity)'
     return f'{entity}{f".{widget.attribute}" if widget.attribute else ""} · {widget.display}'
 
@@ -136,27 +140,27 @@ def _image_extra(form: ModelForm, widget: ImageWidgetModel, paths: EpaperPaths,
 
 def _homeassistant_extra(form: ModelForm, widget: HomeAssistantWidgetModel, paths: EpaperPaths,
                          persist: Callable[[], None]) -> None:
-    if not app_config.homeassistant_url:
-        ui.label('No Home Assistant URL configured — set it in the global E-Paper settings.'
+    if not get_project_config(paths).homeassistant_url:
+        ui.label('No Home Assistant URL configured — set it in the project settings.'
                  ).classes('text-caption text-negative')
 
 
 WIDGET_TYPES: dict[str, WidgetType] = {
     'Text': WidgetType(
         model=TextWidgetModel, icon='text_fields', title='Text Widget',
-        summary=lambda w: w.text or '(empty text)',
+        summary=lambda w, paths: w.text or '(empty text)',
         defaults={'text': 'Text'},
         content=['text', 'alignment'],
     ),
     'Date': WidgetType(
         model=DateWidgetModel, icon='event', title='Date Widget',
-        summary=lambda w: w.date_format or 'Date',
+        summary=lambda w, paths: w.date_format or 'Date',
         content=['date_format', 'alignment'],
         field_infos=hints(date_format=DATE_PATTERN_HINT),
     ),
     'RoomCalendar': WidgetType(
         model=RoomCalendarWidgetModel, icon='calendar_month', title='Room Calendar Widget',
-        summary=lambda w: '(room calendar — shows the rendering device\'s own room)',
+        summary=lambda w, paths: '(room calendar — shows the rendering device\'s own room)',
         defaults={},
         content=[[ROW, 'date_format_long', 'date_format', 'time_format']],
         field_infos=hints(date_format_long=DATE_PATTERN_HINT,
@@ -185,7 +189,7 @@ WIDGET_TYPES: dict[str, WidgetType] = {
     ),
     'Image': WidgetType(
         model=ImageWidgetModel, icon='image', title='Image Widget',
-        summary=lambda w: (w.url if w.source_type == 'url' else w.file) or '(no image)',
+        summary=lambda w, paths: (w.url if w.source_type == 'url' else w.file) or '(no image)',
         # only the source that is actually in use, so the other one can't be
         # filled in and silently ignored
         content=lambda w, paths: ['source_type', 'file' if w.source_type == 'file' else 'url',

@@ -1,5 +1,74 @@
 # Changelog
 
+## 0.27.0 — 2026-08-31
+
+### Added
+
+- **The project Dashboard card now shows iCal and Image datasource health
+  too**, next to the existing weather/Home Assistant lines: one row per
+  failing/stale calendar feed or image source (`ui/cards.py`'s
+  `dashboard_card()` gained `ical_statuses`/`image_statuses` params). This
+  needed both datasources to actually track fetch outcomes, which they
+  didn't before:
+  - **`core/datasources/ical.py`**: `get_from_ical()` now returns an
+    `IcalStatus` (fail_count, exponential backoff via `retry_after`, last
+    error, like weather/Home Assistant) instead of a bare list, and never
+    raises -- a failing feed now shows its last-known events during an
+    outage (graceful degradation) and backs off instead of being re-fetched
+    on every single render, which is what it did before (no backoff
+    existed at all). New `ical_retry_min_s`/`ical_retry_max_s` in
+    `GlobalConfig`. `room/backend.py`'s `get_room_events()` adapts the new
+    `IcalStatus` back to the raise-on-total-failure contract its own callers
+    (the `RoomCalendar` widget, the simplified UI's Occupancy panel) already
+    expected, so neither needed to change. New `read_all_ical_statuses()`.
+  - **`core/datasources/image.py`**: `get_image()` keeps its existing
+    `Optional[Image.Image]` return type, but now tracks fetch/decode
+    failures the same way in a small JSON sidecar next to the cached bytes
+    (`ImageStatus`), with the same backoff (new
+    `image_retry_min_s`/`image_retry_max_s`) -- previously a broken
+    `reload_each_time` source (or one that never loaded successfully) was
+    retried on every render. New `read_all_image_statuses()`.
+  - Standalone's own Project tab now also passes weather/Home Assistant
+    statuses to `dashboard_card()`, which it never did (only the nice4iot
+    project card did) -- fixed for consistency while touching this code.
+
+### Changed
+
+- **Home Assistant URL/token and the default weather location moved from
+  `GlobalConfig` to a new per-project `ProjectConfig`** (`project_config/`):
+  a project stands for one site (one building, one Home Assistant instance),
+  so sharing one HA credential and one weather location across every project
+  on a nice4iot install was a real limitation. `homeassistant_url`,
+  `homeassistant_token`, `latitude` and `longitude` are removed from
+  `GlobalConfig`; the update-interval/backoff/error-text settings around them
+  stay global, since those are operational knobs, not site properties.
+  `ProjectConfig` is persisted to `project_config.json` next to a project's
+  `screens/`/`rooms/`/... (`EpaperPaths.project_config_file`), read fresh via
+  `get_project_config(paths)` rather than cached in a singleton like
+  `app_config`, since two projects can have different values. Edited via a
+  new "Settings" tab (nice4iot project tab, standalone tab, and simplified-UI
+  Preferences > Project settings). **Breaking, no migration**: an existing
+  `global_config.json`/`.epaper_global_config.json` that still has these keys
+  loads fine (pydantic ignores unknown fields) but drops them on the next
+  save — re-enter the Home Assistant URL/token and the weather location under
+  the new Settings tab after upgrading, matching how `epaper_color_models`
+  was handled when it moved out of `GlobalConfig` (0.15.0).
+- `core.datasources.homeassistant.get_entity()`/`is_configured()` take
+  `url`/`token` as explicit arguments instead of reading `app_config`,
+  matching how the weather datasource already takes `latitude`/`longitude`
+  explicitly. `WidgetType.summary` (`ui/widget_types.py`) now takes
+  `(widget, paths)` instead of just `(widget)`, since a weather widget's
+  summary needs the project's default location.
+- **Weather cache cleanup**: `read_all_weather_statuses()` now deletes cache
+  files older than twice `weather_update_interval_s` before reading, so a
+  location no widget uses anymore (e.g. after editing a screen's
+  coordinates) doesn't linger on the project Dashboard forever.
+- **Simplified UI: full-height layout.** `build_page()`'s content column and
+  `ui.sub_pages` now stretch to `h-full` instead of shrinking to their
+  content, and the Organizer names textarea grows to fill the remaining
+  height (`flex-grow`) instead of a fixed size — both read better on a tall
+  viewport.
+
 ## 0.26.12 — 2026-08-30
 
 ### Changed

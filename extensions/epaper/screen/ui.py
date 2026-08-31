@@ -331,7 +331,7 @@ def screen_editor_content(paths: EpaperPaths, filename: str, image_base_url: str
                                     'click', lambda _, k=key: _open_detail(k)):
                                 ui.icon(entry.icon)
                                 ui.badge(widget.widget_type).props('outline')
-                                ui.label(entry.summary(widget)).classes('text-grey-8')
+                                ui.label(entry.summary(widget, paths)).classes('text-grey-8')
             widget_list_container.make_sortable(handle='.drag-handle', on_end=_handle_reorder)
 
     def _refresh_editor_area() -> None:

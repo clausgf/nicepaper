@@ -71,7 +71,8 @@ def delete_room(paths: EpaperPaths, room_id: str) -> None:
 async def get_room_events(paths: EpaperPaths, room: RoomModel) -> list:
     """This room's calendar events (sorted, from its booking system's iCal
     feed -- see BookingSystemModel and RoomModel.booking_system_id/
-    booking_ical_url), for the simplified UI's Occupancy panel.
+    booking_ical_url), for the simplified UI's Occupancy panel and
+    RoomCalendarWidget.
 
     booking_ical_url, if set, is the room's own full feed URL (e.g. one iCal
     URL per resource on the same server); empty falls back to the booking
@@ -79,7 +80,14 @@ async def get_room_events(paths: EpaperPaths, room: RoomModel) -> list:
     timing all come from the booking system -- get_from_ical() itself reads
     no config. Raises ValueError (not e.g. returning []) when the room isn't
     configured yet, so the panel can show why rather than an empty list
-    indistinguishable from "no events"."""
+    indistinguishable from "no events".
+
+    get_from_ical() itself never raises (graceful degradation: it returns
+    the last-known events, backing off from a failing feed instead of
+    hammering it every render) -- this adapts that IcalStatus back to the
+    raise-on-total-failure contract every caller here already expects: a
+    RuntimeError only when there is no last-known data at all, same as
+    before get_from_ical() gained backoff/status tracking."""
     if not room.booking_system_id:
         raise ValueError("This room has no booking system configured yet.")
     system = read_booking_system(paths, room.booking_system_id)
@@ -89,12 +97,15 @@ async def get_room_events(paths: EpaperPaths, room: RoomModel) -> list:
     if not url:
         raise ValueError(f"Booking system '{system.name}' has no URL configured.")
 
-    return await get_from_ical(
+    status = await get_from_ical(
         paths.ical_dir, paths.organizer_names_file, f"room-{room.id}", url,
         update_interval_s=int(system.update_interval.total_seconds()),
         max_days=system.max_days_ahead.days,
         username=system.username, password=system.password, headers=system.header or None,
         extract_organizer_from_summary=True)
+    if status.events is None:
+        raise RuntimeError(status.error or "Could not fetch calendar events.")
+    return status.events
 
 
 def rooms_adapter(paths: EpaperPaths) -> JsonDirectoryAdapter[RoomModel]:

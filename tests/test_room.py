@@ -3,11 +3,17 @@ import datetime
 
 import pytest
 
+from extensions.epaper.core.datasources.ical import IcalStatus
 from extensions.epaper.room.backend import (
     create_room, delete_room, get_room_events, list_rooms, read_room, room_adapter, room_path,
 )
 from extensions.epaper.paths import EpaperPaths
 import extensions.epaper.room.backend as room_backend
+
+
+def _status(events: list, id: str = "room-x") -> IcalStatus:
+    return IcalStatus(id=id, events=events, last_update=None, fresh=False,
+                      failing=False, fail_count=0, retry_after=None, error=None)
 
 
 def _paths(tmp_path) -> EpaperPaths:
@@ -152,7 +158,7 @@ def test_get_room_events_prefers_room_url_over_system_url(tmp_path, monkeypatch)
 
     async def fake_get_from_ical(ical_dir, organizer_names_file, id, url, **kwargs):
         captured.update(url=url, **kwargs)
-        return ["EVENT"]
+        return _status(["EVENT"])
 
     monkeypatch.setattr(room_backend, "get_from_ical", fake_get_from_ical)
     events = asyncio.run(get_room_events(paths, room))
@@ -171,7 +177,7 @@ def test_get_room_events_falls_back_to_system_url(tmp_path, monkeypatch):
 
     async def fake_get_from_ical(ical_dir, organizer_names_file, id, url, **kwargs):
         captured["url"] = url
-        return []
+        return _status([])
 
     monkeypatch.setattr(room_backend, "get_from_ical", fake_get_from_ical)
     asyncio.run(get_room_events(paths, room))
@@ -189,7 +195,7 @@ def test_get_room_events_passes_system_timing_as_seconds_and_days(tmp_path, monk
 
     async def fake_get_from_ical(ical_dir, organizer_names_file, id, url, **kwargs):
         captured.update(kwargs)
-        return []
+        return _status([])
 
     monkeypatch.setattr(room_backend, "get_from_ical", fake_get_from_ical)
     asyncio.run(get_room_events(paths, room))
@@ -206,7 +212,7 @@ def test_get_room_events_passes_none_for_empty_headers(tmp_path, monkeypatch):
 
     async def fake_get_from_ical(ical_dir, organizer_names_file, id, url, **kwargs):
         captured.update(kwargs)
-        return []
+        return _status([])
 
     monkeypatch.setattr(room_backend, "get_from_ical", fake_get_from_ical)
     asyncio.run(get_room_events(paths, room))

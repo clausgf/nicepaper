@@ -109,9 +109,9 @@ def _backoff_seconds(fail_count: int) -> float:
     return float(min(base * (2 ** max(0, fail_count - 1)), app_config.homeassistant_retry_max_s))
 
 
-def is_configured() -> bool:
+def is_configured(url: str, token: str) -> bool:
     """Whether a Home Assistant URL and token are configured at all."""
-    return bool(app_config.homeassistant_url and app_config.homeassistant_token)
+    return bool(url and token)
 
 
 def read_all_entity_statuses(homeassistant_dir: Path) -> list[EntityStatus]:
@@ -119,6 +119,15 @@ def read_all_entity_statuses(homeassistant_dir: Path) -> list[EntityStatus]:
     The entity id is read from the cache file's content, not its name, so the
     file-name sanitization above stays one-way."""
     now = datetime.datetime.now(ZoneInfo(app_config.timezone))
+    # remove files older than twice the update interval (they're stale and not used by any widget)
+    cutoff = now - datetime.timedelta(seconds=app_config.homeassistant_update_interval_s * 2)
+    for path in homeassistant_dir.glob("*.json"):
+        if path.is_file() and datetime.datetime.fromtimestamp(path.stat().st_mtime, ZoneInfo(app_config.timezone)) < cutoff:
+            try:
+                path.unlink()
+            except Exception as e:
+                logger.warning(f"Failed to delete stale homeassistant cache file {path}: {e}")
+    # read the remaining cache files, skipping any with invalid names
     statuses = []
     for path in sorted(Path(homeassistant_dir).glob("*.json")):
         cache = _read_cache(path)
@@ -140,9 +149,12 @@ def _get_session() -> aiohttp.ClientSession:
     return _session
 
 
-async def get_entity(homeassistant_dir: Path, entity_id: str) -> EntityStatus:
+async def get_entity(homeassistant_dir: Path, entity_id: str, url: str, token: str) -> EntityStatus:
     """
     Fetch (or return cached) state + attributes of one Home Assistant entity.
+    `url`/`token` are the project's ProjectConfig.homeassistant_url/_token
+    (see core/widgets/homeassistant.py) -- Home Assistant is project-specific,
+    unlike the update-interval/retry/error settings below, which stay global.
 
     Never raises: a failure is recorded in the same cache file (fail_count,
     exponential backoff via retry_after, last error) and the last-known state
@@ -154,7 +166,7 @@ async def get_entity(homeassistant_dir: Path, entity_id: str) -> EntityStatus:
     cache = _read_cache(cache_filename)
     status = _status_from_cache(entity_id, cache, now)
 
-    if not is_configured():
+    if not is_configured(url, token):
         # not an outage worth backing off from -- report it without touching
         # the cache, so configuring the URL/token takes effect immediately
         status.failing = True
@@ -167,19 +179,19 @@ async def get_entity(homeassistant_dir: Path, entity_id: str) -> EntityStatus:
         logger.info(f"Home Assistant {entity_id} backing off until {status.retry_after.isoformat()}")
         return status
 
-    url = f"{app_config.homeassistant_url.rstrip('/')}/api/states/{entity_id}"
-    headers = {"Authorization": f"Bearer {app_config.homeassistant_token}"}
-    logger.info(f"Home Assistant {entity_id} updating from {url}")
+    fetch_url = f"{url.rstrip('/')}/api/states/{entity_id}"
+    headers = {"Authorization": f"Bearer {token}"}
+    logger.info(f"Home Assistant {entity_id} updating from {fetch_url}")
     try:
         timeout = aiohttp.ClientTimeout(total=FETCH_TIMEOUT_S)
-        async with _get_session().get(url, headers=headers, timeout=timeout) as response:
+        async with _get_session().get(fetch_url, headers=headers, timeout=timeout) as response:
             payload = await response.json()
         state = payload["state"]
     except Exception as e:
         code, detail = _classify_error(e)
         fail_count = status.fail_count + 1
         retry_after = now + datetime.timedelta(seconds=_backoff_seconds(fail_count))
-        logger.error(f"Error occurred while fetching Home Assistant entity {entity_id} from {url}: "
+        logger.error(f"Error occurred while fetching Home Assistant entity {entity_id} from {fetch_url}: "
                      f"{detail}; retrying after {retry_after.isoformat()} (attempt {fail_count})")
         cache.update(entity_id=entity_id, fail_count=fail_count,
                      retry_after=retry_after.isoformat(), error=detail, error_code=code)

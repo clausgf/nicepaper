@@ -5,6 +5,7 @@ from PIL import Image
 
 from extensions.epaper.bookingsystem.backend import booking_system_adapter, create_booking_system
 from extensions.epaper.catalog.models import Palette
+from extensions.epaper.core.datasources.ical import IcalStatus
 from extensions.epaper.core.drawingcontext import DrawingContext
 from extensions.epaper.core.widgets.roomcalendar import RoomCalendarWidget
 from extensions.epaper.paths import EpaperPaths
@@ -62,6 +63,11 @@ def _has_pixel(image: Image.Image, color: tuple) -> bool:
     return any(image.getpixel((x, y)) == color for x in range(w) for y in range(h))
 
 
+def _status(events: list) -> IcalStatus:
+    return IcalStatus(id="room-x", events=events, last_update=None, fresh=False,
+                      failing=False, fail_count=0, retry_after=None, error=None)
+
+
 def test_no_room_renders_placeholder_without_crashing(tmp_path):
     paths = _paths(tmp_path)
     image = _render(paths, room=None)
@@ -82,7 +88,7 @@ def test_category_color_reaches_the_drawn_card(tmp_path, monkeypatch):
     booking_system_adapter(paths, system.id).save(system)
 
     async def fake_get_from_ical(ical_dir, organizer_names_file, id, url, **kwargs):
-        return [_event(categories="meeting")]
+        return _status([_event(categories="meeting")])
 
     monkeypatch.setattr(room_backend, "get_from_ical", fake_get_from_ical)
 
@@ -96,7 +102,7 @@ def test_unmapped_category_falls_back_to_primary_color(tmp_path, monkeypatch):
     booking_system_adapter(paths, system.id).save(system)
 
     async def fake_get_from_ical(ical_dir, organizer_names_file, id, url, **kwargs):
-        return [_event(categories="other")]
+        return _status([_event(categories="other")])
 
     monkeypatch.setattr(room_backend, "get_from_ical", fake_get_from_ical)
 
@@ -117,7 +123,7 @@ def test_off_palette_color_falls_back_to_black_not_a_nearest_guess(tmp_path, mon
     booking_system_adapter(paths, system.id).save(system)
 
     async def fake_get_from_ical(ical_dir, organizer_names_file, id, url, **kwargs):
-        return [_event(categories="meeting")]
+        return _status([_event(categories="meeting")])
 
     monkeypatch.setattr(room_backend, "get_from_ical", fake_get_from_ical)
 

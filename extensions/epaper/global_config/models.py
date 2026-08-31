@@ -5,7 +5,10 @@ from pydantic import BaseModel, Field
 class GlobalConfig(BaseModel):
     """
     Settings that are the same for every screen regardless of which
-    project/root it belongs to.
+    project/root it belongs to. Settings that instead identify one site --
+    Home Assistant URL/token, the default weather location -- live in
+    ProjectConfig (project_config/models.py) since different projects can
+    be different sites.
 
     font_path/icon_path (package resource locations) deliberately stay
     out of this model -- see config.py's _ResourcePaths -- since they are
@@ -27,6 +30,8 @@ class GlobalConfig(BaseModel):
     screen (and, within a screen, a widget) doesn't set its own.
     """
     ical_error: str = "Error fetching calendar data"
+    ical_retry_min_s: int = Field(default=60, description="Backoff after a failed iCal fetch starts at this many seconds and doubles per consecutive failure.")
+    ical_retry_max_s: int = Field(default=1800, description="Upper cap for the iCal-fetch backoff, in seconds.")
     no_appointments: str = "No appointments"
     next_appointment: str = "Next appointment"
     current_appointment: str = "Current appointment"
@@ -37,8 +42,6 @@ class GlobalConfig(BaseModel):
 
     weather_update_interval_s: int = 900
     weather_error: str = "Error fetching weather data"
-    latitude: float = Field(default=52.52, description="Default latitude for weather widgets that set no location of their own.")
-    longitude: float = Field(default=13.405, description="Default longitude for weather widgets that set no location of their own.")
     wind_speed_unit: str = Field(
         default="kmh",
         description=(
@@ -52,12 +55,11 @@ class GlobalConfig(BaseModel):
     weather_stale_notice: str = Field(default="as of {time}", description="WeatherNow marker shown when serving cached data during an outage; '{time}' is the last successful update. Empty to hide.")
 
     image_error: str = "Error loading image"
+    image_retry_min_s: int = Field(default=60, description="Backoff after a failed image load starts at this many seconds and doubles per consecutive failure.")
+    image_retry_max_s: int = Field(default=1800, description="Upper cap for the image-load backoff, in seconds.")
 
-    # Home Assistant (HomeAssistant widget). The token is a secret stored in
-    # plain text in this config file, like every other field -- see SECURITY.md;
-    # give it a read-only user's long-lived access token if that matters.
-    homeassistant_url: str = Field(default="", description="Base URL of the Home Assistant instance, e.g. 'http://homeassistant.local:8123', without the '/api' suffix which is added automatically. Empty disables the HomeAssistant widget.")
-    homeassistant_token: str = Field(default="", description="Long-lived access token, created on the Home Assistant profile page. Stored in plain text in this config file.")
+    # Home Assistant (HomeAssistant widget). URL/token live in ProjectConfig;
+    # these are the operational knobs, the same for every project.
     homeassistant_update_interval_s: int = Field(default=300, description="How long a fetched entity state is reused before Home Assistant is asked again.")
     homeassistant_retry_min_s: int = Field(default=60, description="Backoff after a failed Home Assistant fetch starts at this many seconds and doubles per consecutive failure.")
     homeassistant_retry_max_s: int = Field(default=1800, description="Upper cap for the Home Assistant fetch backoff, in seconds.")

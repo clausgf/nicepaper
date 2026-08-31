@@ -7,6 +7,7 @@ from extensions.epaper.core import gauge
 from extensions.epaper.core.datasources.homeassistant import (
     EntityStatus, entity_label, entity_unit, format_value, get_entity, numeric_value, raw_value,
 )
+from extensions.epaper.project_config.backend import get_project_config
 from extensions.epaper.screen.models import HomeAssistantWidgetModel
 from extensions.epaper.util import logger
 from ..drawingcontext import DrawingContext
@@ -57,7 +58,9 @@ class HomeAssistantWidget(Widget):
         await super().draw(ctx)
         w, h = self.config.size
 
-        self._status = await get_entity(ctx.paths.homeassistant_dir, self.config.entity_id)
+        project_config = get_project_config(ctx.paths)
+        self._status = await get_entity(ctx.paths.homeassistant_dir, self.config.entity_id,
+                                        project_config.homeassistant_url, project_config.homeassistant_token)
         value = raw_value(self._status, self.config.attribute)
         if value is None:
             text = app_config.homeassistant_error.format(

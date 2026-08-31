@@ -91,6 +91,12 @@ class EpaperPaths:
         return self.root / "palettes.json"
 
     @property
+    def project_config_file(self) -> Path:
+        """Optional per-root settings (ProjectConfig): Home Assistant URL/token,
+        default weather location. Absent by default, like panel_types_file."""
+        return self.root / "project_config.json"
+
+    @property
     def organizer_names_file(self) -> Path:
         return self.root / "organizer_names.json"
 
