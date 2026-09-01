@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.32.2 — 2026-09-01
+
+### Changed
+
+- **E-Paper dashboard card's telemetry age now matches nice4iot's device
+  status card style** — "as of 18 min ago" became "as of 01.09.26 08:04:38
+  (18min ago)". New `util.humanize_datetime_age()` deferred-imports
+  nice4iot's own `app.util.render_datetime_age()` for parity (local
+  timezone included), falling back to a UTC-based rendering outside
+  nice4iot/in tests.
+
+### Fixed
+
+- **Panel type mismatch hint in the device Settings card now updates live**
+  — changing the Panel type select in `devicebinding/ui.py`'s
+  `device_config_card()` used to leave the "Firmware reports panel ..."
+  hint showing the old (or no) mismatch until the page was reloaded, unlike
+  the simplified UI's already-refreshable equivalent. The card's
+  Panel type/Screen/Room selects and the hint are now wrapped in a local
+  `@ui.refreshable` body that `on_panel_type_change` refreshes, mirroring
+  `room/simplified_ui.py`'s pattern.
+
 ## 0.32.1 — 2026-08-31
 
 ### Added

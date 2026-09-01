@@ -25,6 +25,21 @@ def humanize_age(dt: Optional[datetime.datetime], now: datetime.datetime) -> str
     return f'{minutes // (60 * 24)} d ago'
 
 
+def humanize_datetime_age(dt: Optional[datetime.datetime], now: datetime.datetime) -> str:
+    """'DD.MM.YY HH:MM:SS (Nmin ago)', matching nice4iot's own device status
+    card (app.util.render_datetime_age -- local timezone, its own age
+    granularity), or 'never' for None. Deferred-imported since epaper must
+    also run standalone/in tests where app.* doesn't exist; the fallback
+    below uses UTC and humanize_age()'s granularity instead."""
+    if dt is None:
+        return 'never'
+    try:
+        from app.util import render_datetime_age
+        return render_datetime_age(dt)
+    except ImportError:
+        return f'{dt.strftime("%d.%m.%y %H:%M:%S")} ({humanize_age(dt, now)})'
+
+
 def check_filename(filename: str) -> bool:
     """
     Check if the filename consists of alphanumeric characters, underscores, hyphens, and plus signs.
