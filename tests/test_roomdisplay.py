@@ -87,6 +87,28 @@ def test_display_rows_read_panel_type_and_reported_panel(tmp_path, monkeypatch):
     assert row.panel_type_id == "waveshare_7in5_v2"
     assert row.reported_panel == "GDEW075T7"
     assert row.reported_panels == "GDEW075T7,GDEP073E01"
+    # matches the reported panel -- no "⚠" suffix
+    assert row.panel_label == 'GDEW075T7 Waveshare 7.5" V2/V3 (800x480 b/w)'
+
+
+def test_display_rows_panel_label_flags_a_mismatch(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    set_device_binding(paths, "d", panel_type_id="waveshare_7in5_v2")
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(
+        types.SimpleNamespace(name="d", last_seen_at=NOW),
+    ))
+    monkeypatch.setattr(rd, "_device_runtime", lambda project, name:
+                        types.SimpleNamespace(kind_labels={"epaper": {"panel": "GDEW0583T7", "panels": ""}}))
+
+    row = rd.display_rows(paths, "proj")[0]
+    assert row.panel_label == 'GDEW075T7 Waveshare 7.5" V2/V3 (800x480 b/w) ⚠'
+
+
+def test_display_rows_panel_label_placeholder_without_a_panel_type(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(_dev("d")))
+    row = rd.display_rows(paths, "proj")[0]
+    assert row.panel_label == "—"
 
 
 def test_device_epaper_labels_outside_nice4iot(tmp_path):

@@ -22,7 +22,7 @@ import niceview
 from nicegui import ui
 from niceview import CollectionAdapter, DrillDownWrapper, ModelForm
 
-from extensions.epaper.catalog.backend import get_panel_types
+from extensions.epaper.catalog.backend import get_panel_types, panel_type_label
 from extensions.epaper.devicebinding.backend import set_device_binding
 from extensions.epaper.display.backend import (
     RoomDisplaysAdapter, available_screen_ids, panel_mismatch_hint,
@@ -87,7 +87,7 @@ def _render_detail(paths: EpaperPaths, image_base_url: str,
     the freshly saved binding -- the Screen options (available_screen_ids())
     and the mismatch hint both depend on it."""
     panel_types = get_panel_types(paths)
-    panel_type_options = {pt.id: pt.name for pt in panel_types.values()}
+    panel_type_options = {pt.id: panel_type_label(pt) for pt in panel_types.values()}
 
     @ui.refreshable
     def _body(current_key: str) -> None:

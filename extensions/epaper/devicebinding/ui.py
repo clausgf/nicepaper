@@ -11,7 +11,7 @@ import datetime
 
 from nicegui import context, ui
 
-from extensions.epaper.catalog.backend import get_panel_type, get_panel_types
+from extensions.epaper.catalog.backend import get_panel_type, get_panel_types, panel_type_label
 from extensions.epaper.devicebinding.backend import get_device_binding, set_device_binding
 from extensions.epaper.display.backend import (
     device_epaper_labels, device_epaper_telemetry, panel_mismatch_hint,
@@ -70,7 +70,7 @@ def device_config_card(paths: EpaperPaths, project_name: str, device_name: str, 
         panel type change instead of only on the next page load -- see
         room/simplified_ui.py's body() for the same pattern."""
         panel_types = get_panel_types(paths)
-        panel_type_options = {pt.id: pt.name for pt in panel_types.values()}
+        panel_type_options = {pt.id: panel_type_label(pt) for pt in panel_types.values()}
         binding = get_device_binding(paths, device_name)
         reported_panel = device_epaper_labels(project_name, device_name).get('panel', '')
 

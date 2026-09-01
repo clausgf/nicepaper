@@ -112,12 +112,22 @@ the panel shows instead of a card, rather than an empty "no events" that would
 look the same either way. The fetch is a network call, so the panel renders a
 loading state first and refreshes once it lands (`nicegui.background_tasks`,
 not a bare `asyncio.create_task`, so the refresh reaches the right client).
+A reload icon button re-fetches with `get_room_events(force=True)`, bypassing
+the iCal cache's own TTL/backoff — for a booking made after the last fetch
+that shouldn't have to wait out `update_interval` to show up.
 
 The room's **Displays** tab (`room/simplified_ui.py`'s `_displays_panel`) leads
 with a compact room summary (label + type, and, smaller, building/floor), then
 its own niceview `DrillDownWrapper` (not the shared grid below) over
 `RoomDisplaysAdapter`, one row per device bound to the room — Title device
-name, Subtitle screen. Each row's detail is editable and deletable: Device is
+name, Subtitle screen/panel/firmware. The panel part is `RoomDisplayRow.
+panel_label` (`display.backend.display_rows()`): the configured panel type
+as `"{panel_id} {name}"` (`catalog.backend.panel_type_label()`), `"—"`
+without one, suffixed with a plain `⚠` when it doesn't match what the
+firmware itself last reported (`display.backend.panel_mismatch_hint()`) --
+plain text computed once per row, so the mismatch is visible in the list
+without opening the detail (which still shows the fuller text hint, see
+below). Each row's detail is editable and deletable: Device is
 a select over every project device (`display.backend.project_device_names`),
 reassigning the row to a different device via `RoomDisplaysAdapter.rename()`
 (moves the room/screen assignment, unbinding the old device) wired through
@@ -153,7 +163,11 @@ plus two hand-built editors for the fields that layout omits — `header`
 card color for the `RoomCalendar` widget) — both inline-editable lists
 (every row a live input pair, autosaving on change, no dialog) with a
 delete icon per row and an "Add" button matching DrillDownWrapper's own
-toolbar style (dense round). `category_colors`' color picker restricts
+toolbar style (dense round), plus a "Reload all rooms" button
+(`_reload_rooms_action`) that re-fetches every room using this system with
+`get_room_events(force=True)` in one go — the system-wide equivalent of a
+room's own Occupancy reload button, for when several rooms share one feed.
+`category_colors`' color picker restricts
 itself to the 6-color display's own colors (the `e6` Spectra palette
 — black, white, yellow, red, blue, green): a booking system isn't tied to
 one screen/panel, so there's no single "closest" color that would be right

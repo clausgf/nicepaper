@@ -53,9 +53,18 @@ _BOXES_DESCRIPTION = (
     "editor; a display never needs it."
 )
 
+_FORCE_DESCRIPTION = (
+    "Re-render unconditionally, even if the cached image is still within "
+    "its config-mtime/expires_at validity. Unlike `boxes`, this updates the "
+    "real cache -- a display polling the same screen later gets this "
+    "render too. For a preview that must reflect live data (e.g. room "
+    "info) a widget reads but that isn't captured by cache invalidation; "
+    "a display never needs it."
+)
+
 
 async def _render_screen_image(paths: EpaperPaths, id: str, if_none_match: Optional[str],
-                               raw: bool = False, boxes: bool = False) -> Response:
+                               raw: bool = False, boxes: bool = False, force: bool = False) -> Response:
     """
     Shared logic behind both the standalone and the nice4iot-extension
     image endpoint: render (if needed) and return the current PNG for a
@@ -82,7 +91,7 @@ async def _render_screen_image(paths: EpaperPaths, id: str, if_none_match: Optio
                         headers={"Cache-Control": "no-store"})
 
     # update the image if needed
-    await screen.update_if_needed()
+    await screen.update_if_needed(force=force)
 
     # collect new response header fields
     meta = await screen.get_metadata()
@@ -162,6 +171,7 @@ def build_standalone_router(paths: EpaperPaths) -> APIRouter:
         if_none_match: Optional[str] = Header(None, description="`ETag` of the image version the display already has; if it is still current, the response is `304 Not Modified`."),
         raw: bool = Query(False, description=_RAW_DESCRIPTION),
         boxes: bool = Query(False, description=_BOXES_DESCRIPTION),
+        force: bool = Query(False, description=_FORCE_DESCRIPTION),
     ):
         """
         Render (if needed) and return the current PNG image for a screen,
@@ -172,7 +182,7 @@ def build_standalone_router(paths: EpaperPaths) -> APIRouter:
         should poll this endpoint, send the last `ETag` as `If-None-Match` and
         sleep for `Cache-Control: max-age` seconds between polls.
         """
-        return await _render_screen_image(paths, id, if_none_match, raw, boxes)
+        return await _render_screen_image(paths, id, if_none_match, raw, boxes, force)
 
     @router.get(
         "/screen/{id}/last_delivered.png",
@@ -212,9 +222,10 @@ def build_extension_router(paths_for_project: Callable[[str], EpaperPaths]) -> A
         if_none_match: Optional[str] = Header(None),
         raw: bool = Query(False, description=_RAW_DESCRIPTION),
         boxes: bool = Query(False, description=_BOXES_DESCRIPTION),
+        force: bool = Query(False, description=_FORCE_DESCRIPTION),
     ):
         paths = paths_for_project(project_name)
-        return await _render_screen_image(paths, id, if_none_match, raw, boxes)
+        return await _render_screen_image(paths, id, if_none_match, raw, boxes, force)
 
     @router.get(
         "/{project_name}/screens/{id}/last_delivered.png",

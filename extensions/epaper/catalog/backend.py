@@ -28,7 +28,7 @@ from extensions.epaper.util import logger
 
 __all__ = [
     "get_palettes", "get_palette", "get_panel_types", "get_panel_type",
-    "palettes_mtime", "nearest_palette_color",
+    "palettes_mtime", "nearest_palette_color", "panel_type_label",
 ]
 
 _PALETTES_RESOURCE = "palettes.json"
@@ -125,6 +125,15 @@ def get_panel_type(id: Optional[str], paths: Optional[EpaperPaths] = None) -> Op
     if not id:
         return None
     return get_panel_types(paths).get(id)
+
+
+def panel_type_label(panel_type: PanelTypeModel) -> str:
+    """Option label for a panel-type select: `panel_id` first (the
+    manufacturer's own designation, distinguishing same-hardware rebrands
+    that share it, see PanelTypeModel.panel_id) then this catalog entry's
+    own name, since a `ui.select`'s value is already the catalog id -- the
+    label needs the info that id doesn't carry."""
+    return f'{panel_type.panel_id} {panel_type.name}' if panel_type.panel_id else panel_type.name
 
 
 def palettes_mtime(paths: EpaperPaths) -> Optional[float]:

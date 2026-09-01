@@ -119,17 +119,25 @@ class Screen:
         return await self.image_cache.get_metadata()
 
 
-    async def update_if_needed(self):
+    async def update_if_needed(self, force: bool = False):
         """
-        Update the screen image if needed.
+        Update the screen image if needed, or unconditionally when `force`
+        is set -- for callers that need this exact request to reflect
+        anything a widget reads live (e.g. room data) and isn't captured by
+        the config mtime or `expires_at` (e.g. a preview opened right after
+        an unrelated change).
         """
-        update_needed = False
         meta = await self.get_metadata()
         now = datetime.datetime.now(ZoneInfo(app_config.timezone))
-        logger.info(f"Checking update for screen {self.id} now={now.isoformat()} config_mtime={self.config_mtime.isoformat()} meta.expires_at={meta.expires_at if meta else None} meta.last_update_at={meta.last_update_at if meta else None} meta.version={meta.version if meta else None}")
-        update_needed = update_needed or meta is None or meta.expires_at is None or meta.last_update_at is None
-        update_needed = update_needed or self.config_mtime > meta.last_update_at
-        update_needed = update_needed or now > meta.expires_at  #  TODO: does it make sense not to regenerate on every request and use the expires only for controlling the client wakeup?
+        logger.info(f"Checking update for screen {self.id} now={now.isoformat()} config_mtime={self.config_mtime.isoformat()} meta.expires_at={meta.expires_at if meta else None} meta.last_update_at={meta.last_update_at if meta else None} meta.version={meta.version if meta else None} force={force}")
+        if meta is None or meta.expires_at is None or meta.last_update_at is None:
+            update_needed = True
+        else:
+            update_needed = (
+                force
+                or self.config_mtime > meta.last_update_at
+                or now > meta.expires_at  #  TODO: does it make sense not to regenerate on every request and use the expires only for controlling the client wakeup?
+            )
         if update_needed:
             await self._update()
 

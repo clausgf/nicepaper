@@ -434,7 +434,7 @@ def test_room_occupancy_upcoming_lists_events_with_organizer():
 def test_room_displays_panel_shows_summary_and_bound_devices(tmp_path, monkeypatch):
     """The Displays tab leads with a room summary (room_label + type, then
     building/floor) and lists every device bound to the room, titled by
-    device name with screen and firmware version as subtitle."""
+    device name with screen, panel and firmware version as subtitle."""
     import datetime
     import types
 
@@ -469,7 +469,9 @@ def test_room_displays_panel_shows_summary_and_bound_devices(tmp_path, monkeypat
     assert "A-101 (North Conference) · Meeting room" in labels
     assert "Main, 2" in labels
     assert "sign-1" in labels  # list row title (device_name)
-    assert "weather · 1.4.2" in labels  # list row subtitle (screen_id, firmware_version)
+    # list row subtitle (screen_id, panel_label, firmware_version); "—" since
+    # sign-1's binding has no panel_type_id set
+    assert "weather · — · 1.4.2" in labels
 
 
 def test_displays_top_level_lists_devices_and_shows_room_and_status(tmp_path, monkeypatch):
@@ -582,8 +584,10 @@ def test_device_preview_with_screen_but_no_delivery_yet(tmp_path):
         images = [e for e in client.elements.values() if type(e).__name__ == "Image"]
     assert tab_labels == {"Current", "Last delivered"}
     assert "This device hasn't fetched its image yet." in texts
-    # Current tab's live preview is built from image_base_url + device name
-    assert any(e._props.get("src") == "/api/screen/sign-1/image.png" for e in images)
+    # Current tab's live preview is built from image_base_url + device name,
+    # forcing a fresh render and bypassing the browser cache
+    assert any((e._props.get("src") or "").startswith("/api/screen/sign-1/image.png?force=true&_t=")
+               for e in images)
     # no last_delivered.png element without a snapshot on disk
     assert not any(e._props.get("src") == "/api/screen/sign-1/last_delivered.png" for e in images)
 

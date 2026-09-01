@@ -190,7 +190,7 @@ def test_picking_a_display_applies_the_preset(tmp_path, monkeypatch):
         screen_editor_content(paths, "s.json", "/api/screen")
         select = next(e for e in client.elements.values()
                       if type(e).__name__ == "Select" and e._props.get("label") == "Panel type")
-        option = next(o for o in select._props["options"] if o["label"].startswith("Waveshare 7.5\" V2/V3"))
+        option = next(o for o in select._props["options"] if "Waveshare 7.5\" V2/V3" in o["label"])
         # dispatch the way NiceGUI does: every listener for the event, through
         # handle_event (which is what adapts the handler's signature)
         for listener in select._event_listeners.values():

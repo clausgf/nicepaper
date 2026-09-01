@@ -43,6 +43,14 @@ class RoomDisplayRow(BaseModel):
             niceview.Field(label='Reported panel', editable=False, table_sortable=True)
         ] = ''
 
+    panel_label: Annotated[str,
+            Field(description="Configured panel type as '{panel_id} {name}' (catalog.backend."
+                              "panel_type_label()), or '—' if panel_type_id is unset/unknown; "
+                              "suffixed with a warning glyph when it doesn't match "
+                              "reported_panel (see display.backend.panel_mismatch_hint())."),
+            niceview.Field(label='Panel', editable=False)
+        ] = '—'
+
     reported_panels: Annotated[str,
             Field(description="Firmware-reported compiled-in panel ids, comma-separated."),
             niceview.Field(label='Supported panels', editable=False)

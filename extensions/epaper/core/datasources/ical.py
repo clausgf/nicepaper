@@ -171,7 +171,7 @@ def read_all_ical_statuses(ical_dir: Path) -> list[IcalStatus]:
 async def get_from_ical(ical_dir: Path, organizer_names_file: Optional[Path], id: str, url: str,
                         update_interval_s: int, max_days: int,
                         username: str = "", password: str = "", headers: Optional[dict] = None,
-                        extract_organizer_from_summary: bool = True) -> IcalStatus:
+                        extract_organizer_from_summary: bool = True, force: bool = False) -> IcalStatus:
     """
     Fetch (or return cached) events from an iCal feed, as an IcalStatus.
     `id` names the cache file. update_interval_s/max_days are the caller's
@@ -179,6 +179,9 @@ async def get_from_ical(ical_dir: Path, organizer_names_file: Optional[Path], id
     BookingSystemModel's update_interval/max_days_ahead (room/backend.py's
     get_room_events). username/password (HTTP Basic Auth) and headers are
     optional, both from a BookingSystemModel when the feed needs them.
+    `force` skips both the freshness check and the failure backoff -- for an
+    explicit user-triggered reload (a room's Occupancy tab, a booking
+    system's detail page), not for a widget's own render.
 
     Never raises: on a fetch/parse failure it records the failure (fail_count,
     exponential backoff via retry_after, last error) in the same cache file
@@ -193,12 +196,13 @@ async def get_from_ical(ical_dir: Path, organizer_names_file: Optional[Path], id
     cache = _read_cache(cache_filename)
     status = _status_from_cache(id, cache, now, update_interval_s)
 
-    if status.fresh:
-        logger.info(f"Ical {id} skipping update, cached data is fresh")
-        return status
-    if status.retry_after is not None and now < status.retry_after:
-        logger.info(f"Ical {id} backing off until {status.retry_after.isoformat()}")
-        return status
+    if not force:
+        if status.fresh:
+            logger.info(f"Ical {id} skipping update, cached data is fresh")
+            return status
+        if status.retry_after is not None and now < status.retry_after:
+            logger.info(f"Ical {id} backing off until {status.retry_after.isoformat()}")
+            return status
 
     logger.info(f"Ical {id} updating from {url}")
     request_headers = dict(headers) if headers else {}

@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.33.0 — 2026-09-01
+
+### Added
+
+- **`image.png` endpoint takes a `force` query parameter** —
+  `GET /screen/{id}/image.png?force=true` (and the nice4iot-extension
+  equivalent) re-renders unconditionally instead of only when the config
+  mtime or `expires_at` say it's due, updating the real cache so a display
+  polling afterwards gets this render too. `Screen.update_if_needed()`
+  gained a matching `force` parameter.
+
+- **Panel-type selects show `panel_id` too** — every "Panel type" `ui.select`
+  (screen editor, device Settings card, simplified UI's Displays and Room
+  Displays tab) used to label options with the catalog entry's own `name`
+  only, e.g. `Waveshare 7.5" V2/V3 (800x480 b/w)`, dropping `panel_id` (the
+  manufacturer's own designation, e.g. `GDEW075T7`) entirely -- so two
+  catalog entries for the same rebranded hardware looked unrelated. New
+  `catalog.backend.panel_type_label()` builds `"{panel_id} {name}"`
+  (falling back to plain `name` without one), used by all four call sites.
+
+- **Room Displays tab's list rows show the configured panel, flagging a
+  mismatch with what the firmware reports** — `RoomDisplayRow` gained
+  `panel_label` (`"{panel_id} {name}"` via `catalog.backend.
+  panel_type_label()`, or `"—"` without a panel type set), computed in
+  `display.backend.display_rows()` and suffixed with a `⚠` when
+  `panel_mismatch_hint()` has something to flag. `room/simplified_ui.py`'s
+  `_displays_panel()` added it to the row subtitle -- plain text, no custom
+  `render_list_item` needed.
+
+- **Reload booking data on demand, bypassing the iCal cache** —
+  `get_from_ical()`/`get_room_events()` gained a `force` parameter that
+  skips the cache's freshness check and failure backoff. Two new entry
+  points: a reload icon button on a room's Occupancy tab
+  (`room/simplified_ui.py`), and a "Reload all rooms" button on a booking
+  system's detail page (`bookingsystem/ui.py`) that re-fetches every room
+  using that system at once.
+
+### Fixed
+
+- **Displays detail's "Current" preview now shows a genuinely fresh
+  render** — `display/preview.py`'s `render_device_preview()` used to
+  point the Current tab at a plain, unrefreshed `image.png` URL, so it
+  could show a stale image (e.g. after a change a widget reads live but
+  that doesn't touch the screen's config mtime, such as room data).
+  It now requests `image.png?force=true&_t=<timestamp>` on every render,
+  forcing a fresh server render and bypassing the browser cache — no
+  polling or refresh button, since this is a one-shot "current state on
+  page load" view, not a live-updating one like the screen editor's.
+
 ## 0.32.2 — 2026-09-01
 
 ### Changed

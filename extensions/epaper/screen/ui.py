@@ -29,7 +29,9 @@ from niceview.util import confirm_dialog
 # is created dynamically after the initial page load. Importing the module here at
 # setup registers the ESM eagerly so 'nicegui-sortable' is in every page's importmap.
 
-from extensions.epaper.catalog.backend import get_palette, get_palettes, get_panel_type, get_panel_types
+from extensions.epaper.catalog.backend import (
+    get_palette, get_palettes, get_panel_type, get_panel_types, panel_type_label,
+)
 from extensions.epaper.catalog.models import PanelTypeModel
 from extensions.epaper.screen.models import ScreenModel, WidgetModel
 from extensions.epaper.paths import EpaperPaths
@@ -66,7 +68,7 @@ _SCREEN_LAYOUT = [
 
 def _panel_type_options(panel_types: dict) -> dict:
     """{panel_type_id: label} for a panel-type select, "no preset" first."""
-    return {None: _NO_PANEL_TYPE_LABEL, **{p.id: p.name for p in panel_types.values()}}
+    return {None: _NO_PANEL_TYPE_LABEL, **{p.id: panel_type_label(p) for p in panel_types.values()}}
 
 
 def _keep_current(options, current):

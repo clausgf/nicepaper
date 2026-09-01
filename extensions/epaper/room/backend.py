@@ -68,7 +68,7 @@ def delete_room(paths: EpaperPaths, room_id: str) -> None:
     room_path(paths, room_id).unlink(missing_ok=True)
 
 
-async def get_room_events(paths: EpaperPaths, room: RoomModel) -> list:
+async def get_room_events(paths: EpaperPaths, room: RoomModel, force: bool = False) -> list:
     """This room's calendar events (sorted, from its booking system's iCal
     feed -- see BookingSystemModel and RoomModel.booking_system_id/
     booking_ical_url), for the simplified UI's Occupancy panel and
@@ -81,6 +81,10 @@ async def get_room_events(paths: EpaperPaths, room: RoomModel) -> list:
     no config. Raises ValueError (not e.g. returning []) when the room isn't
     configured yet, so the panel can show why rather than an empty list
     indistinguishable from "no events".
+
+    `force` bypasses the iCal cache's freshness/backoff checks -- for an
+    explicit reload (room/simplified_ui.py's Occupancy panel, a booking
+    system's "reload all rooms" action), not a widget's own render.
 
     get_from_ical() itself never raises (graceful degradation: it returns
     the last-known events, backing off from a failing feed instead of
@@ -102,7 +106,7 @@ async def get_room_events(paths: EpaperPaths, room: RoomModel) -> list:
         update_interval_s=int(system.update_interval.total_seconds()),
         max_days=system.max_days_ahead.days,
         username=system.username, password=system.password, headers=system.header or None,
-        extract_organizer_from_summary=True)
+        extract_organizer_from_summary=True, force=force)
     if status.events is None:
         raise RuntimeError(status.error or "Could not fetch calendar events.")
     return status.events

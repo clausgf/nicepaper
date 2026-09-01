@@ -34,6 +34,21 @@ def test_unknown_and_empty_ids_resolve_to_none():
     assert catalog.get_palette("") is None
 
 
+def test_panel_type_label_leads_with_panel_id():
+    """A select's value is already the catalog id -- the label needs
+    panel_id (the manufacturer's own designation, shared by rebrands of the
+    same hardware) since name alone can't distinguish those."""
+    panel_type = catalog.get_panel_types()["waveshare_7in5_v2"]
+    assert panel_type.panel_id  # otherwise this test doesn't exercise the interesting branch
+    assert catalog.panel_type_label(panel_type) == f"{panel_type.panel_id} {panel_type.name}"
+
+
+def test_panel_type_label_falls_back_to_name_without_a_panel_id():
+    from extensions.epaper.catalog.models import PanelTypeModel
+    panel_type = PanelTypeModel(id="x", name="Custom panel", width=1, height=1)
+    assert catalog.panel_type_label(panel_type) == "Custom panel"
+
+
 def test_root_file_adds_and_overrides_entries(tmp_path):
     paths = EpaperPaths(root=tmp_path)
     paths.ensure_dirs()

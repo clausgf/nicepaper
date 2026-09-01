@@ -160,6 +160,11 @@ from, for debugging a color that dithers; a display never needs it.
 `?boxes=true` renders the screen with every widget outlined — see
 [Clipping and debug outline](#clipping-and-debug-outline). Both are editor
 views; neither touches the cached image.
+`?force=true` re-renders unconditionally instead of only when the config
+mtime or `expires_at` say it's due, and — unlike `raw`/`boxes` — updates the
+real cache, so a display polling afterwards gets this render too. For a
+preview that must reflect live data (e.g. room info) a widget reads but that
+isn't captured by cache invalidation.
 
 When `<id>` is a device's own name (resolved via its binding, see
 [Display bindings](#display-bindings)), a real `200 OK` response (not a
@@ -251,12 +256,16 @@ aren't shipped and correct one that is:
 `panel_id` — the panel's own official designation from its manufacturer's
 datasheet, e.g. `GDEH075Z9` (not a GxEPD2 class name, and not this entry's own
 `id`, which is a vendor+size slug) — is informational only; nicepaper renders
-a PNG and never talks to a panel driver. It is shown under the panel-type list
-so a panel can be found by the name its datasheet or firmware knows it under.
-The same physical panel is often sold under different vendor names (e.g.
-Waveshare and Seeed both rebrand Good Display panels) — those get separate
-catalog entries (different `id`, different `vendor`/`name`) that share the
-same `panel_id`.
+a PNG and never talks to a panel driver. Every panel-type select
+(`catalog.backend.panel_type_label()`) leads its option label with it --
+`"{panel_id} {name}"` -- so a panel can be found by the name its datasheet or
+firmware knows it under, and, under the select itself, a hint repeats it for
+whichever entry is currently picked. The same physical panel is often sold
+under different vendor names (e.g. Waveshare and Seeed both rebrand Good
+Display panels) — those get separate catalog entries (different `id`,
+different `vendor`/`name`) that share the same `panel_id`, which is exactly
+what the label surfaces: two list entries with the same leading `panel_id`
+are the same hardware.
 
 Palettes work the same way: an optional `data/palettes.json` adds to (or
 overrides) the shipped ones. Unlike `panel_types.json`, editing it changes what

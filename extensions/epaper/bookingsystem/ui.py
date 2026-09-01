@@ -16,6 +16,8 @@ Shared with the simplified UI's Preferences > Booking systems view
 in a Shell-bound render() -- mirrors room/ui.py::rooms_wrapper() and
 screen/ui.py::screens_wrapper().
 """
+import asyncio
+
 from nicegui import ui
 from niceview import CollectionAdapter, ConflictError, DrillDownWrapper, ModelForm, StorageError
 
@@ -23,6 +25,7 @@ from extensions.epaper.bookingsystem.backend import booking_systems_adapter
 from extensions.epaper.bookingsystem.models import BookingSystemModel
 from extensions.epaper.catalog.backend import get_palette
 from extensions.epaper.paths import EpaperPaths
+from extensions.epaper.room.backend import get_room_events, list_rooms
 
 # A booking system isn't tied to one screen/panel -- several rooms with
 # different panels can share it -- so the category-color picker offers the
@@ -47,6 +50,35 @@ def _render_detail(paths: EpaperPaths, adapter: CollectionAdapter[BookingSystemM
     ModelForm.from_adapter(BookingSystemModel, adapter, key, autosave=True).render()
     _header_editor(adapter, key)
     _category_color_editor(paths, adapter, key)
+    _reload_rooms_action(paths, key)
+
+
+def _reload_rooms_action(paths: EpaperPaths, system_id: str) -> None:
+    """Bypass the iCal cache for every room using this booking system, in one
+    go -- the system-level equivalent of room/simplified_ui.py's Occupancy
+    reload button, for when several rooms share this system and should all
+    reflect the booking backend right now rather than waiting out their own
+    update_interval."""
+    rooms = [r for r in list_rooms(paths) if r.booking_system_id == system_id]
+
+    async def reload_all() -> None:
+        if not rooms:
+            ui.notify('No rooms use this booking system yet.', color='warning')
+            return
+        results = await asyncio.gather(
+            *(get_room_events(paths, room, force=True) for room in rooms),
+            return_exceptions=True)
+        failed = sum(1 for r in results if isinstance(r, Exception))
+        if failed:
+            ui.notify(f'Reloaded {len(rooms) - failed}/{len(rooms)} room(s); {failed} failed.', color='warning')
+        else:
+            ui.notify(f'Reloaded {len(rooms)} room(s).', color='positive')
+
+    with ui.row().classes('w-full items-center justify-between q-mt-md'):
+        ui.label(f'{len(rooms)} room(s) use this booking system.').classes('text-caption text-grey')
+        ui.button('Reload all rooms', icon='refresh').props('dense outline') \
+            .tooltip("Bypass the cache and re-fetch every room's events now") \
+            .on_click(reload_all)
 
 
 def _header_editor(adapter: CollectionAdapter[BookingSystemModel], key: str) -> None:

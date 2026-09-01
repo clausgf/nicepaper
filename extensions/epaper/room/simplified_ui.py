@@ -20,7 +20,7 @@ from niceview import CollectionAdapter, DrillDownWrapper, ModelForm
 import niceview
 
 from extensions.epaper.bookingsystem.backend import list_booking_systems
-from extensions.epaper.catalog.backend import get_panel_types
+from extensions.epaper.catalog.backend import get_panel_types, panel_type_label
 from extensions.epaper.devicebinding.backend import set_device_binding
 from extensions.epaper.display.backend import (
     RoomDisplaysAdapter, assignable_devices, available_screen_ids, panel_mismatch_hint,
@@ -87,11 +87,19 @@ def _occupancy_panel(shell: Shell, room: RoomModel) -> None:
     fetch is async (a network call), so this renders a loading state first
     and refreshes once it lands; background_tasks.create (not a bare
     asyncio.create_task) keeps the task bound to this page's client so the
-    refresh actually reaches the browser."""
+    refresh actually reaches the browser.
+
+    The reload button bypasses the iCal cache (get_room_events(force=True))
+    for cases the cache's own TTL/backoff wouldn't catch, e.g. a booking made
+    after the last fetch that should show up now, not after update_interval
+    elapses on its own."""
     state: dict[str, Any] = {'events': None, 'error': None}
 
     @ui.refreshable
     def body() -> None:
+        with ui.row().classes('w-full items-center justify-end'):
+            ui.button(icon='refresh').props('dense round size=sm flat') \
+                .tooltip('Reload from booking system').on_click(reload)
         if state['error'] is not None:
             with ui.row().classes('items-center gap-2 text-grey'):
                 ui.icon('info').props('size=xs')
@@ -105,12 +113,19 @@ def _occupancy_panel(shell: Shell, room: RoomModel) -> None:
         _occupancy_status(state['events'])
         _occupancy_upcoming(state['events'])
 
-    async def load() -> None:
+    async def load(force: bool = False) -> None:
         try:
-            state['events'] = await get_room_events(shell.paths, room)
+            state['events'] = await get_room_events(shell.paths, room, force=force)
+            state['error'] = None
         except Exception as exc:
             state['error'] = str(exc)
         body.refresh()
+
+    async def reload() -> None:
+        state['events'] = None
+        state['error'] = None
+        body.refresh()
+        await load(force=True)
 
     body()
     if core.loop is not None:  # no running nicegui app -- e.g. a render test building the tree only
@@ -185,11 +200,13 @@ def _room_summary(room: RoomModel) -> None:
 
 def _displays_panel(shell: Shell, room_id: str) -> None:
     """The displays in this room: a room header plus a drill-down list of the
-    devices bound to it (Title device name, Subtitle screen), each editable
-    (its Screen) and deletable (unassigns it from the room). Add picks from
-    the project's assignable devices -- there is nothing to type, so the
-    wrapper's standard Add button drives a device picker instead of an
-    empty new item."""
+    devices bound to it (Title device name, Subtitle screen/panel/firmware --
+    panel is display_rows()'s panel_label, "{panel_id} {name}" suffixed with
+    a "⚠" glyph when it doesn't match what the firmware itself reports, see
+    display.backend.panel_mismatch_hint()), each editable (its Screen) and
+    deletable (unassigns it from the room). Add picks from the project's
+    assignable devices -- there is nothing to type, so the wrapper's standard
+    Add button drives a device picker instead of an empty new item."""
     room = read_room(shell.paths, room_id)
     if room is None:
         ui.label('Room not found.').classes('text-negative')
@@ -219,7 +236,7 @@ def _displays_panel(shell: Shell, room_id: str) -> None:
         RoomDisplayRow, adapter,
         title='Displays',
         item_title_field='device_name',
-        item_subtitle_fields=['screen_id', 'firmware_version'],
+        item_subtitle_fields=['screen_id', 'panel_label', 'firmware_version'],
         on_add=handle_add,
         # cast: DrillDownWrapper's render_detail is typed over the generic
         # CollectionAdapter protocol, but it always calls back with the exact
@@ -276,7 +293,7 @@ def _display_detail(shell: Shell, adapter: RoomDisplaysAdapter, key: str, set_ke
                  on_change=on_device_change).classes('w-full').props('outlined dense')
 
         panel_types = get_panel_types(paths)
-        panel_type_options = {pt.id: pt.name for pt in panel_types.values()}
+        panel_type_options = {pt.id: panel_type_label(pt) for pt in panel_types.values()}
 
         def on_panel_type_change(e) -> None:
             set_device_binding(paths, current_key, panel_type_id=e.value)

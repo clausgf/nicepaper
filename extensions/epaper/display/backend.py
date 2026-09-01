@@ -129,7 +129,10 @@ def display_rows(paths: EpaperPaths, project_name: str,
     """One row per device, filtered to `room_id` when given (the room tab) or
     all devices otherwise (a global list). building/floor/number come from the
     device's *own* bound room, so the columns are meaningful either way."""
+    from extensions.epaper.catalog.backend import get_panel_types, panel_type_label
+
     bindings = get_device_bindings(paths)
+    panel_types = get_panel_types(paths)
     rows: list[RoomDisplayRow] = []
     for device in _project_devices(project_name):
         binding = bindings.get(device.name)
@@ -141,11 +144,21 @@ def display_rows(paths: EpaperPaths, project_name: str,
         rssi = getattr(runtime, 'rssi', None)
         battery_voltage = getattr(runtime, 'battery_voltage', None)
         epaper_labels = getattr(runtime, 'kind_labels', {}).get('epaper', {})
+        panel_type_id = binding.panel_type_id if binding else None
+        reported_panel = epaper_labels.get('panel', '')
+        panel_type = panel_types.get(panel_type_id) if panel_type_id else None
+        # "—" (not '') so a missing panel type still joins cleanly into the
+        # simplified UI's " · "-separated row subtitle (ModelList._item_subtitle
+        # doesn't skip empty parts, which would otherwise show as a stray " · ")
+        panel_label = panel_type_label(panel_type) if panel_type is not None else '—'
+        if panel_mismatch_hint(paths, panel_types, panel_type_id, reported_panel):
+            panel_label = f'{panel_label} ⚠'
         rows.append(RoomDisplayRow(
             device_name=device.name,
             screen_id=(binding.screen_id if binding else None) or '',
-            panel_type_id=binding.panel_type_id if binding else None,
-            reported_panel=epaper_labels.get('panel', ''),
+            panel_type_id=panel_type_id,
+            reported_panel=reported_panel,
+            panel_label=panel_label,
             reported_panels=epaper_labels.get('panels', ''),
             room_label=(room.room_label if room else None) or '',
             building=(room.building if room else None) or '',
