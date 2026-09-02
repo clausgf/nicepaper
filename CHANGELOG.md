@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.35.1 — 2026-09-02
+
+### Changed
+
+- Simplified UI header brand label changed from "E-Paper Rooms" to "E-Paper
+  Rooms & Displays" to reflect that the UI also covers device displays, not
+  just rooms.
+
 ## 0.35.0 — 2026-09-02
 
 ### Fixed

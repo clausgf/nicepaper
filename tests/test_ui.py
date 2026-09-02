@@ -280,7 +280,7 @@ def test_simplified_ui_frame_renders_header_and_drawer(tmp_path):
                   if type(e).__name__ in ("Label", "ItemLabel")}
 
     assert "Header" in names and "LeftDrawer" in names
-    assert "E-Paper Rooms" in labels  # brand
+    assert "E-Paper Rooms & Displays" in labels  # brand
     # landing view is the rooms list (DrillDownWrapper), titled "Rooms"
     assert "Rooms" in labels
 

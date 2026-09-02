@@ -195,7 +195,7 @@ def build_page(project_name: str, paths: EpaperPaths, nav: list[NavItem],
         ui.button(icon='menu', on_click=drawer.toggle) \
             .props('flat color=white round dense').classes('lg:hidden')
         ui.icon('meeting_room').classes('text-2xl')
-        ui.label('E-Paper Rooms').classes('text-h6 font-bold')
+        ui.label('E-Paper Rooms & Displays').classes('text-h6 font-bold')
         ui.space()
         _user_menu()
 
