@@ -180,7 +180,12 @@ device and its screen stay). Below the Screen select, `display/preview.py`'s
 renders right now, and the actual PNG + timestamp the device's own alias URL
 last served with a real `200 OK` (not a `304`, tracked by
 `devicebinding/snapshot.py`, `GET .../last_delivered.png`) — so a stale or
-never-polling device is visible here, not just assumed from "Online".
+never-polling device is visible here, not just assumed from "Online". The
+Last delivered tab also shows when the device is next expected to poll
+again (`humanize_eta()`), in red past that point (plus a grace window,
+`display.backend.OVERDUE_GRACE`) — see
+[screens.md](screens.md#displays-palettes-and-colors) for how that time is
+computed.
 
 **Booking systems** (Settings › Booking systems) are wired the same way:
 `bookingsystem/backend.py` stores one JSON file per system
@@ -217,10 +222,12 @@ a device at a screen without opening nice4iot's own device UI. No Add or
 Delete — a display is a nice4iot device, assigned to a room via the room's own
 Displays tab above or the device's E-Paper card. Each row shows an
 online/offline status dot, the device name, room + screen as subtitle, and
-WiFi/battery icons; the detail adds the room's building/floor/number, last
-seen, numeric RSSI/battery, an editable Screen select (narrowed to the
-device's panel type when one is set, same as the room's own Displays tab
-above), and an "Open in nice4iot" link for experts (`device_url`). RSSI and
+WiFi/battery icons, plus a red warning icon when the device is overdue to
+poll again (`RoomDisplayRow.overdue`); the detail adds the room's
+building/floor/number, last seen, a matching "Next update" line, numeric
+RSSI/battery, an editable Screen select (narrowed to the device's panel type
+when one is set, same as the room's own Displays tab above), and an "Open in
+nice4iot" link for experts (`device_url`). RSSI and
 battery have no per-device source in nice4iot yet, so their icons/values
 stay at "no data" — see [extension wishlist](nice4iot-extension-wishlist.md).
 A device's panel type itself is set on nice4iot's own device card

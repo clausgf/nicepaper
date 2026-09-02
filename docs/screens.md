@@ -190,6 +190,15 @@ rendering) and would otherwise look exactly like the device's real poll and
 overwrite "last delivered" with whatever the admin's browser just requested,
 independent of whether the device itself has fetched anything.
 
+Every such poll — `200` or `304` alike — also records when the device is
+next expected to poll again, computed from the same `Cache-Control: max-age`
+value the response just sent (`devicebinding/snapshot.py`'s
+`save_next_expected()`). The Displays list and Display Detail compare that
+against the current time (plus a grace window,
+`display/backend.py`'s `OVERDUE_GRACE`) to flag a device as overdue —
+catching a display that stopped checking in even before its "last
+delivered" content goes stale.
+
 The preview is framed by a pixel ruler with labelled ticks on all four sides,
 and moving the mouse over it shows the exact pixel under the cursor — widgets
 are positioned by typing `position_x`/`position_y`, so the preview is only

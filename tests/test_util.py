@@ -1,6 +1,6 @@
 import datetime
 
-from extensions.epaper.util import check_filename, humanize_age
+from extensions.epaper.util import check_filename, humanize_age, humanize_eta
 
 
 def test_humanize_age():
@@ -11,6 +11,20 @@ def test_humanize_age():
     assert humanize_age(now - d(minutes=5), now) == "5 min ago"
     assert humanize_age(now - d(hours=3), now) == "3 h ago"
     assert humanize_age(now - d(days=2), now) == "2 d ago"
+
+
+def test_humanize_eta():
+    now = datetime.datetime(2026, 1, 1, 12, 0, tzinfo=datetime.timezone.utc)
+    d = datetime.timedelta
+    assert humanize_eta(None, now) == "unknown"
+    assert humanize_eta(now + d(seconds=30), now) == "due any moment"
+    assert humanize_eta(now + d(minutes=5), now) == "in 5 min"
+    assert humanize_eta(now + d(hours=3), now) == "in 3 h"
+    assert humanize_eta(now + d(days=2), now) == "in 2 d"
+    assert humanize_eta(now - d(seconds=30), now) == "overdue"
+    assert humanize_eta(now - d(minutes=5), now) == "overdue by 5 min"
+    assert humanize_eta(now - d(hours=3), now) == "overdue by 3 h"
+    assert humanize_eta(now - d(days=2), now) == "overdue by 2 d"
 
 
 def test_check_filename_accepts_simple_names():

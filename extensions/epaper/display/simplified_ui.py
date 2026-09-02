@@ -31,7 +31,7 @@ from extensions.epaper.display.models import RoomDisplayRow
 from extensions.epaper.display.preview import render_device_preview
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.ui.simplified_ui.layout import Shell
-from extensions.epaper.util import humanize_age
+from extensions.epaper.util import humanize_age, humanize_eta
 
 
 def render_displays(shell: Shell) -> None:
@@ -75,6 +75,9 @@ def _render_list_item(key: str, item: RoomDisplayRow, select) -> None:
                 ui.item_label(subtitle).props('caption')
         with ui.item_section().props('side'):
             with ui.row().classes('items-center gap-2 no-wrap'):
+                if item.overdue:
+                    ui.icon('warning', color='negative').props('size=sm') \
+                        .tooltip(f'Next update {humanize_eta(item.next_expected_at, datetime.datetime.now(datetime.timezone.utc))}')
                 ui.icon(_wifi_icon(item.rssi), color='grey-7').props('size=sm').tooltip(_rssi_text(item.rssi))
                 ui.icon(_battery_icon(item.battery_voltage), color=_battery_color(item.battery_voltage)) \
                     .props('size=sm').tooltip(_battery_text(item.battery_voltage))
@@ -139,6 +142,13 @@ def _render_detail(paths: EpaperPaths, image_base_url: str,
                 _status_icon(item).props('size=sm')
                 now = datetime.datetime.now(datetime.timezone.utc)
                 ui.label(f'{_STATUS_LABELS[_status_key(item)]} · last seen {humanize_age(item.last_seen_at, now)}')
+
+            if item.next_expected_at is not None:
+                with ui.row().classes('items-center gap-2'):
+                    if item.overdue:
+                        ui.icon('warning', color='negative').props('size=sm')
+                    ui.label(f'Next update {humanize_eta(item.next_expected_at, now)}') \
+                        .classes('text-negative' if item.overdue else 'text-grey-7')
 
             with ui.row().classes('items-center gap-2'):
                 ui.icon(_wifi_icon(item.rssi), color='grey-7').props('size=sm')

@@ -25,6 +25,24 @@ def humanize_age(dt: Optional[datetime.datetime], now: datetime.datetime) -> str
     return f'{minutes // (60 * 24)} d ago'
 
 
+def humanize_eta(dt: Optional[datetime.datetime], now: datetime.datetime) -> str:
+    """'in N min' / 'in N h' / 'in N d' for a future datetime, 'overdue' /
+    'overdue by N min/h/d' for a past one, or 'unknown' for None -- the ETA
+    counterpart to humanize_age()'s "how long ago". Used for a device's next
+    expected poll (display/preview.py, display/simplified_ui.py)."""
+    if dt is None:
+        return 'unknown'
+    seconds = (dt - now).total_seconds()
+    prefix, minutes = ('in ', int(seconds // 60)) if seconds >= 0 else ('overdue by ', int(-seconds // 60))
+    if minutes < 1:
+        return 'due any moment' if seconds >= 0 else 'overdue'
+    if minutes < 60:
+        return f'{prefix}{minutes} min'
+    if minutes < 60 * 24:
+        return f'{prefix}{minutes // 60} h'
+    return f'{prefix}{minutes // (60 * 24)} d'
+
+
 def humanize_datetime_age(dt: Optional[datetime.datetime], now: datetime.datetime) -> str:
     """'DD.MM.YY HH:MM:SS (Nmin ago)', matching nice4iot's own device status
     card (app.util.render_datetime_age -- local timezone, its own age

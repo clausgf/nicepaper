@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 
 from extensions.epaper.devicebinding.backend import get_device_bindings
 from extensions.epaper.devicebinding.snapshot import (
-    device_snapshot_png_path, read_device_snapshot, save_device_snapshot,
+    device_snapshot_png_path, read_device_snapshot, save_device_snapshot, save_next_expected,
 )
 from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.util import logger, clean_path_parameter
@@ -113,8 +113,8 @@ async def _render_screen_image(paths: EpaperPaths, id: str, if_none_match: Optio
     # variant is different bytes and so must not share its ETag
     etag = f"{meta.version}-raw" if raw else meta.version
     expires_at = meta.expires_at
+    now = datetime.datetime.now(ZoneInfo(app_config.timezone))
     if expires_at:
-        now = datetime.datetime.now(ZoneInfo(app_config.timezone))
         seconds_till_update = (expires_at - now).total_seconds()
         # wakeup_margin_s biases the display to wake at or slightly after
         # expires_at rather than before it: an early wakeup gets served the
@@ -128,6 +128,21 @@ async def _render_screen_image(paths: EpaperPaths, id: str, if_none_match: Optio
         "Cache-Control": f"max-age={max_age}"
     }
 
+    # `id` genuinely names a device (not a literal screen id an editor
+    # preview happens to hit this same endpoint with), and this isn't the
+    # UI's own live-preview fetch (see _PREVIEW_DESCRIPTION) or a `raw`
+    # request (a display never sends either, see _RAW_DESCRIPTION).
+    device_bound = not raw and not preview and get_device_bindings(paths).get(id) is not None
+
+    # Record when this device is next expected to poll again, per the
+    # Cache-Control we're about to send it -- every real poll through its
+    # own alias, 200 or 304 alike, since a 304 still carries a fresh max-age
+    # the device is expected to honor. Lets Display Detail/the Displays list
+    # flag a device as overdue without waiting for its next real delivery.
+    if device_bound:
+        next_expected_at = now + datetime.timedelta(seconds=max_age)
+        await asyncio.to_thread(save_next_expected, paths, id, next_expected_at)
+
     # Return 304 if content did not change
     if if_none_match is not None and if_none_match == etag:
         return Response("", status.HTTP_304_NOT_MODIFIED, headers=headers)
@@ -140,13 +155,8 @@ async def _render_screen_image(paths: EpaperPaths, id: str, if_none_match: Optio
         raise HTTPException(status_code=500, detail="Error getting image")
 
     # A real 200 to a device's own alias URL: remember this exact PNG + when,
-    # for the "Last delivered" view (display/preview.py) -- distinct from
-    # `raw`, which a display never requests (see _RAW_DESCRIPTION), `preview`,
-    # which the UI's own live-preview fetch sets precisely because it hits
-    # this same alias URL (see _PREVIEW_DESCRIPTION), and only for `id`s that
-    # are genuinely a device's own name, not a literal screen id an editor
-    # preview happens to hit this same endpoint with.
-    if not raw and not preview and get_device_bindings(paths).get(id) is not None:
+    # for the "Last delivered" view (display/preview.py).
+    if device_bound:
         await asyncio.to_thread(save_device_snapshot, paths, id, Path(filename))
 
     return FileResponse(path=filename, media_type="image/png", headers=headers)

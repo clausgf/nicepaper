@@ -22,10 +22,15 @@ from pydantic import BaseModel, Field
 
 
 class DeviceSnapshot(BaseModel):
-    """Metadata sidecar for a device's last successfully delivered image
-    (devicebinding/snapshot.py) -- just the fetch time; the PNG bytes
-    themselves live next to it as a plain file, not base64 in here."""
-    fetched_at: datetime.datetime
+    """Metadata sidecar for a device's polling state (devicebinding/
+    snapshot.py). fetched_at is the last real 200's time -- the PNG bytes
+    for it live next to this file, not base64 in here -- and is None until
+    the device's first real delivery. next_expected_at is when the device is
+    next expected to poll again, per the most recent Cache-Control: max-age
+    it was sent (200 or 304 alike, so it stays current even while the image
+    itself hasn't changed); None if never told one yet."""
+    fetched_at: Optional[datetime.datetime] = None
+    next_expected_at: Optional[datetime.datetime] = None
 
 
 class DeviceBinding(BaseModel):

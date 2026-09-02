@@ -4,6 +4,7 @@ import types
 
 import extensions.epaper.display.backend as rd
 from extensions.epaper.devicebinding.backend import get_device_binding, set_device_binding
+from extensions.epaper.devicebinding.snapshot import save_device_snapshot, save_next_expected
 from extensions.epaper.room.backend import create_room, room_adapter
 from extensions.epaper.paths import EpaperPaths
 
@@ -53,6 +54,25 @@ def test_display_rows_join_room_and_online(tmp_path, monkeypatch):
     assert rows["d-unbound"].building == ""  # not in a room
     # unavailable columns stay empty
     assert rows["d-online"].rssi is None and rows["d-online"].battery_voltage is None
+
+
+def test_display_rows_reports_next_expected_and_overdue_from_the_snapshot(tmp_path, monkeypatch):
+    paths = _paths(tmp_path)
+    source = tmp_path / "source.png"
+    source.write_bytes(b"data")
+    for name in ("d-on-time", "d-overdue"):
+        save_device_snapshot(paths, name, source)  # read_device_snapshot() needs a PNG present
+    save_next_expected(paths, "d-on-time", NOW + datetime.timedelta(minutes=30))
+    save_next_expected(paths, "d-overdue", NOW - datetime.timedelta(hours=1))
+
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(
+        _dev("d-on-time"), _dev("d-overdue"), _dev("d-never-polled"),
+    ))
+
+    rows = {r.device_name: r for r in rd.display_rows(paths, "proj")}
+    assert rows["d-on-time"].next_expected_at is not None and rows["d-on-time"].overdue is False
+    assert rows["d-overdue"].next_expected_at is not None and rows["d-overdue"].overdue is True
+    assert rows["d-never-polled"].next_expected_at is None and rows["d-never-polled"].overdue is False
 
 
 def test_display_rows_flags_a_deleted_room_instead_of_looking_unassigned(tmp_path, monkeypatch):

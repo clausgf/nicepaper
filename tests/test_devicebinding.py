@@ -7,7 +7,7 @@ from extensions.epaper.devicebinding.backend import (
 )
 from extensions.epaper.devicebinding.models import DeviceBinding
 from extensions.epaper.devicebinding.snapshot import (
-    device_snapshot_png_path, read_device_snapshot, save_device_snapshot,
+    device_snapshot_png_path, read_device_snapshot, save_device_snapshot, save_next_expected,
 )
 from extensions.epaper.paths import EpaperPaths
 
@@ -172,3 +172,50 @@ def test_device_snapshots_are_independent_per_device(tmp_path):
     save_device_snapshot(paths, "dev-a", source)
     assert read_device_snapshot(paths, "dev-b") is None
     assert read_device_snapshot(paths, "dev-a") is not None
+
+
+def test_save_next_expected_before_any_delivery_is_invisible_without_a_png(tmp_path):
+    """next_expected_at can be written before a device's first real 200 (a
+    304 can't happen that early, but nothing stops a direct call) -- but
+    read_device_snapshot() still requires the PNG (see its own docstring),
+    so it reads as no snapshot at all until a real delivery also happens."""
+    paths = _paths(tmp_path)
+    save_next_expected(paths, "dev", datetime.datetime.now(datetime.timezone.utc))
+    assert read_device_snapshot(paths, "dev") is None
+
+
+def test_save_next_expected_does_not_touch_fetched_at_or_the_png(tmp_path):
+    paths = _paths(tmp_path)
+    source = tmp_path / "source.png"
+    source.write_bytes(b"image-bytes")
+    save_device_snapshot(paths, "dev", source)
+    delivered = read_device_snapshot(paths, "dev")
+    assert delivered is not None
+
+    next_expected = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=5)
+    save_next_expected(paths, "dev", next_expected)
+
+    updated = read_device_snapshot(paths, "dev")
+    assert updated is not None
+    assert updated.next_expected_at == next_expected
+    assert updated.fetched_at == delivered.fetched_at
+    assert device_snapshot_png_path(paths, "dev").read_bytes() == b"image-bytes"
+
+
+def test_save_device_snapshot_does_not_clobber_an_existing_next_expected_at(tmp_path):
+    """A real delivery (save_device_snapshot) must merge into the existing
+    metadata, not overwrite it wholesale -- otherwise a next_expected_at
+    written moments earlier in the same request (api/endpoints.py writes it
+    before deciding 200 vs 304) would be silently dropped."""
+    paths = _paths(tmp_path)
+    next_expected = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=5)
+    save_next_expected(paths, "dev", next_expected)
+
+    source = tmp_path / "source.png"
+    source.write_bytes(b"image-bytes")
+    save_device_snapshot(paths, "dev", source)
+
+    snapshot = read_device_snapshot(paths, "dev")
+    assert snapshot is not None
+    assert snapshot.next_expected_at == next_expected
+    assert snapshot.fetched_at is not None

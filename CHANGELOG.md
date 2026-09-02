@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.35.2 — 2026-09-02
+
+### Added
+
+- **A device's next expected poll is now tracked and surfaced as "overdue"**
+  — every poll through a device's own alias URL (`200` or `304` alike)
+  records `next_expected_at`, computed from the same `Cache-Control:
+  max-age` value just sent to it (`devicebinding/snapshot.py`'s new
+  `save_next_expected()`; `DeviceSnapshot.fetched_at` is now optional so
+  this can be recorded before a device's first real delivery too).
+  `RoomDisplayRow` gains `next_expected_at`/`overdue` fields
+  (`display.backend.OVERDUE_GRACE` grace window before flagging).
+  The simplified UI's Displays list shows a warning icon for an overdue
+  device, and Display Detail's "Last delivered" tab shows "Next update ..."
+  (`util.humanize_eta()`), in red once overdue — so a display that stopped
+  checking in is visible without waiting for its last-delivered content to
+  go stale.
+
 ## 0.35.1 — 2026-09-02
 
 ### Changed

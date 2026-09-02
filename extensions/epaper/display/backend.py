@@ -26,6 +26,7 @@ import math
 from typing import Iterator, Optional
 
 from extensions.epaper.devicebinding.backend import get_device_bindings, set_device_binding
+from extensions.epaper.devicebinding.snapshot import read_device_snapshot
 from extensions.epaper.room.backend import read_room
 from extensions.epaper.display.models import RoomDisplayRow
 from extensions.epaper.paths import EpaperPaths
@@ -33,6 +34,11 @@ from extensions.epaper.paths import EpaperPaths
 # A device counts as online if it was seen within this window (its last_seen_at
 # is refreshed on every authenticated request/telemetry push).
 ONLINE_THRESHOLD = datetime.timedelta(minutes=5)
+
+# Grace added on top of next_expected_at before flagging a device overdue --
+# covers ordinary jitter (WiFi reconnect, clock drift) that isn't itself a
+# sign of a stuck display.
+OVERDUE_GRACE = datetime.timedelta(minutes=10)
 
 
 def _project_devices(project_name: str) -> list:
@@ -137,6 +143,12 @@ def _is_online(device) -> bool:
     return datetime.datetime.now(datetime.timezone.utc) - last_seen < ONLINE_THRESHOLD
 
 
+def _is_overdue(next_expected_at: Optional[datetime.datetime]) -> bool:
+    if next_expected_at is None:
+        return False
+    return datetime.datetime.now(datetime.timezone.utc) > next_expected_at + OVERDUE_GRACE
+
+
 def display_rows(paths: EpaperPaths, project_name: str,
                  room_id: Optional[str] = None) -> list[RoomDisplayRow]:
     """One row per device, filtered to `room_id` when given (the room tab) or
@@ -182,6 +194,8 @@ def display_rows(paths: EpaperPaths, project_name: str,
         screen_label = screen_id or '—'
         if screen_id and not _screen_exists(paths, screen_id):
             screen_label = f'{screen_id} ⚠'
+        snapshot = read_device_snapshot(paths, device.name)
+        next_expected_at = snapshot.next_expected_at if snapshot else None
         rows.append(RoomDisplayRow(
             device_name=device.name,
             screen_id=screen_id,
@@ -198,6 +212,8 @@ def display_rows(paths: EpaperPaths, project_name: str,
             is_provisioning_approved=getattr(device, 'is_provisioning_approved', False),
             online=_is_online(device),
             last_seen_at=getattr(device, 'last_seen_at', None),
+            next_expected_at=next_expected_at,
+            overdue=_is_overdue(next_expected_at),
             firmware_version=getattr(device, 'firmware_version', '') or '',
             rssi=round(rssi) if rssi is not None and math.isfinite(rssi) else None,
             battery_voltage=battery_voltage if battery_voltage is not None and math.isfinite(battery_voltage) else None,

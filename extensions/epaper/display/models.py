@@ -106,6 +106,20 @@ class RoomDisplayRow(BaseModel):
             niceview.Field(label='Last seen', editable=False, table_sortable=True)
         ] = None
 
+    next_expected_at: Annotated[Optional[datetime.datetime],
+            Field(description="When this device is next expected to poll its image, per the "
+                              "Cache-Control it was sent on its last poll (devicebinding/"
+                              "snapshot.py). None if it has never polled through its own alias."),
+            niceview.Field(label='Next expected', editable=False, table_sortable=True)
+        ] = None
+
+    overdue: Annotated[bool,
+            Field(description='Whether the device is past next_expected_at (plus a grace '
+                              'window) without having polled again -- see display.backend.'
+                              'OVERDUE_GRACE.'),
+            niceview.Field(label='Overdue', editable=False, table_sortable=True)
+        ] = False
+
     firmware_version: Annotated[str,
             Field(description='Firmware version the device last reported. Empty if it never has.'),
             niceview.Field(label='Firmware', editable=False, table_sortable=True, table_filterable=True)

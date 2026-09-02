@@ -16,8 +16,9 @@ from typing import Optional
 from nicegui import ui
 
 from extensions.epaper.devicebinding.snapshot import read_device_snapshot
+from extensions.epaper.display.backend import OVERDUE_GRACE
 from extensions.epaper.paths import EpaperPaths
-from extensions.epaper.util import humanize_age
+from extensions.epaper.util import humanize_age, humanize_eta
 
 
 def render_device_preview(paths: EpaperPaths, device_name: str,
@@ -55,4 +56,8 @@ def render_device_preview(paths: EpaperPaths, device_name: str,
                 return
             now = datetime.datetime.now(datetime.timezone.utc)
             ui.label(f'Delivered {humanize_age(snapshot.fetched_at, now)}').classes('text-caption text-grey')
+            if snapshot.next_expected_at is not None:
+                overdue = now > snapshot.next_expected_at + OVERDUE_GRACE
+                ui.label(f'Next update {humanize_eta(snapshot.next_expected_at, now)}') \
+                    .classes(f'text-caption {"text-negative" if overdue else "text-grey"}')
             ui.image(f'{image_base_url}/{device_name}/last_delivered.png').classes('w-full')
