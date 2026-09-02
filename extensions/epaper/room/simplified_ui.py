@@ -3,19 +3,26 @@ Rooms section: a niceview DrillDownWrapper over the rooms directory
 (rooms_adapter, a JsonDirectoryAdapter), so the list, Add and Delete are
 niceview's; this module only supplies the row and the detail body -- three
 tabs: Occupancy (free/occupied status, next meeting, upcoming events -- from
-the room's booking system, see _occupancy_panel()), Settings (the RoomModel
-form, autosaving through the adapter), and Displays (a room summary plus its
-own drill-down list of the devices bound to the room, see _displays_panel()).
+the room's booking system, plus the room's photo at the bottom, see
+_occupancy_panel()), Settings (the RoomModel form, autosaving through the
+adapter, plus the photo upload/remove, see _settings_panel()), and Displays
+(a room summary, the photo, then a drill-down list of the devices bound to
+the room, see _displays_panel()).
 
 The form's field metadata (labels/widgets/hints) lives on RoomModel itself
 (its fields' Annotated FieldInfo); only the visual layout is here.
+
+The photo itself is not a RoomModel field -- it's a plain file in
+EpaperPaths.room_photo_dir, extension-owned rather than the user's project
+directory (see room/photo.py); _room_photo_view() renders it, capped so it
+can't dominate a tab on a phone.
 """
 import datetime
 from typing import Any, Optional, cast
 from zoneinfo import ZoneInfo
 
 from babel.dates import format_datetime
-from nicegui import background_tasks, core, ui
+from nicegui import background_tasks, core, events, ui
 from niceview import CollectionAdapter, DrillDownWrapper, ModelForm
 import niceview
 
@@ -32,6 +39,7 @@ from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.room.backend import get_room_events, read_room, rooms_adapter
 from extensions.epaper.room.models import ROOM_TYPE_LABELS, RoomModel
+from extensions.epaper.room.photo import delete_room_photo, room_photo_path, save_room_photo
 
 from extensions.epaper.ui.simplified_ui.layout import Shell
 
@@ -69,15 +77,56 @@ def _render_detail(shell: Shell, adapter: CollectionAdapter[RoomModel], key: str
         with ui.tab_panel('occupancy'):
             _occupancy_panel(shell, room)
         with ui.tab_panel('settings'):
-            # field_infos come from RoomModel's Annotated FieldInfo; only the
-            # layout and the runtime-dependent booking-system options are
-            # supplied here (shared with the project-tab editor, room/ui.py).
-            # Autosaves through the adapter.
-            ModelForm.from_adapter(RoomModel, adapter, key, autosave=True,
-                                   field_infos=booking_system_field_infos(shell.paths, room),
-                                   ).render()
+            _settings_panel(shell, adapter, key, room)
         with ui.tab_panel('displays'):
             _displays_panel(shell, key)
+
+
+def _room_photo_view(paths: EpaperPaths, room_id: str) -> None:
+    """The room's photo, if it has one -- capped height so it can't dominate
+    a tab on a phone, cropped (not squeezed) to fill the width."""
+    path = room_photo_path(paths, room_id)
+    if path is None:
+        return
+    ui.image(path).classes('w-full rounded-borders').props('fit=cover height=192px')
+
+
+def _settings_panel(shell: Shell, adapter: CollectionAdapter[RoomModel], key: str, room: RoomModel) -> None:
+    """The RoomModel form (field_infos come from RoomModel's Annotated
+    FieldInfo; only the layout and the runtime-dependent booking-system
+    options are supplied here, shared with the project-tab editor,
+    room/ui.py; autosaves through the adapter), plus the room's photo below
+    it -- view, upload (replaces any previous one) and remove."""
+    ModelForm.from_adapter(RoomModel, adapter, key, autosave=True,
+                           field_infos=booking_system_field_infos(shell.paths, room),
+                           ).render()
+
+    @ui.refreshable
+    def photo_section() -> None:
+        ui.label('Photo').classes('text-subtitle2 q-mt-md')
+        has_photo = room_photo_path(shell.paths, key) is not None
+        _room_photo_view(shell.paths, key)
+
+        async def handle_upload(e: events.UploadEventArguments) -> None:
+            try:
+                save_room_photo(shell.paths, key, e.file.name, await e.file.read())
+            except ValueError as exc:
+                ui.notify(str(exc), type='negative')
+                return
+            photo_section.refresh()
+
+        def handle_remove() -> None:
+            delete_room_photo(shell.paths, key)
+            photo_section.refresh()
+
+        with ui.row().classes('w-full items-center gap-2'):
+            ui.upload(on_upload=handle_upload, auto_upload=True) \
+                .props('accept=image/* flat dense').classes('max-w-xs')
+            if has_photo:
+                ui.button('Remove photo', icon='delete', on_click=handle_remove) \
+                    .props('flat dense color=negative')
+
+    photo_section()
 
 
 def _occupancy_panel(shell: Shell, room: RoomModel) -> None:
@@ -92,7 +141,10 @@ def _occupancy_panel(shell: Shell, room: RoomModel) -> None:
     The reload button bypasses the iCal cache (get_room_events(force=True))
     for cases the cache's own TTL/backoff wouldn't catch, e.g. a booking made
     after the last fetch that should show up now, not after update_interval
-    elapses on its own."""
+    elapses on its own.
+
+    The room's photo (if any), below everything else -- see
+    _room_photo_view()."""
     state: dict[str, Any] = {'events': None, 'error': None}
 
     @ui.refreshable
@@ -130,6 +182,7 @@ def _occupancy_panel(shell: Shell, room: RoomModel) -> None:
     body()
     if core.loop is not None:  # no running nicegui app -- e.g. a render test building the tree only
         background_tasks.create(load(), name=f'occupancy-{room.id}')
+    _room_photo_view(shell.paths, room.id)
 
 
 def _event_time(iso: str) -> datetime.datetime:
@@ -199,10 +252,11 @@ def _room_summary(room: RoomModel) -> None:
 
 
 def _displays_panel(shell: Shell, room_id: str) -> None:
-    """The displays in this room: a room header plus a drill-down list of the
-    devices bound to it (Title device name, Subtitle screen/panel/firmware --
-    panel is display_rows()'s panel_label, "{panel_id} {name}" suffixed with
-    a "⚠" glyph when it doesn't match what the firmware itself reports, see
+    """The displays in this room: a room header, its photo (if any, see
+    _room_photo_view()), then a drill-down list of the devices bound to it
+    (Title device name, Subtitle screen/panel/firmware -- panel is
+    display_rows()'s panel_label, "{panel_id} {name}" suffixed with a "⚠"
+    glyph when it doesn't match what the firmware itself reports, see
     display.backend.panel_mismatch_hint()), each editable (its Screen) and
     deletable (unassigns it from the room). Add picks from the project's
     assignable devices -- there is nothing to type, so the wrapper's standard
@@ -212,6 +266,7 @@ def _displays_panel(shell: Shell, room_id: str) -> None:
         ui.label('Room not found.').classes('text-negative')
         return
     _room_summary(room)
+    _room_photo_view(shell.paths, room_id)
 
     adapter = RoomDisplaysAdapter(shell.paths, shell.project_name, room_id)
 

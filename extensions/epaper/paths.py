@@ -101,6 +101,13 @@ class EpaperPaths:
         return self.root / "organizer_names.json"
 
     @property
+    def room_photo_dir(self) -> Path:
+        """One photo per room (<room_id>.<ext>), extension-owned -- deliberately
+        not asset_dir (the project directory the Image widget reads from), see
+        room/photo.py."""
+        return self.root / "room_photos"
+
+    @property
     def device_snapshot_dir(self) -> Path:
         """Last screen PNG actually delivered to each device -- a real 200 OK
         response, not a 304 Not Modified -- plus when, so Display Detail can
@@ -113,5 +120,5 @@ class EpaperPaths:
     def ensure_dirs(self) -> None:
         for d in (self.screen_dir, self.room_dir, self.booking_dir, self.schedule_dir,
                   self.image_dir, self.ical_dir, self.weather_dir, self.image_cache_dir,
-                  self.homeassistant_dir, self.device_snapshot_dir):
+                  self.homeassistant_dir, self.room_photo_dir, self.device_snapshot_dir):
             d.mkdir(parents=True, exist_ok=True)

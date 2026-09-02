@@ -34,6 +34,7 @@ def register(app: FastAPI) -> None:
     from extensions.epaper.core.datasources.weather import read_all_weather_statuses
     from extensions.epaper.global_config.backend import load_global_config, save_global_config
     from extensions.epaper.global_config.ui import global_config_fields
+    from extensions.epaper.organizer.ui import organizer_names_fields
     from extensions.epaper.paths import EpaperPaths
     from extensions.epaper.project_config.ui import project_config_fields
     from extensions.epaper.bookingsystem.ui import booking_systems_wrapper
@@ -101,6 +102,18 @@ def register(app: FastAPI) -> None:
         project_config_fields(_paths_for_project(project_name))
 
     register_project_card('settings', _settings_card, title='E-Paper')
+
+    # --- Organizer names card -------------------------------------------
+    # Its own 'settings' card (own sidebar entry, own foldable header,
+    # expanded by default like every other Project Settings section) rather
+    # than a second section inside _settings_card -- register_project_card()
+    # gives one section per registered card, see nice4iot's docs/extensions.md.
+    # Previously simplified-UI-only (organizer/simplified_ui.py); this gives
+    # it a home in the non-simplified UI too.
+    def _organizer_names_card(project_name: str) -> None:
+        organizer_names_fields(_paths_for_project(project_name))
+
+    register_project_card('settings', _organizer_names_card, title='Organizer names')
 
     # --- Device settings card -------------------------------------------
     # Lets a device be assigned a screen and shows the resulting

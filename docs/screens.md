@@ -355,8 +355,9 @@ formats):
   `roomcalendar` screen, see [Display bindings](#display-bindings).
 - `examples/organizer_names.json` — example entries for `organizer_names_file`,
   used to extract an organizer's name from an event summary when the iCal feed
-  has no `ORGANIZER` field. Also editable in the simplified UI, under
-  Preferences > Organizer names.
+  has no `ORGANIZER` field. Also editable in the simplified UI (Preferences >
+  Organizer names) and the non-simplified UI (an "Organizer names" card next
+  to "E-Paper" in Project Settings / standalone's Settings page).
 
 Copy the ones you need into the matching `data/` subdirectory (see
 [Development](development.md)); they are plain screen/schedule files, so they

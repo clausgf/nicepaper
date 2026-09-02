@@ -46,9 +46,10 @@ The sidebar tree is a list of `NavItem`s. A **leaf** carries a `render`
 only folds it). Current sections:
 
 - **Rooms** — list + Add Room; a room opens a detail view with three tabs:
-  Occupancy (status), Settings (number, name, building, floor, type, photo,
-  booking system, room-specific iCal URL), and Displays (the devices bound
-  to the room, see below).
+  Occupancy (status, plus the room's photo at the bottom), Settings (number,
+  name, building, floor, type, capacity, notes, description, booking system,
+  room-specific iCal URL, plus the photo upload/remove), and Displays (a room
+  summary, the photo, then the devices bound to the room, see below).
 - **Templates** — read-only: every screen (shared storage with the
   non-simplified editor) plus the auto-generated Room Calendar templates
   (see [screens.md](screens.md#auto-generated-room-calendar-templates)),
@@ -68,7 +69,10 @@ only folds it). Current sections:
   wrapper.
 - **Settings › Organizer names** — a directly editable textarea for
   `organizer_names_file` (one name per line, saved on blur), previously
-  admin-only/hand-placed on disk.
+  admin-only/hand-placed on disk. Also reachable in the non-simplified UI:
+  its own "Organizer names" card next to "E-Paper" in nice4iot's Project
+  Settings sidebar group, and a second card on standalone's Settings page
+  (`organizer/ui.py`'s `organizer_names_fields()`, shared content).
 - **Settings › Project settings** — Home Assistant URL/token and the default
   weather location for *this* project only (`ProjectConfig`), the same fields
   as nice4iot's "Settings" project tab.
@@ -114,11 +118,24 @@ loading state first and refreshes once it lands (`nicegui.background_tasks`,
 not a bare `asyncio.create_task`, so the refresh reaches the right client).
 A reload icon button re-fetches with `get_room_events(force=True)`, bypassing
 the iCal cache's own TTL/backoff — for a booking made after the last fetch
-that shouldn't have to wait out `update_interval` to show up.
+that shouldn't have to wait out `update_interval` to show up. Below all of
+that, the room's photo (see below), so it never pushes the live status down.
+
+**Room photos** are a plain file per room, not a `RoomModel` field — one
+image at most in `EpaperPaths.room_photo_dir` (`<room_id>.<ext>`, extension-
+owned storage, deliberately not the project directory the `Image` widget
+reads from), managed by `room/photo.py` and rendered by `room/simplified_ui.py`'s
+`_room_photo_view()`: capped to `height=192px` with `fit=cover` so it can't
+grow to dominate a tab on a phone, and rendered as nothing at all when the
+room has none. The Settings tab is the only place it's editable — a
+`ui.upload` (`accept=image/*`, so mobile browsers offer camera or library)
+that replaces any previous photo (even under a different extension) plus a
+"Remove photo" button shown once one exists.
 
 The room's **Displays** tab (`room/simplified_ui.py`'s `_displays_panel`) leads
-with a compact room summary (label + type, and, smaller, building/floor), then
-its own niceview `DrillDownWrapper` (not the shared grid below) over
+with a compact room summary (label + type, and, smaller, building/floor),
+then the room's photo, then its own niceview `DrillDownWrapper` (not the
+shared grid below) over
 `RoomDisplaysAdapter`, one row per device bound to the room — Title device
 name, Subtitle screen/panel/firmware. The panel part is `RoomDisplayRow.
 panel_label` (`display.backend.display_rows()`): the configured panel type

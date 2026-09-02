@@ -482,7 +482,7 @@ def test_room_fields_carry_niceview_field_info_for_the_form():
     the runtime booking-system options)."""
     from niceview import FieldInfo
     from extensions.epaper.room.models import RoomModel
-    for name in ("room_type", "capacity", "photo", "description",
+    for name in ("room_type", "capacity", "description",
                  "booking_system_id", "booking_ical_url"):
         md = RoomModel.model_fields[name].metadata
         assert any(isinstance(m, FieldInfo) for m in md), f"{name} has no niceview FieldInfo"

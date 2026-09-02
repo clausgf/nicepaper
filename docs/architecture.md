@@ -16,12 +16,13 @@ nicepaper
 │   ├── catalog/                 # models.py (Palette, PanelTypeModel), backend.py (package + per-root catalog, no ui.py -- read-only reference data, selected inside screen/ui.py)
 │   ├── screen/                  # feature pkg: models.py, backend.py (render/cache), ui.py (editor), simplified_ui.py (Templates, scaffolding)
 │   ├── schedule/                # feature pkg: models.py, backend.py (evaluation), ui.py (editor)
-│   ├── room/                    # feature pkg: models.py, backend.py (storage), ui.py (editor tab), simplified_ui.py
+│   ├── room/                    # feature pkg: models.py, backend.py (storage), photo.py (per-room photo file), ui.py (editor tab), simplified_ui.py
 │   ├── bookingsystem/           # feature pkg: models.py, backend.py (storage), simplified_ui.py
 │   ├── display/                 # feature pkg: models.py (row), backend.py (device<->room<->screen join), simplified_ui.py (grid)
 │   ├── devicebinding/           # feature pkg: models.py, backend.py (device->screen/room store), ui.py (device card)
 │   ├── global_config/           # feature pkg: models.py (GlobalConfig), backend.py (app_config singleton + persist), ui.py (form)
 │   ├── project_config/          # feature pkg: models.py (ProjectConfig, per-root), backend.py (read/persist), ui.py (form)
+│   ├── organizer/                # feature pkg: backend.py (organizer_names_file storage), ui.py (form), simplified_ui.py
 │   ├── ui                       # shared content-only rendering, reused by both modes
 │   │   ├── forms.py             # form vocabulary: field styling, spacing, hints
 │   │   ├── drilldown.py         # file list <-> editor chrome, inline rename

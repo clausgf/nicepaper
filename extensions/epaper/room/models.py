@@ -82,12 +82,6 @@ class RoomModel(BaseModel):
             niceview.Field(widget_type='ui.textarea', table_hidden=True)
         ] = None
 
-    photo: Annotated[Optional[str],
-            Field(description='Room photo: a file in the project directory (the same place the '
-                              'Image widget reads from). Empty = no photo.'),
-            niceview.Field(hint='File in the project directory', table_hidden=True)
-        ] = None
-
     # --- Booking source ---------------------------------------------------
     booking_system_id: Annotated[Optional[str],
             Field(title="Booking system",
@@ -131,6 +125,6 @@ class RoomModel(BaseModel):
                 ['room_number:w-1/4', 'room_name'],
                 ['building', 'floor:w-1/4'],
                 ['room_type', 'capacity:w-1/4'],
-                'notes', 'description', 'photo'],
+                'notes', 'description'],
             ['## Booking system', ['booking_system_id:shrink', 'booking_ical_url']],
         ]

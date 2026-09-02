@@ -7,15 +7,9 @@ no separate edit dialog/button, since the textarea IS the editor.
 from nicegui import ui
 
 from extensions.epaper.organizer.backend import read_organizer_names, save_organizer_names
+from extensions.epaper.organizer.ui import ORGANIZER_NAMES_DESCRIPTION as _DESCRIPTION
 from extensions.epaper.ui.simplified_ui.common import view_header
 from extensions.epaper.ui.simplified_ui.layout import Shell
-
-_DESCRIPTION = (
-    "Names checked against an event's summary when its iCal feed has no "
-    "ORGANIZER field: a summary starting with one of these names is credited "
-    "to that organizer, and the name is stripped from the summary shown. "
-    "One name per line."
-)
 
 
 def render_organizer_names(shell: Shell) -> None:

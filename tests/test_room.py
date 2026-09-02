@@ -7,6 +7,7 @@ from extensions.epaper.core.datasources.ical import IcalStatus
 from extensions.epaper.room.backend import (
     create_room, delete_room, get_room_events, list_rooms, read_room, room_adapter, room_path,
 )
+from extensions.epaper.room.photo import delete_room_photo, room_photo_path, save_room_photo
 from extensions.epaper.paths import EpaperPaths
 import extensions.epaper.room.backend as room_backend
 
@@ -201,6 +202,47 @@ def test_get_room_events_passes_system_timing_as_seconds_and_days(tmp_path, monk
     asyncio.run(get_room_events(paths, room))
     assert captured["update_interval_s"] == 300
     assert captured["max_days"] == 14
+
+
+def test_room_photo_round_trip(tmp_path):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    assert room_photo_path(paths, room.id) is None
+
+    save_room_photo(paths, room.id, "hallway.jpg", b"fake-jpeg-bytes")
+    path = room_photo_path(paths, room.id)
+    assert path is not None
+    assert path.name == f"{room.id}.jpg"
+    assert path.read_bytes() == b"fake-jpeg-bytes"
+
+
+def test_room_photo_replace_removes_old_extension(tmp_path):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    save_room_photo(paths, room.id, "first.jpg", b"one")
+    save_room_photo(paths, room.id, "second.png", b"two")
+
+    assert [p.name for p in paths.room_photo_dir.glob(f"{room.id}.*")] == [f"{room.id}.png"]
+    assert room_photo_path(paths, room.id).read_bytes() == b"two"
+
+
+def test_room_photo_rejects_unsupported_extension(tmp_path):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    with pytest.raises(ValueError, match="Unsupported image type"):
+        save_room_photo(paths, room.id, "not-an-image.txt", b"text")
+    assert room_photo_path(paths, room.id) is None
+
+
+def test_delete_room_photo_is_idempotent(tmp_path):
+    paths = _paths(tmp_path)
+    room = create_room(paths)
+    delete_room_photo(paths, room.id)  # no photo yet -- must not raise
+
+    save_room_photo(paths, room.id, "photo.png", b"data")
+    delete_room_photo(paths, room.id)
+    assert room_photo_path(paths, room.id) is None
+    delete_room_photo(paths, room.id)  # already gone -- still fine
 
 
 def test_get_room_events_passes_none_for_empty_headers(tmp_path, monkeypatch):

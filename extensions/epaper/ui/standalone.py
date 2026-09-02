@@ -16,6 +16,7 @@ from extensions.epaper.core.datasources.weather import read_all_weather_statuses
 from extensions.epaper.devicebinding.ui import device_config_card
 from extensions.epaper.global_config.backend import save_global_config
 from extensions.epaper.global_config.ui import global_config_card
+from extensions.epaper.organizer.ui import organizer_names_card
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.project_config.ui import project_config_card
 from extensions.epaper.room.ui import rooms_wrapper
@@ -126,6 +127,7 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
     def page_settings():
         with frame('Settings'):
             project_config_card(paths)
+            organizer_names_card(paths)
 
     @ui.page('/device')
     def page_device():

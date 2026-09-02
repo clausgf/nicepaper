@@ -316,9 +316,10 @@ def test_templates_section_lists_real_and_synthetic_screens(tmp_path):
 
 def test_simplified_ui_room_detail_lays_out_every_setting(tmp_path):
     """The room detail lays out the full (English) field set -- number, name,
-    building, floor, type, capacity, photo, notes, booking system, iCal URL --
-    with labels/widgets taken from RoomModel's own FieldInfo, plus the three
-    tabs. Renders the detail body directly (the list wrapper starts on the list)."""
+    building, floor, type, capacity, notes, description, booking system,
+    iCal URL -- with labels/widgets taken from RoomModel's own FieldInfo,
+    plus the three tabs. Renders the detail body directly (the list wrapper
+    starts on the list)."""
     from nicegui.client import Client
     from nicegui.page import page
 
@@ -336,7 +337,7 @@ def test_simplified_ui_room_detail_lays_out_every_setting(tmp_path):
                       if type(e).__name__ == "Tab"}
 
     for field in ("Room number", "Room name", "Building", "Floor", "Room type",
-                  "Capacity", "Photo", "Description", "Booking system", "iCal URL"):
+                  "Capacity", "Description", "Booking system", "iCal URL"):
         assert field in labels, f"{field!r} missing from room settings"
     assert {"Occupancy", "Settings", "Displays"} <= tab_labels
 

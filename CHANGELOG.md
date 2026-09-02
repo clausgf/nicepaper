@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.34.0 — 2026-09-02
+
+### Added
+
+- **Organizer names editor in the non-simplified UI** — previously only
+  reachable from the simplified UI's Preferences (`organizer/simplified_ui.py`).
+  New `organizer/ui.py`'s `organizer_names_fields()`/`organizer_names_card()`
+  give it a home in nice4iot's Project Settings sidebar (its own "Organizer
+  names" card next to "E-Paper", `register_project_card('settings', ...)`,
+  foldable and expanded by default like every other settings section) and a
+  second card on standalone's Settings page.
+
+- **Room photos** — a room can now have one photo, shown on its detail page's
+  Occupancy tab (bottom, below the status/upcoming list), Settings tab
+  (with upload/remove), and Displays tab (below the room summary, above the
+  device list). Stored as a plain file in the new `EpaperPaths.room_photo_dir`
+  (`<room_id>.<ext>`, extension-owned, deliberately not the project directory
+  the `Image` widget reads from) via new `room/photo.py`
+  (`room_photo_path()`/`save_room_photo()`/`delete_room_photo()`), rendered
+  capped to `height=192px`/`fit=cover` so it can't dominate a tab on a phone.
+  Replaces `RoomModel.photo` (a free-text project-directory filename that
+  nothing ever rendered), removed from the model and its Settings form layout.
+
 ## 0.33.0 — 2026-09-01
 
 ### Added
