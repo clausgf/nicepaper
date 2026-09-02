@@ -2,8 +2,8 @@ import pytest
 from pydantic import ValidationError
 
 from extensions.epaper.bookingsystem.backend import (
-    booking_systems_adapter, booking_system_path, create_booking_system,
-    delete_booking_system, list_booking_systems, read_booking_system,
+    booking_systems_adapter, booking_system_path, count_unreadable_booking_systems,
+    create_booking_system, delete_booking_system, list_booking_systems, read_booking_system,
 )
 from extensions.epaper.bookingsystem.models import BookingSystemModel
 from extensions.epaper.paths import EpaperPaths
@@ -88,6 +88,17 @@ def test_list_sorted_by_name(tmp_path):
     _sys("Beta")
     _sys("alpha")
     assert [s.name for s in list_booking_systems(paths)] == ["alpha", "Beta"]
+
+
+def test_count_unreadable_booking_systems(tmp_path):
+    """See test_room.py's test_count_unreadable_rooms() docstring: this diffs
+    the real adapter's own count rather than re-reading each file, since a
+    lenient single-file JsonAdapter.read() wouldn't actually catch a
+    malformed file (BookingSystemModel is all-defaults too)."""
+    paths = _paths(tmp_path)
+    create_booking_system(paths)
+    (paths.booking_dir / "broken.json").write_text("{")
+    assert count_unreadable_booking_systems(paths) == 1
 
 
 def test_delete_removes_file(tmp_path):

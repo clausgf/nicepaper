@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.35.0 — 2026-09-02
+
+### Fixed
+
+- **A device's "Last delivered" snapshot could be overwritten by the UI's own
+  live preview** — the simplified UI's "Current" tab (`display/preview.py`)
+  fetches through a device's own alias URL for correct room-aware rendering,
+  which looked exactly like the device's real poll to the image endpoint (a
+  real `200 OK` through the same device-bound id) — so merely opening a
+  device's detail page could silently record *that* fetch as the device's
+  latest delivery, making an offline/stale device show a fresh "Delivered
+  just now". New `?preview=true` query flag opts a fetch out of snapshot
+  recording; the Current tab now sends it.
+- **One crashing widget no longer takes the whole screen down** — a widget
+  raising while drawing (a bug, not a datasource outage — those already
+  degrade gracefully) used to propagate to an unhandled 500 from the image
+  endpoint. `Screen._create_image()` now catches per-widget, logs it, and
+  draws the widget's own box with a new configurable `widget_error` text
+  (Global Settings) instead, so every other widget still renders.
+- **A device's room/screen binding could look identical to "never assigned"
+  once the room/screen was deleted** — dangling bindings are kept visible on
+  purpose (not silently rewritten), but the simplified UI's Displays views
+  showed the same blank room label / bare screen id either way.
+  `display.backend.display_rows()` now sets `room_label` to `"Room deleted
+  ⚠"` and a new `screen_label` field to `"{id} ⚠"` when dangling, without
+  touching the raw `screen_id` the Screen field itself reads/writes.
+- **`RoomModel.booking_ical_url`'s field description said "added to the
+  booking system's base URL"**, but the actual behavior (and
+  `room/backend.py`'s own docstring) is a full override, not append. Fixed
+  the description, relabeled the field "Booking System URL override" (was
+  "iCal URL"), and clarified the hint.
+
+### Added
+
+- **Datasource health visibility in the simplified UI** — previously only
+  nice4iot's Dashboard tab and standalone's Project tab showed
+  weather/Home Assistant/iCal/image outages (`ui/cards.py`'s
+  `dashboard_card()`); the simplified UI showed none of it. New
+  `ui.cards.datasource_health_rows()` (refactored out of `dashboard_card()`,
+  no behavior change there) now also renders on the Rooms landing view via
+  `only_failing=True` — silent unless something is actually down.
+- **A warning when a room/booking-system file fails to parse and is silently
+  dropped from its list** — previously logged only, with zero in-app trace.
+  New `ui.cards.unreadable_items_banner()` plus
+  `room.backend.count_unreadable_rooms()` /
+  `bookingsystem.backend.count_unreadable_booking_systems()`, wired into
+  both UIs' Rooms/Booking systems lists. (Screens' own list is filename-based,
+  not content-validated, so nothing is silently hidden there — no banner
+  needed.)
+- **nice4iot's own device card gets the Current/Last-delivered preview** the
+  simplified UI's Displays views already had (`display/preview.py`'s
+  `render_device_preview()`, reused verbatim) — previously only a plain
+  read-only "Image URL" text field, no way to see what a device actually
+  last fetched without leaving nice4iot.
+- **"Rooms & Displays App" link** in nice4iot's "E-Paper" project-settings
+  card (previously no link there at all) and standalone's Global tab (was
+  labeled "Simplified UI", now the same user-facing name) — shared content
+  via `ui.cards.simplified_ui_link_fields()`.
+- **`register_extension_group('E-Paper', icon='tv')`** — nice4iot's
+  project-sidebar group for Rooms/Screens/Schedules/Booking systems now
+  shows "E-Paper" with a screen icon instead of the default bare-module-name
+  fallback ("epaper", generic icon).
+- Room detail's Occupancy tab is now the default (was Settings).
+
 ## 0.34.0 — 2026-09-02
 
 ### Added

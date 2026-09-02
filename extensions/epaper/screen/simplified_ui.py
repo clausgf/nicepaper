@@ -22,23 +22,27 @@ from extensions.epaper.screen.backend import (
     synthetic_roomcalendar_screens,
 )
 from extensions.epaper.screen.models import ScreenModel
+from extensions.epaper.ui.cards import unreadable_items_banner
 from extensions.epaper.ui.preview import screen_image_view
 from extensions.epaper.ui.simplified_ui.common import view_header
 from extensions.epaper.ui.simplified_ui.layout import Shell
 from extensions.epaper.util import logger
 
 
-def _real_screens(paths: EpaperPaths) -> list[tuple[str, ScreenModel]]:
-    """Every screen file, skipping one that fails to parse rather than
-    breaking the whole list -- same tolerance as list_rooms()/
-    list_booking_systems()."""
+def _real_screens(paths: EpaperPaths) -> tuple[list[tuple[str, ScreenModel]], int]:
+    """Every screen file plus a count of how many failed to parse and were
+    skipped instead of breaking the whole list -- same tolerance as
+    list_rooms()/list_booking_systems(); the count feeds
+    unreadable_items_banner() below."""
     screens = []
+    skipped = 0
     for p in sorted(paths.screen_dir.glob('*.json')):
         try:
             screens.append((p.stem, JsonAdapter(ScreenModel, p, create_if_not_exist=False).read()))
         except Exception as e:
             logger.warning(f"Skipping unreadable screen {p}: {e}")
-    return screens
+            skipped += 1
+    return screens, skipped
 
 
 def render_templates(shell: Shell) -> None:
@@ -49,7 +53,8 @@ def render_templates(shell: Shell) -> None:
         .classes('text-caption text-grey')
 
     paths = shell.paths
-    real = _real_screens(paths)
+    real, skipped = _real_screens(paths)
+    unreadable_items_banner(skipped, 'screen(s)')
     synthetic = synthetic_roomcalendar_screens(paths)
 
     if not real and not synthetic:

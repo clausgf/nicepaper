@@ -39,6 +39,11 @@ same settings with humanized labels):
 - `font_name`, `font_size` — the default font for widgets that don't set their
   own. A widget may override either aspect on its own (see
   [Screens, widgets & schedules](screens.md)).
+- `widget_error` — text drawn in a widget's own box in place of it, when that
+  widget raises an unexpected error while rendering (a bug, not a datasource
+  outage — those already degrade gracefully with their own `*_error`/
+  `*_stale_notice` below). Keeps the rest of the screen rendering instead of
+  the whole image failing.
 - `wind_speed_unit` — unit `WeatherNow` and the `WeatherChart` wind series show
   wind speed/gusts in: `kmh` (default), `ms`, `mph` or `kn` (knots). Open-Meteo
   is always fetched in km/h and converted locally, so changing this takes effect

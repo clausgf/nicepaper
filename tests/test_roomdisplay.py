@@ -55,6 +55,42 @@ def test_display_rows_join_room_and_online(tmp_path, monkeypatch):
     assert rows["d-online"].rssi is None and rows["d-online"].battery_voltage is None
 
 
+def test_display_rows_flags_a_deleted_room_instead_of_looking_unassigned(tmp_path, monkeypatch):
+    """A device's room_id can outlive the room itself (room/backend.py's
+    delete_room() leaves dangling refs visible on purpose) -- room_label must
+    say so, not fall back to the same blank '' an actually-unassigned device
+    would have (that would silently mask the dangling reference)."""
+    paths = _paths(tmp_path)
+    set_device_binding(paths, "d-orphaned", room_id="does-not-exist")
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(_dev("d-orphaned")))
+
+    rows = {r.device_name: r for r in rd.display_rows(paths, "proj")}
+    assert rows["d-orphaned"].room_label == "Room deleted ⚠"
+
+
+def test_display_rows_screen_label_flags_a_missing_screen(tmp_path, monkeypatch):
+    """screen_label warns when screen_id no longer names a real screen (or a
+    still-valid synthetic Room Calendar template); screen_id itself must stay
+    the raw value (it's the one the Screen field actually reads/writes)."""
+    paths = _paths(tmp_path)
+    (paths.screen_dir / "real.json").write_text(json.dumps(
+        {"width": 100, "height": 100, "widgets": []}))
+    set_device_binding(paths, "d-real-screen", screen_id="real")
+    set_device_binding(paths, "d-gone-screen", screen_id="does-not-exist")
+    set_device_binding(paths, "d-no-screen")
+
+    monkeypatch.setattr(rd, "_project_devices", _fake_devices(
+        _dev("d-real-screen"), _dev("d-gone-screen"), _dev("d-no-screen"),
+    ))
+
+    rows = {r.device_name: r for r in rd.display_rows(paths, "proj")}
+    assert rows["d-real-screen"].screen_id == "real"
+    assert rows["d-real-screen"].screen_label == "real"
+    assert rows["d-gone-screen"].screen_label == "does-not-exist ⚠"
+    assert rows["d-no-screen"].screen_id == ""
+    assert rows["d-no-screen"].screen_label == "—"
+
+
 def test_display_rows_read_telemetry_and_alarms_from_runtime(tmp_path, monkeypatch):
     """rssi/battery_voltage come from _device_runtime (nice4iot's DeviceRuntime),
     alarm_count/firmware_version straight off the device object."""

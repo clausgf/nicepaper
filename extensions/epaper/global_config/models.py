@@ -20,6 +20,12 @@ class GlobalConfig(BaseModel):
     to drop a homeassistant_*/roomcalendar_* field's own redundant prefix,
     since its section heading already says it.
     """
+    widget_error: Annotated[str,
+            Field(description="Text drawn in place of a widget that raised an unexpected error "
+                              "while rendering, so one broken widget doesn't take the whole "
+                              "screen down with it."),
+            niceview.Field(hint="Error message, e.g. 'Widget error'")
+        ] = "Widget error"
     ical_error: Annotated[str,
             Field(title="iCal error",
                   description="Text shown on a display when the fetch from the booking system fails, e.g. 'Error fetching calendar data'."),

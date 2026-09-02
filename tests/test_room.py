@@ -5,7 +5,8 @@ import pytest
 
 from extensions.epaper.core.datasources.ical import IcalStatus
 from extensions.epaper.room.backend import (
-    create_room, delete_room, get_room_events, list_rooms, read_room, room_adapter, room_path,
+    count_unreadable_rooms, create_room, delete_room, get_room_events, list_rooms, read_room,
+    room_adapter, room_path,
 )
 from extensions.epaper.room.photo import delete_room_photo, room_photo_path, save_room_photo
 from extensions.epaper.paths import EpaperPaths
@@ -83,6 +84,25 @@ def test_delete_room_removes_the_file(tmp_path):
     delete_room(paths, room.id)
     assert read_room(paths, room.id) is None
     delete_room(paths, room.id)  # idempotent, missing_ok
+
+
+def test_count_unreadable_rooms(tmp_path):
+    """count_unreadable_rooms() diffs the real Rooms-list adapter (files on
+    disk vs. what rooms_adapter() actually lists) rather than re-reading
+    each file itself -- a single-file JsonAdapter.read() (as list_rooms()
+    above does) is lenient by default and recovers a malformed file into a
+    *default* RoomModel instead of raising, so it would never catch this."""
+    paths = _paths(tmp_path)
+    create_room(paths)  # a real, valid room
+    (paths.room_dir / "broken.json").write_text("not json at all")
+    assert count_unreadable_rooms(paths) == 1
+
+
+def test_count_unreadable_rooms_is_zero_when_all_valid(tmp_path):
+    paths = _paths(tmp_path)
+    create_room(paths)
+    create_room(paths)
+    assert count_unreadable_rooms(paths) == 0
 
 
 def test_rooms_adapter_crud(tmp_path):

@@ -8,6 +8,7 @@ global_config/ui.py, screen/ui.py, schedule/ui.py) are reused.
 from contextlib import contextmanager
 from nicegui import ui
 
+from extensions.epaper.bookingsystem.backend import count_unreadable_booking_systems
 from extensions.epaper.bookingsystem.ui import booking_systems_wrapper
 from extensions.epaper.core.datasources.homeassistant import read_all_entity_statuses
 from extensions.epaper.core.datasources.ical import read_all_ical_statuses
@@ -19,9 +20,10 @@ from extensions.epaper.global_config.ui import global_config_card
 from extensions.epaper.organizer.ui import organizer_names_card
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.project_config.ui import project_config_card
+from extensions.epaper.room.backend import count_unreadable_rooms
 from extensions.epaper.room.ui import rooms_wrapper
 from extensions.epaper.ui import simplified_ui
-from extensions.epaper.ui.cards import dashboard_card
+from extensions.epaper.ui.cards import dashboard_card, simplified_ui_link_fields, unreadable_items_banner
 from extensions.epaper.schedule.ui import schedules_wrapper
 from extensions.epaper.screen.ui import screens_wrapper
 
@@ -68,19 +70,12 @@ def frame(active_tab: str):
 
 
 def _simplified_ui_link() -> None:
-    """Link card to the simplified, room-focused UI, shown on the Global tab
-    above the settings card. The simplified UI is its own full page
-    (SIMPLIFIED_ROUTE), so this only navigates there."""
+    """Link card to the simplified, room-focused UI ("Rooms & Displays App"),
+    shown on the Global tab above the settings card. The simplified UI is its
+    own full page (SIMPLIFIED_ROUTE); content shared with nice4iot's own
+    'E-Paper' settings card via simplified_ui_link_fields()."""
     with ui.card().classes('w-full'):
-        with ui.row().classes('w-full items-center justify-between'):
-            with ui.row().classes('items-center gap-2'):
-                ui.icon('meeting_room').classes('text-2xl')
-                with ui.column().classes('gap-0'):
-                    ui.label('Simplified UI').classes('text-subtitle1')
-                    ui.label('Room-focused view: rooms, displays, booking systems') \
-                        .classes('text-caption text-grey')
-            ui.button('Open', icon='open_in_new',
-                      on_click=lambda: ui.navigate.to(SIMPLIFIED_ROUTE)).props('unelevated')
+        simplified_ui_link_fields(SIMPLIFIED_ROUTE)
 
 
 def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
@@ -137,11 +132,15 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
     @ui.page('/rooms')
     def page_rooms():
         with frame('Rooms'):
+            unreadable_items_banner(count_unreadable_rooms(paths), 'room(s)')
             rooms_wrapper(paths, project_name='standalone').render()
 
     @ui.page('/screens')
     def page_screens():
         with frame('Screens'):
+            # no unreadable_items_banner() here -- see __init__.py's
+            # _screens_tab() for why (filename-based list, not
+            # content-validated, so nothing is silently hidden)
             screens_wrapper(paths, image_base_url).render()
 
     @ui.page('/schedules')
@@ -152,4 +151,5 @@ def register_standalone_pages(paths: EpaperPaths, image_base_url: str) -> None:
     @ui.page('/booking-systems')
     def page_booking_systems():
         with frame('Booking systems'):
+            unreadable_items_banner(count_unreadable_booking_systems(paths), 'booking system(s)')
             booking_systems_wrapper(paths).render()

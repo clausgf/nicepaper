@@ -45,11 +45,18 @@ The sidebar tree is a list of `NavItem`s. A **leaf** carries a `render`
 (it is a view); a **group** carries `children` and no render (clicking
 only folds it). Current sections:
 
-- **Rooms** — list + Add Room; a room opens a detail view with three tabs:
-  Occupancy (status, plus the room's photo at the bottom), Settings (number,
-  name, building, floor, type, capacity, notes, description, booking system,
-  room-specific iCal URL, plus the photo upload/remove), and Displays (a room
-  summary, the photo, then the devices bound to the room, see below).
+- **Rooms** — the landing view (`/` aliases `/rooms`): list + Add Room, led by
+  a quiet datasource-outage summary (nothing when weather/Home
+  Assistant/iCal/image are all healthy, one line per failing one otherwise —
+  `ui.cards.datasource_health_rows(only_failing=True)`, the same health lines
+  nice4iot's Dashboard tab/standalone's Project tab always show in full) and a
+  warning if any room file failed to parse and was silently dropped from the
+  list (`ui.cards.unreadable_items_banner()`). A room opens a detail view with
+  three tabs, Occupancy shown first: Occupancy (status, plus the room's photo
+  at the bottom), Settings (number, name, building, floor, type, capacity,
+  notes, description, booking system, Booking System URL override, plus the
+  photo upload/remove), and Displays (a room summary, the photo, then the devices
+  bound to the room, see below).
 - **Templates** — read-only: every screen (shared storage with the
   non-simplified editor) plus the auto-generated Room Calendar templates
   (see [screens.md](screens.md#auto-generated-room-calendar-templates)),
@@ -58,13 +65,21 @@ only folds it). Current sections:
   (`screen/ui.py`'s `screens_wrapper`) or the standalone editor.
 - **Displays** — the flat, project-wide drill-down list of every device; no
   Add or Delete (assigning a display to a room happens in the room's own
-  Displays tab, or the device's E-Paper card).
+  Displays tab, or the device's E-Paper card). A device's room/screen
+  assignment can outlive the room/screen itself (deleting either leaves
+  dangling references visible on purpose, not silently rewritten) — the row
+  and detail flag this rather than looking indistinguishable from "never
+  assigned": `"Room deleted ⚠"` in place of the room label, `"{screen_id} ⚠"`
+  in place of the screen subtitle (`display.backend.display_rows()`'s
+  `room_label`/`screen_label`).
 - **Settings › Schedule** — the weekly-rule editor for "default", the one
   schedule every screen uses unless it overrides `update_schedule_id` (see
   [screens.md](screens.md#update-schedules)); no list/rename/delete chrome,
   since there is only ever one schedule to manage here.
 - **Settings › Booking systems** — list + Add; per-system config (iCal URL +
-  refresh today; Exchange and others later). Also reachable as a nice4iot
+  refresh today; Exchange and others later), led by a warning if any booking
+  system file failed to parse and was silently dropped from the list
+  (`ui.cards.unreadable_items_banner()`). Also reachable as a nice4iot
   project tab ("Booking systems"), sharing the same `bookingsystem/ui.py`
   wrapper.
 - **Settings › Organizer names** — a directly editable textarea for
@@ -144,7 +159,10 @@ without one, suffixed with a plain `⚠` when it doesn't match what the
 firmware itself last reported (`display.backend.panel_mismatch_hint()`) --
 plain text computed once per row, so the mismatch is visible in the list
 without opening the detail (which still shows the fuller text hint, see
-below). Each row's detail is editable and deletable: Device is
+below). The screen part is `screen_label`, not the raw `screen_id` --
+identical text unless the screen was deleted after assignment, when it's
+suffixed `⚠` the same way (`screen_id` itself stays the raw value the Screen
+field reads/writes). Each row's detail is editable and deletable: Device is
 a select over every project device (`display.backend.project_device_names`),
 reassigning the row to a different device via `RoomDisplaysAdapter.rename()`
 (moves the room/screen assignment, unbinding the old device) wired through

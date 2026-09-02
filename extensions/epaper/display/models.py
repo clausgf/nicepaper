@@ -51,6 +51,13 @@ class RoomDisplayRow(BaseModel):
             niceview.Field(label='Panel', editable=False)
         ] = '—'
 
+    screen_label: Annotated[str,
+            Field(description="screen_id for display, or '—' if unset; suffixed with a warning "
+                              "glyph when screen_id no longer names a real screen (deleted since "
+                              "assignment) -- screen_id itself stays the raw, editable value."),
+            niceview.Field(label='Screen (display)', editable=False)
+        ] = '—'
+
     reported_panels: Annotated[str,
             Field(description="Firmware-reported compiled-in panel ids, comma-separated."),
             niceview.Field(label='Supported panels', editable=False)

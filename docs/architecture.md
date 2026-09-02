@@ -88,11 +88,16 @@ In extension mode:
   per weather location / Home Assistant entity / iCal feed / image source
   that is failing or serving stale cached data, so an outage is visible
   without opening a screen -- see `ui/cards.py`'s `dashboard_card()`) and a
-  link into the Screens tab; a Settings card on nice4iot's project Settings
-  sidebar group (`register_project_card('settings', ..., title='Settings')`,
-  chrome supplied by nice4iot); and Rooms/Screens/Schedules/Booking systems
-  tabs registered via `register_project_tab` on nice4iot's own project
-  page — no separate routes of our own. No built-in login here either —
+  link into the simplified UI ("Rooms & Displays App", `simplified_ui_link_fields()`,
+  shared with standalone's own Global tab); two Settings cards on nice4iot's
+  project Settings sidebar group (`register_project_card('settings', ...)`,
+  chrome supplied by nice4iot) -- "E-Paper" (project settings, plus the same
+  simplified-UI link) and "Organizer names"; and Rooms/Screens/Schedules/
+  Booking systems tabs registered via `register_project_tab` on nice4iot's
+  own project page, grouped under a labeled/iconed "E-Paper" sidebar group
+  (`register_extension_group('E-Paper', icon='tv')`) instead of the default
+  bare-module-name fallback -- no separate routes of our own. No built-in
+  login here either —
   nice4iot's own auth and per-project activation gate access.
 - Each nice4iot **device**'s General tab gets an "E-Paper" card
   (`register_device_card('settings', ...)`) to assign the device a screen
@@ -103,8 +108,12 @@ In extension mode:
   resulting device-specific image URL — so the device firmware only
   ever needs to know its own name, never the screen id, and every
   header (`If-None-Match`) keeps working unchanged since it's the same
-  image endpoint. The room half is the device→room relation the simplified
-  UI reads back as the displays in a room.
+  image endpoint — plus the same Current/Last delivered preview tabs the
+  simplified UI's Displays views show (`display/preview.py`'s
+  `render_device_preview()`, shared verbatim), so what a device actually
+  last fetched is visible from nice4iot too. The room half is the
+  device→room relation the simplified UI reads back as the displays in a
+  room.
 
 `extensions/epaper/__init__.py` defers every nice4iot-specific import
 (`app.extensions`, `app.paths`, `app.routes`) into `register()`'s

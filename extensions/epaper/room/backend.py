@@ -44,6 +44,24 @@ def list_rooms(paths: EpaperPaths) -> list[RoomModel]:
     return sorted(rooms, key=lambda r: (r.room_name.lower(), r.room_number))
 
 
+def count_unreadable_rooms(paths: EpaperPaths) -> int:
+    """How many files in room_dir the *actual* Rooms list (rooms_adapter(),
+    a niceview JsonDirectoryAdapter -- used directly by both UIs' Rooms
+    views) silently drops -- logged only, otherwise no trace anywhere.
+
+    Deliberately not "try reading each file, count the exceptions": a
+    single-file JsonAdapter.read() (as list_rooms() above uses) is lenient
+    by default and recovers a malformed file into a *default* RoomModel
+    instead of raising, so that approach never actually catches the common
+    case (corrupted JSON) -- only diffing against what the adapter that
+    backs the real list actually returns is guaranteed to match what's
+    visible (or not) there."""
+    on_disk = sum(1 for p in paths.room_dir.glob('*.json')
+                  if p.is_file() and not p.name.startswith('.'))
+    listed = sum(1 for _ in rooms_adapter(paths))
+    return max(0, on_disk - listed)
+
+
 def read_room(paths: EpaperPaths, room_id: str) -> Optional[RoomModel]:
     """The room with this id, or None if there is no such file."""
     if not room_path(paths, room_id).exists():

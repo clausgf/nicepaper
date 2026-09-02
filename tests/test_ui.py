@@ -314,6 +314,28 @@ def test_templates_section_lists_real_and_synthetic_screens(tmp_path):
         "the auto-generated templates should be listed too"
 
 
+def test_render_templates_flags_a_screen_file_that_failed_to_parse(tmp_path):
+    """A screen file that can't parse (ScreenModel.width/height are required,
+    no default -- unlike RoomModel/BookingSystemModel, which are all
+    defaults) is skipped by _real_screens() rather than shown as a ghost
+    default screen, and unreadable_items_banner() surfaces the count."""
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.screen.simplified_ui import render_templates
+    from extensions.epaper.ui.simplified_ui.layout import Shell
+
+    paths = _simplified_paths(tmp_path)
+    (paths.screen_dir / "broken.json").write_text("not json at all")
+
+    shell = Shell("demo-project", paths, image_base_url="/api/screen")
+    with Client(page("/test-templates-broken"), request=None) as client:
+        render_templates(shell)
+        labels = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+
+    assert any("1 screen(s) failed to load" in label for label in labels)
+
+
 def test_simplified_ui_room_detail_lays_out_every_setting(tmp_path):
     """The room detail lays out the full (English) field set -- number, name,
     building, floor, type, capacity, notes, description, booking system,
@@ -337,9 +359,31 @@ def test_simplified_ui_room_detail_lays_out_every_setting(tmp_path):
                       if type(e).__name__ == "Tab"}
 
     for field in ("Room number", "Room name", "Building", "Floor", "Room type",
-                  "Capacity", "Description", "Booking system", "iCal URL"):
+                  "Capacity", "Description", "Booking system", "Booking System URL override"):
         assert field in labels, f"{field!r} missing from room settings"
     assert {"Occupancy", "Settings", "Displays"} <= tab_labels
+
+
+def test_render_rooms_list_flags_a_room_file_that_failed_to_parse(tmp_path):
+    """The Rooms landing view (room_id=None) shows unreadable_items_banner()
+    for any room file rooms_adapter() silently dropped -- not shown at all
+    once a room_id is opened (that's a detail view, not the list)."""
+    from nicegui.client import Client
+    from nicegui.page import page
+
+    from extensions.epaper.room.backend import create_room
+    from extensions.epaper.room.simplified_ui import render_rooms
+    from extensions.epaper.ui.simplified_ui.layout import Shell
+
+    paths = _simplified_paths(tmp_path)
+    create_room(paths)
+    (paths.room_dir / "broken.json").write_text("not json at all")
+    shell = Shell("demo-project", paths)
+    with Client(page("/test-rooms-broken"), request=None) as client:
+        render_rooms(shell)
+        labels = {e.text for e in client.elements.values() if type(e).__name__ == "Label"}
+
+    assert any("1 room(s) failed to load" in label for label in labels)
 
 
 def test_render_rooms_with_room_id_opens_straight_to_that_rooms_detail(tmp_path):
@@ -454,6 +498,7 @@ def test_room_displays_panel_shows_summary_and_bound_devices(tmp_path, monkeypat
     room.building, room.floor = "Main", "2"
     from extensions.epaper.room.backend import room_adapter
     room_adapter(paths, room.id).save(room)
+    (paths.screen_dir / "weather.json").write_text('{"width": 400, "height": 300, "widgets": []}')
     set_device_binding(paths, "sign-1", room_id=room.id, screen_id="weather")
 
     monkeypatch.setattr(display_backend, "_project_devices", lambda project: [
@@ -497,6 +542,7 @@ def test_displays_top_level_lists_devices_and_shows_room_and_status(tmp_path, mo
     room = create_room(paths)
     room.room_number, room.room_name = "A-101", "North Conference"
     room_adapter(paths, room.id).save(room)
+    (paths.screen_dir / "weather.json").write_text('{"width": 400, "height": 300, "widgets": []}')
     set_device_binding(paths, "sign-1", room_id=room.id, screen_id="weather")
 
     monkeypatch.setattr(display_backend, "_project_devices", lambda project: [
@@ -586,9 +632,11 @@ def test_device_preview_with_screen_but_no_delivery_yet(tmp_path):
     assert tab_labels == {"Current", "Last delivered"}
     assert "This device hasn't fetched its image yet." in texts
     # Current tab's live preview is built from image_base_url + device name,
-    # forcing a fresh render and bypassing the browser cache
-    assert any((e._props.get("src") or "").startswith("/api/screen/sign-1/image.png?force=true&_t=")
-               for e in images)
+    # forcing a fresh render, bypassing the browser cache, and excluded from
+    # the "last delivered" snapshot (it's an admin preview, not a real device
+    # poll -- see api/endpoints.py's _PREVIEW_DESCRIPTION)
+    assert any((e._props.get("src") or "").startswith(
+        "/api/screen/sign-1/image.png?force=true&preview=true&_t=") for e in images)
     # no last_delivered.png element without a snapshot on disk
     assert not any(e._props.get("src") == "/api/screen/sign-1/last_delivered.png" for e in images)
 
@@ -965,8 +1013,8 @@ def test_room_booking_select_lists_configured_systems(tmp_path):
 
 
 def test_standalone_global_tab_links_to_the_simplified_ui():
-    """The Global tab shows the 'Open simplified UI' card (above the settings
-    card) that navigates to the standalone simplified-UI route."""
+    """The Global tab shows the 'Rooms & Displays App' card (above the
+    settings card) that navigates to the standalone simplified-UI route."""
     from nicegui.client import Client
     from nicegui.page import page
 
@@ -977,5 +1025,5 @@ def test_standalone_global_tab_links_to_the_simplified_ui():
         texts = {e.text for e in client.elements.values()
                  if type(e).__name__ in ("Label", "Button")}
 
-    assert "Simplified UI" in texts and "Open" in texts
+    assert "Rooms & Displays App" in texts and "Open" in texts
     assert SIMPLIFIED_ROUTE == "/simplified"

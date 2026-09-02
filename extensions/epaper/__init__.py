@@ -20,7 +20,7 @@ def register(app: FastAPI) -> None:
     from app.config import app_config as nice4iot_app_config
     from app.extensions import (
         mount_extension_router,
-        register_global_card, register_project_page,
+        register_extension_group, register_global_card, register_project_page,
         register_device_card, register_project_card,
         register_project_tab, register_telemetry_cache_kind,
     )
@@ -37,10 +37,12 @@ def register(app: FastAPI) -> None:
     from extensions.epaper.organizer.ui import organizer_names_fields
     from extensions.epaper.paths import EpaperPaths
     from extensions.epaper.project_config.ui import project_config_fields
+    from extensions.epaper.bookingsystem.backend import count_unreadable_booking_systems
     from extensions.epaper.bookingsystem.ui import booking_systems_wrapper
+    from extensions.epaper.room.backend import count_unreadable_rooms
     from extensions.epaper.room.ui import rooms_wrapper
     from extensions.epaper.devicebinding.ui import device_config_card, device_dashboard_card
-    from extensions.epaper.ui.cards import dashboard_card
+    from extensions.epaper.ui.cards import dashboard_card, simplified_ui_link_fields, unreadable_items_banner
     from extensions.epaper.schedule.ui import schedules_wrapper
     from extensions.epaper.screen.ui import screens_wrapper
 
@@ -98,7 +100,10 @@ def register(app: FastAPI) -> None:
     # 'settings' card, unlike a project tab -- so this calls the chrome-less
     # project_config_fields(), not project_config_card() (that one's for
     # standalone.py's own Project tab, which supplies no chrome of its own).
+    # Leads with the link to the simplified UI (see standalone.py's own Global
+    # tab for the same link, shared content via simplified_ui_link_fields()).
     def _settings_card(project_name: str) -> None:
+        simplified_ui_link_fields(project_extension_url(project_name, 'epaper'))
         project_config_fields(_paths_for_project(project_name))
 
     register_project_card('settings', _settings_card, title='E-Paper')
@@ -137,15 +142,27 @@ def register(app: FastAPI) -> None:
     register_device_card('dashboard', _device_dashboard_card)
 
     # --- Project tabs --------------------------------------------------
+    # Names our project-sidebar group (Rooms/Screens/Schedules/Booking
+    # systems below) "E-Paper" with a screen-ish icon instead of the default
+    # fallback (the bare extension/module name "epaper", generic icon) --
+    # see register_extension_group() in nice4iot's docs/extensions.md.
+    register_extension_group('E-Paper', icon='tv')
+
     # Tabs on nice4iot's own project page (its tab bar, not ours), each
     # rendering the same DrillDownWrapper the standalone/simplified UIs use --
     # see room.ui.rooms_wrapper(), screen.ui.screens_wrapper() and
     # schedule.ui.schedules_wrapper() for the list<->editor chrome, state and
     # slide animation. Registration order is tab order: Rooms comes first.
     def _rooms_tab(project_name: str) -> None:
-        rooms_wrapper(_paths_for_project(project_name), project_name).render()
+        paths = _paths_for_project(project_name)
+        unreadable_items_banner(count_unreadable_rooms(paths), 'room(s)')
+        rooms_wrapper(paths, project_name).render()
 
     def _screens_tab(project_name: str) -> None:
+        # no unreadable_items_banner() here, unlike Rooms/Booking systems --
+        # this list (directory_drilldown, screen/ui.py) is filename-based,
+        # not content-validated, so a broken screen file still shows up as
+        # its own row (with row_warning) rather than silently vanishing.
         paths = _paths_for_project(project_name)
         screens_wrapper(paths, f'/api/ext/epaper/{project_name}/screens').render()
 
@@ -153,7 +170,9 @@ def register(app: FastAPI) -> None:
         schedules_wrapper(_paths_for_project(project_name)).render()
 
     def _booking_systems_tab(project_name: str) -> None:
-        booking_systems_wrapper(_paths_for_project(project_name)).render()
+        paths = _paths_for_project(project_name)
+        unreadable_items_banner(count_unreadable_booking_systems(paths), 'booking system(s)')
+        booking_systems_wrapper(paths).render()
 
     register_project_tab('Rooms', _rooms_tab, icon='meeting_room')
     register_project_tab('Screens', _screens_tab, icon='wallpaper')

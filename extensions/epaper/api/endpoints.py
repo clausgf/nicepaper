@@ -62,9 +62,20 @@ _FORCE_DESCRIPTION = (
     "a display never needs it."
 )
 
+_PREVIEW_DESCRIPTION = (
+    "Don't record this fetch as the device's 'last delivered' snapshot, "
+    "even though `id` resolves to a real device binding. For the UI's own "
+    "live preview of a device's screen (display/preview.py), which "
+    "otherwise looks exactly like the device's own real poll -- same `id`, "
+    "a real 200 -- and would overwrite what the device actually last "
+    "fetched with whatever the admin's browser just requested. A display "
+    "never needs it."
+)
+
 
 async def _render_screen_image(paths: EpaperPaths, id: str, if_none_match: Optional[str],
-                               raw: bool = False, boxes: bool = False, force: bool = False) -> Response:
+                               raw: bool = False, boxes: bool = False, force: bool = False,
+                               preview: bool = False) -> Response:
     """
     Shared logic behind both the standalone and the nice4iot-extension
     image endpoint: render (if needed) and return the current PNG for a
@@ -130,10 +141,12 @@ async def _render_screen_image(paths: EpaperPaths, id: str, if_none_match: Optio
 
     # A real 200 to a device's own alias URL: remember this exact PNG + when,
     # for the "Last delivered" view (display/preview.py) -- distinct from
-    # `raw`, which a display never requests (see _RAW_DESCRIPTION), and only
-    # for `id`s that are genuinely a device's own name, not a literal screen
-    # id an editor preview happens to hit this same endpoint with.
-    if not raw and get_device_bindings(paths).get(id) is not None:
+    # `raw`, which a display never requests (see _RAW_DESCRIPTION), `preview`,
+    # which the UI's own live-preview fetch sets precisely because it hits
+    # this same alias URL (see _PREVIEW_DESCRIPTION), and only for `id`s that
+    # are genuinely a device's own name, not a literal screen id an editor
+    # preview happens to hit this same endpoint with.
+    if not raw and not preview and get_device_bindings(paths).get(id) is not None:
         await asyncio.to_thread(save_device_snapshot, paths, id, Path(filename))
 
     return FileResponse(path=filename, media_type="image/png", headers=headers)
@@ -172,6 +185,7 @@ def build_standalone_router(paths: EpaperPaths) -> APIRouter:
         raw: bool = Query(False, description=_RAW_DESCRIPTION),
         boxes: bool = Query(False, description=_BOXES_DESCRIPTION),
         force: bool = Query(False, description=_FORCE_DESCRIPTION),
+        preview: bool = Query(False, description=_PREVIEW_DESCRIPTION),
     ):
         """
         Render (if needed) and return the current PNG image for a screen,
@@ -182,7 +196,7 @@ def build_standalone_router(paths: EpaperPaths) -> APIRouter:
         should poll this endpoint, send the last `ETag` as `If-None-Match` and
         sleep for `Cache-Control: max-age` seconds between polls.
         """
-        return await _render_screen_image(paths, id, if_none_match, raw, boxes, force)
+        return await _render_screen_image(paths, id, if_none_match, raw, boxes, force, preview)
 
     @router.get(
         "/screen/{id}/last_delivered.png",
@@ -223,9 +237,10 @@ def build_extension_router(paths_for_project: Callable[[str], EpaperPaths]) -> A
         raw: bool = Query(False, description=_RAW_DESCRIPTION),
         boxes: bool = Query(False, description=_BOXES_DESCRIPTION),
         force: bool = Query(False, description=_FORCE_DESCRIPTION),
+        preview: bool = Query(False, description=_PREVIEW_DESCRIPTION),
     ):
         paths = paths_for_project(project_name)
-        return await _render_screen_image(paths, id, if_none_match, raw, boxes, force)
+        return await _render_screen_image(paths, id, if_none_match, raw, boxes, force, preview)
 
     @router.get(
         "/{project_name}/screens/{id}/last_delivered.png",

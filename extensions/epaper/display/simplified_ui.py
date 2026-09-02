@@ -65,7 +65,12 @@ def _render_list_item(key: str, item: RoomDisplayRow, select) -> None:
             _status_icon(item).props('size=xs')
         with ui.item_section():
             ui.item_label(item.device_name)
-            subtitle = ' · '.join(v for v in (item.room_label, item.screen_id) if v)
+            # screen_label defaults to '—' even with no screen assigned (see
+            # display/models.py, matching panel_label's own '—' convention
+            # for niceview's item_subtitle_fields elsewhere) -- only include
+            # it here when a screen actually is assigned, so an unassigned
+            # device's subtitle stays just its room, not "room · —"
+            subtitle = ' · '.join(v for v in (item.room_label, item.screen_label if item.screen_id else '') if v)
             if subtitle:
                 ui.item_label(subtitle).props('caption')
         with ui.item_section().props('side'):

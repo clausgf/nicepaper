@@ -170,6 +170,38 @@ def test_raw_fetch_does_not_update_the_snapshot(client, device_binding):
     assert still_delivered == delivered
 
 
+def test_preview_fetch_does_not_update_the_snapshot(client, device_binding):
+    """?preview=true is what the UI's own live preview (display/preview.py)
+    sends: it hits this same alias URL (device name, not screen id) and gets
+    a real 200 just like the device's own poll would, so without this flag
+    it would silently overwrite Last delivered with whatever the admin's
+    browser just requested -- see _PREVIEW_DESCRIPTION."""
+    device_name = device_binding
+    client.get(f"/api/screen/{device_name}/image.png")
+    delivered = client.get(f"/api/screen/{device_name}/last_delivered.png").content
+
+    r_preview = client.get(f"/api/screen/{device_name}/image.png",
+                           params={"preview": "true", "force": "true"})
+    assert r_preview.status_code == 200
+
+    still_delivered = client.get(f"/api/screen/{device_name}/last_delivered.png").content
+    assert still_delivered == delivered
+
+
+def test_preview_fetch_before_any_real_delivery_leaves_it_undelivered(client, device_binding):
+    """A preview fetch must never be the thing that first creates a
+    snapshot either -- opening a device's detail page before it has ever
+    actually polled must still show "hasn't fetched yet", not a delivery
+    time that was really just an admin looking at the preview."""
+    device_name = device_binding
+    r_preview = client.get(f"/api/screen/{device_name}/image.png",
+                           params={"preview": "true", "force": "true"})
+    assert r_preview.status_code == 200
+
+    r2 = client.get(f"/api/screen/{device_name}/last_delivered.png")
+    assert r2.status_code == 404
+
+
 def test_304_fetch_does_not_update_the_snapshot(client, device_binding):
     device_name = device_binding
     r = client.get(f"/api/screen/{device_name}/image.png")
@@ -181,6 +213,32 @@ def test_304_fetch_does_not_update_the_snapshot(client, device_binding):
 
     still_delivered = client.get(f"/api/screen/{device_name}/last_delivered.png").content
     assert still_delivered == delivered
+
+
+def test_device_page_shows_current_and_last_delivered_preview(client, screen_id):
+    """Standalone's /device page renders devicebinding.ui.device_config_card()
+    for the fixed device name 'standalone' (see ui/standalone.py's
+    page_device()) -- not the device_binding fixture's randomly-named
+    device, so the screen is assigned directly here instead. The card
+    previously only showed a plain read-only Image URL text field -- no way
+    to see what the device actually last fetched without leaving for the
+    simplified UI; it now reuses the same Current/Last delivered tabs
+    (display/preview.py) nice4iot's own device card gets too.
+
+    A real request (not the lightweight Client(page(...), request=None)
+    harness used elsewhere) is needed here: device_config_card() reads
+    context.client.request.base_url, which only a genuine HTTP request sets."""
+    set_device_binding(STANDALONE_PATHS, "standalone", screen_id=screen_id)
+    try:
+        r = client.get("/ui/device")
+        assert r.status_code == 200
+        assert "Current" in r.text and "Last delivered" in r.text
+    finally:
+        set_device_binding(STANDALONE_PATHS, "standalone", room_id=None, screen_id=None, panel_type_id=None)
+        for suffix in (".png", ".json"):
+            path = STANDALONE_PATHS.device_snapshot_dir / f"standalone{suffix}"
+            if path.exists():
+                path.unlink()
 
 
 def test_ui_and_api_docs_reachable(client):

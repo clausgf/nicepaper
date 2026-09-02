@@ -117,6 +117,19 @@ def panel_mismatch_hint(paths: EpaperPaths, panel_types: dict, panel_type_id: Op
     return f'Firmware reports panel "{reported_panel}".{hint}'
 
 
+def _screen_exists(paths: EpaperPaths, screen_id: str) -> bool:
+    """Whether screen_id names a real screen file or a currently-valid
+    auto-generated Room Calendar template (screen.backend.
+    synthetic_roomcalendar_screens) -- for flagging a display bound to a
+    since-deleted screen, same "stays visible, not silently dropped"
+    precedent as the other dangling references in this module."""
+    from extensions.epaper.screen.backend import synthetic_roomcalendar_screens
+
+    if (paths.screen_dir / f'{screen_id}.json').is_file():
+        return True
+    return screen_id in synthetic_roomcalendar_screens(paths)
+
+
 def _is_online(device) -> bool:
     last_seen = getattr(device, 'last_seen_at', None)
     if last_seen is None:
@@ -140,6 +153,14 @@ def display_rows(paths: EpaperPaths, project_name: str,
         if room_id is not None and bound_room_id != room_id:
             continue
         room = read_room(paths, bound_room_id) if bound_room_id else None
+        # a room_id set but not resolving to a room means it was deleted after
+        # assignment -- flag it rather than showing the same blank room_label
+        # an actually-unassigned device would have (see room/backend.py's
+        # delete_room(): dangling refs are left visible on purpose, elsewhere
+        # in the non-simplified device card already; this closes that gap for
+        # the simplified UI's own Displays views)
+        room_label = 'Room deleted ⚠' if bound_room_id and room is None \
+            else (room.room_label if room else None) or ''
         runtime = _device_runtime(project_name, device.name)
         rssi = getattr(runtime, 'rssi', None)
         battery_voltage = getattr(runtime, 'battery_voltage', None)
@@ -153,14 +174,23 @@ def display_rows(paths: EpaperPaths, project_name: str,
         panel_label = panel_type_label(panel_type) if panel_type is not None else '—'
         if panel_mismatch_hint(paths, panel_types, panel_type_id, reported_panel):
             panel_label = f'{panel_label} ⚠'
+        screen_id = (binding.screen_id if binding else None) or ''
+        # screen_label is for display only -- screen_id itself must stay the
+        # raw value the Screen ModelForm field reads/writes (see
+        # room/simplified_ui.py's _display_detail, display/simplified_ui.py's
+        # _render_detail)
+        screen_label = screen_id or '—'
+        if screen_id and not _screen_exists(paths, screen_id):
+            screen_label = f'{screen_id} ⚠'
         rows.append(RoomDisplayRow(
             device_name=device.name,
-            screen_id=(binding.screen_id if binding else None) or '',
+            screen_id=screen_id,
+            screen_label=screen_label,
             panel_type_id=panel_type_id,
             reported_panel=reported_panel,
             panel_label=panel_label,
             reported_panels=epaper_labels.get('panels', ''),
-            room_label=(room.room_label if room else None) or '',
+            room_label=room_label,
             building=(room.building if room else None) or '',
             floor=(room.floor if room else None) or '',
             room_number=(room.room_number if room else None) or '',

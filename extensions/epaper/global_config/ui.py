@@ -8,7 +8,8 @@ from extensions.epaper.config import resource_paths
 from extensions.epaper.global_config.backend import app_config
 
 _LAYOUT = [
-    ['## General', ['locale', 'timezone'], ['date_format', 'time_format'], 'wakeup_margin_s'],
+    ['## General', ['locale', 'timezone'], ['date_format', 'time_format'],
+     'wakeup_margin_s', 'widget_error'],
     ['## Font', ['font_name', 'font_size']],
     ['## Booking System for Room Calendar',
      ['ical_retry_min_s', 'ical_retry_max_s'],

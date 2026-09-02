@@ -38,6 +38,20 @@ def list_booking_systems(paths: EpaperPaths) -> list[BookingSystemModel]:
     return sorted(systems, key=lambda s: s.name.lower())
 
 
+def count_unreadable_booking_systems(paths: EpaperPaths) -> int:
+    """How many files in booking_dir the *actual* Booking systems list
+    (booking_systems_adapter(), a niceview JsonDirectoryAdapter -- used
+    directly by both UIs) silently drops. See room.backend.
+    count_unreadable_rooms()'s docstring for why this diffs against the
+    real adapter's own count rather than re-reading each file with a
+    single-file JsonAdapter (lenient by default, so it wouldn't actually
+    catch the common corrupted-JSON case)."""
+    on_disk = sum(1 for p in paths.booking_dir.glob('*.json')
+                  if p.is_file() and not p.name.startswith('.'))
+    listed = sum(1 for _ in booking_systems_adapter(paths))
+    return max(0, on_disk - listed)
+
+
 def read_booking_system(paths: EpaperPaths, system_id: str) -> Optional[BookingSystemModel]:
     """The booking system with this id, or None if there is no such file."""
     if not booking_system_path(paths, system_id).exists():

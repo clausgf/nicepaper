@@ -48,6 +48,8 @@ def panel_label(config: ScreenModel, paths: EpaperPaths) -> str:
     return ' '.join(parts)
 
 
+
+
 class Screen:
     """
     A screen renders a collection of widgets with a specific layout
@@ -205,37 +207,59 @@ class Screen:
             next_update = self.update_schedule.get_next_update()
 
         for w in self.widgets:
-            if w.config.clipping and w.config.size:
-                # draw onto an isolated, size-bounded sub-image instead of
-                # the shared canvas: PIL silently drops anything a widget
-                # draws beyond an image's own bounds, so this clips
-                # overflow instead of letting it bleed into neighbors.
-                # Seeded from the *current* canvas content at this box
-                # (not a flat background fill) so init_background=False
-                # (transparent) shows whatever an earlier widget already
-                # drew underneath, same as the non-clipped path below --
-                # Image.crop() pads any part of the box that falls outside
-                # the canvas with black, not the screen's own background, so
-                # that part is pasted in separately rather than cropped raw.
-                sub_image = Image.new(mode="RGB", size=w.config.size, color=background)
-                px, py = w.config.position
-                sw, sh = w.config.size
-                src_x0, src_y0 = max(px, 0), max(py, 0)
-                src_x1, src_y1 = min(px + sw, image.width), min(py + sh, image.height)
-                if src_x1 > src_x0 and src_y1 > src_y0:
-                    sub_image.paste(image.crop((src_x0, src_y0, src_x1, src_y1)),
-                                    (src_x0 - px, src_y0 - py))
-                sub_ctx = DrawingContext(sub_image, w.config.color_background, w.config.color_primary,
-                                         app_config.font, paths=self.paths,
-                                         room=self.room, palette=self.palette)
-                sub_ctx.force_bounding_box = force_bounding_box
-                widget_update = await w.draw(sub_ctx)
-                image.paste(sub_image, w.config.position)
-            else:
+            try:
+                if w.config.clipping and w.config.size:
+                    # draw onto an isolated, size-bounded sub-image instead of
+                    # the shared canvas: PIL silently drops anything a widget
+                    # draws beyond an image's own bounds, so this clips
+                    # overflow instead of letting it bleed into neighbors.
+                    # Seeded from the *current* canvas content at this box
+                    # (not a flat background fill) so init_background=False
+                    # (transparent) shows whatever an earlier widget already
+                    # drew underneath, same as the non-clipped path below --
+                    # Image.crop() pads any part of the box that falls outside
+                    # the canvas with black, not the screen's own background, so
+                    # that part is pasted in separately rather than cropped raw.
+                    sub_image = Image.new(mode="RGB", size=w.config.size, color=background)
+                    px, py = w.config.position
+                    sw, sh = w.config.size
+                    src_x0, src_y0 = max(px, 0), max(py, 0)
+                    src_x1, src_y1 = min(px + sw, image.width), min(py + sh, image.height)
+                    if src_x1 > src_x0 and src_y1 > src_y0:
+                        sub_image.paste(image.crop((src_x0, src_y0, src_x1, src_y1)),
+                                        (src_x0 - px, src_y0 - py))
+                    sub_ctx = DrawingContext(sub_image, w.config.color_background, w.config.color_primary,
+                                             app_config.font, paths=self.paths,
+                                             room=self.room, palette=self.palette)
+                    sub_ctx.force_bounding_box = force_bounding_box
+                    widget_update = await w.draw(sub_ctx)
+                    image.paste(sub_image, w.config.position)
+                else:
+                    ctx.origin = w.config.position
+                    ctx.color_primary = w.config.color_primary
+                    ctx.color_background = w.config.color_background
+                    widget_update = await w.draw(ctx)
+            except Exception as e:
+                # One widget raising (a bug, unexpected data shape, ...) must
+                # not take the whole screen down with it -- unlike a
+                # datasource outage (weather/HA/iCal/image), which already
+                # degrades gracefully with a stale/error notice drawn by the
+                # widget itself, an uncaught exception here used to propagate
+                # all the way to an unhandled 500 from the image endpoint,
+                # leaving a display with nothing at all. Log it, draw
+                # app_config.widget_error in the widget's own box (or a
+                # default-sized one, same fallback as the Image widget's own
+                # error text -- see core/widgets/image.py), and keep going so
+                # every other widget still renders.
+                logger.warning(f"Widget {w.id!r} ({type(w).__name__}) failed to render: {e}")
                 ctx.origin = w.config.position
-                ctx.color_primary = w.config.color_primary
-                ctx.color_background = w.config.color_background
-                widget_update = await w.draw(ctx)
+                ctx.color_primary = "#000000"
+                # font=None -> ctx's own default (app_config.font, set at
+                # construction above), same font every self-sizing Text/Date
+                # widget already falls back to with no override of its own
+                ctx.draw_text((0, 0), size=w.config.size or (200, 60),
+                              text=app_config.widget_error, ellipsis='...')
+                widget_update = None
             if widget_update:
                 if next_update is None or widget_update < next_update:
                     next_update = widget_update

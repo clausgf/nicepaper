@@ -31,6 +31,47 @@ def _failure_tooltip(status, now: datetime.datetime) -> str:
             + (f'\nLast error: {status.error}' if status.error else ''))
 
 
+def simplified_ui_link_fields(open_url: str) -> None:
+    """A row linking to the simplified, room-focused UI ("Rooms & Displays
+    App" -- deliberately not calling it "Simplified UI", which is this
+    codebase's own internal/dev term, not a user-facing one). Content only,
+    no ui.card() of its own -- used bare inside nice4iot's already-chromed
+    'E-Paper' settings card (__init__.py's _settings_card), and wrapped in
+    ui.card() by standalone.py's own Global tab, which supplies no chrome."""
+    with ui.row().classes('w-full items-center justify-between'):
+        with ui.row().classes('items-center gap-2'):
+            ui.icon('meeting_room').classes('text-2xl')
+            with ui.column().classes('gap-0'):
+                ui.label('Rooms & Displays App').classes('text-subtitle1')
+                ui.label('Room-focused view: rooms, displays, booking systems') \
+                    .classes('text-caption text-grey')
+        # ui.navigate.to() would route this through nice4iot's ui.sub_pages client-side
+        # router (this card lives inside it) -- which has no entry for the extension's
+        # standalone page (only a real HTTP request reaches that route, in
+        # nice4iot's home_page()) and shows its own 404. client.open() forces a real
+        # browser navigation instead, bypassing that router. Harmless in standalone too
+        # (no such router there), so the same call works in both modes.
+        ui.button('Open', icon='open_in_new',
+                  on_click=lambda: context.client.open(open_url)).props('unelevated')
+
+
+def unreadable_items_banner(count: int, subject: str) -> None:
+    """Inline warning for a JSON-per-file collection that silently dropped
+    N file(s) it couldn't parse -- niceview's JsonDirectoryAdapter (backing
+    every list/grid in this app) and this codebase's own list_*() helpers
+    both just `log.warning` and skip rather than listing a ghost, which
+    means a corrupted file previously left no trace anywhere in the UI, only
+    the server log. Renders nothing when count is 0, so callers can call it
+    unconditionally at the top of a list view. `subject` is the plural noun,
+    e.g. 'room(s)', 'screen(s)', 'booking system(s)'."""
+    if not count:
+        return
+    with ui.row().classes('items-center gap-2 text-negative q-mb-sm'):
+        ui.icon('warning').props('size=xs')
+        ui.label(f'{count} {subject} failed to load and are not shown here -- check the server log.') \
+            .classes('text-caption')
+
+
 def _health_row(icon: str, color: str, text: str, tip: Optional[str]) -> None:
     with ui.row().classes('items-center gap-1 no-wrap'):
         ui.icon(icon, color=color).props('size=xs')
@@ -61,6 +102,49 @@ def _datasource_row(status, now: datetime.datetime, icons: tuple[str, str], subj
         _health_row(bad_icon, 'negative', f'{subject}: unavailable', tip)
 
 
+def datasource_health_rows(weather_statuses: Sequence[WeatherStatus] = (),
+                           homeassistant_statuses: Sequence[EntityStatus] = (),
+                           ical_statuses: Sequence[IcalStatus] = (),
+                           image_statuses: Sequence[ImageStatus] = (), *,
+                           only_failing: bool = False, title: Optional[str] = None) -> int:
+    """One health line per cached datasource (icon/colour by severity, a
+    tooltip with the last error/retry time) -- shared by dashboard_card()
+    (nice4iot Dashboard tab / standalone's Project tab: every source,
+    unconditionally) and the simplified UI's Rooms landing view
+    (room/simplified_ui.py: `only_failing=True`, so it stays silent unless
+    something is actually down -- that view has no separate Dashboard, and
+    previously showed no datasource health at all).
+
+    `title` draws a small label above the rows, but only when at least one
+    row is actually drawn -- never an orphaned heading over nothing. Returns
+    how many rows were drawn, so a caller that wants to react to "nothing
+    failing" itself can check for 0 instead of duplicating the row logic.
+    """
+    now = datetime.datetime.now(ZoneInfo(app_config.timezone))
+    rows = [
+        (feed, ('event_available', 'event_busy'), f'iCal {feed.id}', feed.events is not None)
+        for feed in ical_statuses
+    ] + [
+        (status, ('cloud_done', 'cloud_off'),
+         f'Weather {status.latitude:.2f},{status.longitude:.2f}', status.data is not None)
+        for status in weather_statuses
+    ] + [
+        (entity, ('sensors', 'sensors_off'), f'HA {entity.entity_id}', entity.state is not None)
+        for entity in homeassistant_statuses
+    ] + [
+        (image, ('image', 'broken_image'), f'Image {image.source or image.key}',
+         image.last_update is not None)
+        for image in image_statuses
+    ]
+    if only_failing:
+        rows = [row for row in rows if row[0].failing]
+    if rows and title:
+        ui.label(title).classes('text-caption text-grey-7 q-mb-xs')
+    for status, icons, subject, has_value in rows:
+        _datasource_row(status, now, icons, subject, has_value)
+    return len(rows)
+
+
 def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
                    weather_statuses: Sequence[WeatherStatus] = (),
                    homeassistant_statuses: Sequence[EntityStatus] = (),
@@ -75,7 +159,6 @@ def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
     per location/entity/feed/source, so an outage of any datasource is
     visible here without opening a screen.
     """
-    now = datetime.datetime.now(ZoneInfo(app_config.timezone))
     with ui.card().classes('w-full'):
         with ui.row().classes('w-full items-center justify-between'):
             ui.label('E-Paper').classes('text-subtitle1 font-bold')
@@ -87,16 +170,4 @@ def dashboard_card(num_screens: int, num_schedules: int, open_url: str,
             ui.button(icon='open_in_new').props('dense flat size=sm') \
                 .tooltip(f'Dedicate Epaper UI {open_url}').on_click(lambda: context.client.open(open_url))
         ui.label(f'{num_screens} screen(s), {num_schedules} schedule(s)').classes('text-caption text-grey-7')
-        for feed in ical_statuses:
-            _datasource_row(feed, now, ('event_available', 'event_busy'),
-                            f'iCal {feed.id}', feed.events is not None)
-        for status in weather_statuses:
-            _datasource_row(status, now, ('cloud_done', 'cloud_off'),
-                            f'Weather {status.latitude:.2f},{status.longitude:.2f}',
-                            status.data is not None)
-        for entity in homeassistant_statuses:
-            _datasource_row(entity, now, ('sensors', 'sensors_off'),
-                            f'HA {entity.entity_id}', entity.state is not None)
-        for image in image_statuses:
-            _datasource_row(image, now, ('image', 'broken_image'),
-                            f'Image {image.source or image.key}', image.last_update is not None)
+        datasource_health_rows(weather_statuses, homeassistant_statuses, ical_statuses, image_statuses)

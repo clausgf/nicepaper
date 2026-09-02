@@ -120,6 +120,15 @@ A screen's `widgets` list is made of typed widgets, each positioned with
   (`WeatherNow` with an "as of HH:MM" marker); the outage is also surfaced on
   the nice4iot Dashboard — see [Configuration](configuration.md).
 
+### Render errors
+
+If a widget raises while drawing (a bug, not a datasource outage -- those
+already degrade gracefully with their own stale/error notice, see above),
+that one widget's box shows `widget_error` (see
+[Configuration](configuration.md)) instead of the exception propagating and
+failing the whole screen -- every other widget still renders
+(`screen/backend.py`'s `Screen._create_image()`).
+
 ### Clipping and debug outline
 
 A widget's `clipping` flag cuts off content that overflows its box instead of
@@ -173,7 +182,13 @@ exact PNG bytes plus when, served back unchanged at
 `/api/screen/<id>/last_delivered.png` (404 before the device has ever
 fetched). This is what the simplified UI's Display Detail shows next to the
 live preview, so a device that stopped polling or missed an update is
-visible there, not just assumed from its online status.
+visible there, not just assumed from its online status. `?preview=true`
+opts a fetch out of updating that snapshot even though `<id>` resolves to a
+real device — for the UI's own "Current" preview tab (`display/preview.py`),
+which deliberately reuses the device's own alias id (for room-aware
+rendering) and would otherwise look exactly like the device's real poll and
+overwrite "last delivered" with whatever the admin's browser just requested,
+independent of whether the device itself has fetched anything.
 
 The preview is framed by a pixel ruler with labelled ticks on all four sides,
 and moving the mouse over it shows the exact pixel under the cursor — widgets

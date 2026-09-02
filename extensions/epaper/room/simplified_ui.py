@@ -28,6 +28,10 @@ import niceview
 
 from extensions.epaper.bookingsystem.backend import list_booking_systems
 from extensions.epaper.catalog.backend import get_panel_types, panel_type_label
+from extensions.epaper.core.datasources.homeassistant import read_all_entity_statuses
+from extensions.epaper.core.datasources.ical import read_all_ical_statuses
+from extensions.epaper.core.datasources.image import read_all_image_statuses
+from extensions.epaper.core.datasources.weather import read_all_weather_statuses
 from extensions.epaper.devicebinding.backend import set_device_binding
 from extensions.epaper.display.backend import (
     RoomDisplaysAdapter, assignable_devices, available_screen_ids, panel_mismatch_hint,
@@ -37,10 +41,13 @@ from extensions.epaper.display.models import RoomDisplayRow
 from extensions.epaper.display.preview import render_device_preview
 from extensions.epaper.global_config.backend import app_config
 from extensions.epaper.paths import EpaperPaths
-from extensions.epaper.room.backend import get_room_events, read_room, rooms_adapter
+from extensions.epaper.room.backend import (
+    count_unreadable_rooms, get_room_events, read_room, rooms_adapter,
+)
 from extensions.epaper.room.models import ROOM_TYPE_LABELS, RoomModel
 from extensions.epaper.room.photo import delete_room_photo, room_photo_path, save_room_photo
 
+from extensions.epaper.ui.cards import datasource_health_rows, unreadable_items_banner
 from extensions.epaper.ui.simplified_ui.layout import Shell
 
 
@@ -54,7 +61,18 @@ def render_rooms(shell: Shell, room_id: Optional[str] = None) -> None:
     open() after render(): open() is meant for an already-rendered wrapper
     (e.g. a click handler) and refreshes its body accordingly, which needs a
     running event loop -- here we know the detail view from the start, so
-    building straight into it avoids that refresh entirely."""
+    building straight into it avoids that refresh entirely.
+
+    On the plain list (room_id is None, the app's landing view) a quiet
+    datasource-outage summary sits above the list -- see
+    ui.cards.datasource_health_rows(only_failing=True). Unlike nice4iot's own
+    Dashboard/standalone's Project tab, the simplified UI otherwise shows no
+    weather/Home Assistant/iCal/image health at all. Same spot: a warning if
+    any room file failed to parse and was silently dropped from the list
+    (ui.cards.unreadable_items_banner(), room.backend.count_unreadable_rooms())."""
+    if room_id is None:
+        _datasource_health_summary(shell.paths)
+        unreadable_items_banner(count_unreadable_rooms(shell.paths), 'room(s)')
     adapter = rooms_adapter(shell.paths)
     wrapper = DrillDownWrapper(
         RoomModel, adapter,  # list title/description come from RoomModel.Meta
@@ -67,13 +85,26 @@ def render_rooms(shell: Shell, room_id: Optional[str] = None) -> None:
     wrapper.render()
 
 
+def _datasource_health_summary(paths: EpaperPaths) -> None:
+    """Quiet outage summary above the Rooms list: nothing when every
+    datasource is fine, one line per failing one otherwise -- see
+    ui.cards.datasource_health_rows()."""
+    datasource_health_rows(
+        weather_statuses=read_all_weather_statuses(paths.weather_dir),
+        homeassistant_statuses=read_all_entity_statuses(paths.homeassistant_dir),
+        ical_statuses=read_all_ical_statuses(paths.ical_dir),
+        image_statuses=read_all_image_statuses(paths.image_cache_dir),
+        only_failing=True, title='Data source issues',
+    )
+
+
 def _render_detail(shell: Shell, adapter: CollectionAdapter[RoomModel], key: str) -> None:
     room = adapter.read(key)
     with ui.tabs().classes('w-full') as tabs:
         ui.tab('occupancy', label='Occupancy', icon='event_available')
         ui.tab('settings', label='Settings', icon='tune')
         ui.tab('displays', label='Displays', icon='tv')
-    with ui.tab_panels(tabs, value='settings').classes('w-full'):
+    with ui.tab_panels(tabs, value='occupancy').classes('w-full'):
         with ui.tab_panel('occupancy'):
             _occupancy_panel(shell, room)
         with ui.tab_panel('settings'):
@@ -291,7 +322,7 @@ def _displays_panel(shell: Shell, room_id: str) -> None:
         RoomDisplayRow, adapter,
         title='Displays',
         item_title_field='device_name',
-        item_subtitle_fields=['screen_id', 'panel_label', 'firmware_version'],
+        item_subtitle_fields=['screen_label', 'panel_label', 'firmware_version'],
         on_add=handle_add,
         # cast: DrillDownWrapper's render_detail is typed over the generic
         # CollectionAdapter protocol, but it always calls back with the exact

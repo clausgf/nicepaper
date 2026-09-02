@@ -92,10 +92,16 @@ class RoomModel(BaseModel):
         ] = None
 
     booking_ical_url: Annotated[str,
-            Field(description='Room-specific part of the iCal/ICS feed url, added to the '
-                              'booking system\'s base URL when the booking system is an '
-                              'iCal type. Empty = inherit the booking system\'s own URL.'),
-            niceview.Field(label='iCal URL', hint='http(s):// or webcal://')
+            Field(description='This room\'s own full feed URL, overriding the booking '
+                              'system\'s URL entirely (not appended to it) -- for a system '
+                              'where each room is its own resource on the same server (e.g. '
+                              'Exchange: system = account/server, room = mailbox). Empty = '
+                              'use the booking system\'s own URL as-is. Currently always an '
+                              'iCal/ICS feed (the only BookingSystemType so far).'),
+            niceview.Field(label='Booking System URL override',
+                           hint='Overrides the booking system\'s URL entirely (not appended) '
+                                '-- http(s):// or webcal://. Leave empty to use the booking '
+                                'system\'s own URL.')
         ] = ""
 
     @field_validator("booking_ical_url")

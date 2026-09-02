@@ -40,9 +40,14 @@ def render_device_preview(paths: EpaperPaths, device_name: str,
             # show a genuinely fresh render (e.g. after a settings change
             # that a widget reads live but that doesn't touch the screen's
             # config mtime), not whatever the cache or the browser happen
-            # to still have.
+            # to still have. preview=true: this fetch uses the device's own
+            # alias id (see the comment above) and would otherwise look
+            # exactly like the device's own real poll and overwrite the
+            # Last delivered tab below with whatever the admin's browser
+            # just requested -- see _PREVIEW_DESCRIPTION in api/endpoints.py.
             cache_bust = datetime.datetime.now(datetime.timezone.utc).timestamp()
-            ui.image(f'{image_base_url}/{device_name}/image.png?force=true&_t={cache_bust}').classes('w-full')
+            ui.image(f'{image_base_url}/{device_name}/image.png?force=true&preview=true&_t={cache_bust}') \
+                .classes('w-full')
         with ui.tab_panel(delivered_tab):
             snapshot = read_device_snapshot(paths, device_name)
             if snapshot is None:

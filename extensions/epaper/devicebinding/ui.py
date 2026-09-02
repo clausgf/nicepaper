@@ -16,6 +16,7 @@ from extensions.epaper.devicebinding.backend import get_device_binding, set_devi
 from extensions.epaper.display.backend import (
     device_epaper_labels, device_epaper_telemetry, panel_mismatch_hint,
 )
+from extensions.epaper.display.preview import render_device_preview
 from extensions.epaper.paths import EpaperPaths
 from extensions.epaper.room.backend import list_rooms
 from extensions.epaper.screen.backend import screens_matching_panel_type, synthetic_roomcalendar_screens
@@ -49,6 +50,13 @@ def device_config_card(paths: EpaperPaths, project_name: str, device_name: str, 
     designation, not this catalog's own vendor+size id) -- purely
     informational, same as panel_type_id itself; nothing here overwrites
     the operator's choice automatically.
+
+    Below the Room select, Current/Last delivered (display.preview.
+    render_device_preview(), shared with the simplified UI's own Displays
+    views) -- the screen as it renders right now, and the actual PNG the
+    device's own alias URL last served with a real 200 OK, so a stale or
+    never-polling device is visible from nice4iot too, not just assumed
+    from "Online".
     """
     # real screen files plus the auto-generated Room Calendar templates
     # (see screen/backend.py) -- both are valid ids a device can be bound to
@@ -91,6 +99,7 @@ def device_config_card(paths: EpaperPaths, project_name: str, device_name: str, 
             binding.screen_id = e.value
             set_device_binding(paths, device_name, screen_id=e.value)
             ui.notify('Saved', type='positive')
+            _body.refresh()  # the preview below depends on screen_id
 
         def on_room_change(e) -> None:
             set_device_binding(paths, device_name, room_id=e.value)
@@ -135,6 +144,13 @@ def device_config_card(paths: EpaperPaths, project_name: str, device_name: str, 
             clearable=True,
             on_change=on_room_change,
         ).classes('w-full').props('outlined dense')
+
+        # Current/Last delivered -- same preview the simplified UI's Displays
+        # views show (display/preview.py, shared verbatim); previously this
+        # card only had the plain "Image URL" text field below, with no way
+        # to see what the device actually last fetched without leaving
+        # nice4iot for the simplified UI.
+        render_device_preview(paths, device_name, binding.screen_id, image_base_url)
 
     _body()
 
